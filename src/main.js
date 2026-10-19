@@ -51,6 +51,7 @@ function start(saved = {}) {
   const world = buildWorld(scene, lights);
   const areas = world.areas;
   const B = world.builder;
+  B.camera = camera;
   const collider = new WorldCollider(areas.get('village').ensureOctree());
   collider.area = 'village';
   world.connect(collider);
@@ -174,9 +175,11 @@ function start(saved = {}) {
     B.regrow(a);
     folk.enterArea(a.id);
     inventory.enterArea(a);
-    cull(0, true);
-    // Kompilera nya material medan skärmen är svart, så att spelet inte hackar när bilden kommer tillbaka
+    // Kompilera nya material medan skärmen är svart, så att spelet inte hackar när bilden kommer tillbaka.
+    // Allt i området görs synligt en stund, även fiender och folk som annars är för långt bort.
+    for (const c of culled) if (c.area === a.id) c.obj.visible = true;
     try { renderer.compile(scene, camera); } catch { /* inte viktigt */ }
+    cull(0, true);
   };
 
   // Startskärmen visar den brinnande byn; Fortsätt finns om det finns ett sparat spel
@@ -332,7 +335,7 @@ function start(saved = {}) {
       if (bastion.trap === 'warden') return { id: 'march', now: true };
       if (bastion.state.cleared.boss && P.z < -196.5) return { id: 'dawn', now: true };
       if (P.z < -150) return { id: 'skull' };
-      return { id: 'greenroad' };
+      return { id: 'march' };
     }
     if (here === 'village') {
       if (world.inAetheria(P.x, P.z)) return { id: 'hearth' };
@@ -342,7 +345,7 @@ function start(saved = {}) {
     }
     const byArea = {
       home: 'fieldsdawn', house: 'fieldsdawn', ranch: 'greenroad', pass: 'quiet', field: 'gallop', willowmere: 'willowmere',
-      shop: 'willowmere', stormreach: 'whispers', cave: 'whispers',
+      shop: 'willowmere', stormreach: 'march', cave: 'whispers',
     };
     if (here === 'pass' && P.z < -62) return { id: 'ballad' };
     return { id: byArea[here] };
@@ -397,7 +400,11 @@ function start(saved = {}) {
 
     const calm = !dialog.active && !story.cinematic && !story.fade && !respawn;
     if (hud.started && inp.map && !inventory.open && (hud.mapOpen || calm)) toggleMap(!hud.mapOpen);
-    if (hud.started && inp.bag && !hud.mapOpen && (inventory.open || (calm && story.phase !== 'intro'))) inventory.toggle();
+    let bagNow = false;
+    if (hud.started && inp.bag && !hud.mapOpen && (inventory.open || (calm && story.phase !== 'intro'))) {
+      inventory.toggle();
+      bagNow = true;
+    }
     if (hud.mapOpen) {
       drawMap(hud.mapView);
       hud.frame(dt, player);
@@ -405,7 +412,7 @@ function start(saved = {}) {
       return;
     }
     if (inventory.open) {
-      inventory.menu(dt, inp);
+      if (!bagNow) inventory.menu(dt, inp);
       hud.frame(dt, player);
       music.update(dt);
       return;
@@ -500,7 +507,7 @@ function start(saved = {}) {
   // Handtag för felsökning i webbläsarens konsol
   window.__realm = {
     player, rig, world, areas, input, hud, scene, camera, enemies, combat, fx, sfx, story, dialog, bastion, lights, collider, renderer,
-    culled, cullS, music, pots, inventory, folk,
+    culled, cullS, music, pots, inventory, folk, THREE,
     tick: (dt, inp) => update(dt, { ...input.empty, ...inp }),
   };
   requestAnimationFrame(frame);

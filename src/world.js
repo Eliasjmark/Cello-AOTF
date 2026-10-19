@@ -804,6 +804,7 @@ export function buildWorld(scene, lights) {
   home.exits = [{ x0: -3, x1: 3, z0: 40, z1: 59.6, to: 'village', entry: 'south', label: 'Hollowbrook' }];
   home.doors = [{ pos: cottage.door, to: 'house', entry: 'door', label: 'Enter the house' }];
   home.map.exits = [{ x: 0, z: 58, label: 'Hollowbrook', to: 'village' }];
+  const homeAnimals = [0, 1].map((i) => ({ kind: 'goat', area: 'home', pos: V3(4 + i * 1.6, HH(4 + i * 1.6, 119), 119), center: V3(5, HH(5, 119.5), 119.5), radius: 2.6, H: HH }));
   B.end();
 
   // =====================================================================
@@ -820,8 +821,8 @@ export function buildWorld(scene, lights) {
     lights, makeFire, rand, island, flameMat, flameMat2,
   });
   // Åskstegen: stenar från grottans mynning fram till förgården
-  for (let i = 0; i < 4; i++) {
-    const z = -128.5 - i * 2.6, x = (hash2(i, 9) - 0.5) * 0.4;
+  for (let i = 0; i < 6; i++) {
+    const z = -127.5 - i * 2.9, x = (hash2(i, 9) - 0.5) * 0.4;
     solid(place(new THREE.Mesh(box(2.8, 0.9, 2.4, 1.6), M.rock), x, -0.45, z));
     deco(new THREE.Mesh(rockGeo(1.25, 520 + i, 1.4), M.rock), x, -1.6, z);
     deco(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.02, 0.12), M.runeGlow), x, 0.01, z);
@@ -883,7 +884,7 @@ export function buildWorld(scene, lights) {
       },
       grave,
     },
-    home: { dummy: dummyPos, door: cottage.door, H: HH },
+    home: { dummy: dummyPos, door: cottage.door, H: HH, animals: homeAnimals },
     bastionEntrance: V3(0, 0, -146),
     prologue: { refugee: V(4.6, 12.4), titanHome: V(-16.5, 9) },
     east: field.east,
@@ -902,6 +903,15 @@ export function buildWorld(scene, lights) {
     inAetheria: (x, z) => areas.id === 'village' && Math.hypot(x, z - AZ) < 32,
     inBastion: () => areas.id === 'bastion',
     inVillage: (x, z) => areas.id === 'village' && Math.hypot(x, z) < 36,
+    // Ett område laddas: delarna som beror på sparat läge (dörrar, lyktan i butiken)
+    onEnterArea(id, state) {
+      for (const r of [reach, interiors, field]) r?.onEnter?.(id, state);
+    },
+    // Ett eldfat har tänts
+    onTorch(id, story) {
+      for (const r of [reach, field]) if (r?.onTorch?.(id, story)) return true;
+      return false;
+    },
     connect(collider) {
       areas.collider = collider;
       for (const a of Object.values(areas.list)) {

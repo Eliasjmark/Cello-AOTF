@@ -26,6 +26,7 @@ const LOOKS = {
   fenwick: { name: 'Fenwick', look: { skin: 0xb8906a, hairStyle: 'bald', beard: 0xb0a090, top: 0x4a5a6a, scale: 0.95 } },
   mira: { name: 'Mira', look: { skin: 0xd8b090, hair: 0x3a2a1a, hairStyle: 'long', top: 0x5a7a4a, scale: 0.55 } },
   tob: { name: 'Tob', look: { skin: 0xc49f83, hair: 0x8a5a2a, top: 0x6a6aa0, scale: 0.55 } },
+  wren: { name: 'Wren', look: { skin: 0xc8a080, hair: 0xb0603a, hairStyle: 'long', top: 0x5a6a4a, extraColor: 0x8a7a50, item: 'scroll', scale: 0.88 } },
   fenn: { name: 'Fenn', look: { skin: 0xc49f83, hair: 0x4a3020, hairStyle: 'hood', hood: 0x3a4a3a, top: 0x3a4a3a, extraColor: 0x5a4632, item: 'spear', scale: 0.95 } },
 };
 
@@ -36,7 +37,38 @@ function buildAnimal(kind, M) {
   g.add(body);
   const legs = [];
   const B = (w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); return b; };
-  if (kind === 'chicken') {
+  if (kind === 'horse') {
+    // Brindle: brun med en vit bläs, lång hals, man och svans
+    const coat = M.furBrown, dark = M.furDark;
+    body.add(B(0.62, 0.62, 1.5, coat, 0, 1.25, 0));
+    const neck = new THREE.Group();
+    neck.position.set(0, 1.45, 0.62);
+    neck.rotation.x = -0.75;
+    body.add(neck);
+    neck.add(B(0.3, 0.85, 0.4, coat, 0, 0.36, 0));
+    neck.add(B(0.08, 0.8, 0.3, dark, 0, 0.38, -0.2));
+    const head = new THREE.Group();
+    head.position.set(0, 0.78, 0.06);
+    head.rotation.x = 1.35;
+    neck.add(head);
+    head.add(B(0.26, 0.62, 0.32, coat, 0, 0.22, 0.05));
+    head.add(B(0.08, 0.5, 0.02, M.white, 0, 0.25, 0.22));
+    head.add(B(0.22, 0.14, 0.26, dark, 0, 0.5, 0.05));
+    for (const sx of [-1, 1]) {
+      head.add(B(0.06, 0.16, 0.05, coat, 0.09 * sx, -0.12, -0.08));
+      head.add(B(0.04, 0.04, 0.02, M.furDark, 0.135 * sx, 0.05, 0.08));
+    }
+    const tail = B(0.12, 0.7, 0.12, dark, 0, 1.15, -0.85);
+    tail.rotation.x = 0.35;
+    body.add(tail);
+    for (const [x, z] of [[-0.2, 0.55], [0.2, 0.55], [-0.2, -0.55], [0.2, -0.55]]) {
+      const leg = B(0.14, 1.0, 0.14, coat, x, 0.5, z);
+      body.add(leg);
+      leg.add(B(0.16, 0.12, 0.18, dark, 0, -0.46, 0.02));
+      legs.push(leg);
+    }
+    g.userData.head = neck;
+  } else if (kind === 'chicken') {
     body.add(B(0.26, 0.24, 0.34, M.white, 0, 0.32, 0));
     body.add(B(0.16, 0.18, 0.16, M.white, 0, 0.5, 0.16));
     body.add(B(0.06, 0.05, 0.08, M.pumpkin, 0, 0.5, 0.27));
@@ -144,6 +176,7 @@ export class Folk {
     talk('mira', (n) => this.talkKid(n, 'mira'));
     talk('tob', (n) => this.talkKid(n, 'tob'));
     talk('fenn', (n) => this.talkFenn(n));
+    talk('wren', (n) => this.talkWren(n));
 
     // Butiken: varorna på hyllorna
     const shop = world.interiors?.shop;
@@ -166,11 +199,18 @@ export class Folk {
       const ch = { ...c, g, lid, lidT: 0, box: null };
       this.chests.push(ch);
       const front = V(c.x + Math.sin(c.ry) * 1.1, c.y, c.z + Math.cos(c.ry) * 1.1);
+      const there = () => !c.hidden && (!c.reveal || !!story.state.torches?.[c.reveal]);
+      ch.there = there;
       story.interactions.push({
         label: 'Open the chest', area: c.area, pos: () => front, radius: 1.5,
-        ok: () => (story.phase === 'free' || story.phase === 'intro') && !story.state.opened[c.id] && !c.hidden, run: () => this.openChest(ch),
+        ok: () => (story.phase === 'free' || story.phase === 'intro') && !story.state.opened[c.id] && there(), run: () => this.openChest(ch),
       });
       a.updaters.push((t, dt) => {
+        const show = there();
+        if (g.visible !== show) {
+          g.visible = show;
+          if (ch.box) ch.box.enabled = show;
+        }
         const open = !!story.state.opened[c.id];
         ch.lidT = open ? Math.min(1, ch.lidT + dt * 2.2) : 0;
         ch.lid.rotation.x = -ch.lidT * 1.9;
@@ -201,13 +241,23 @@ export class Folk {
 
     // Djur på ranchen och i Cellos trädgård
     this.animals = [];
-    for (const r of [world.ranch, world.home, world.willow]) {
+    for (const r of [world.ranch, world.home, world.willow, world.field]) {
       for (const an of r?.animals || []) {
         const m = buildAnimal(an.kind, M);
         m.root.position.copy(an.pos);
         areas.get(an.area).root.add(m.root);
         this.animals.push({ ...an, m, pos: an.pos.clone(), home: (an.center ?? an.pos).clone(), target: an.pos.clone(), wait: Math.random() * 3, t: Math.random() * 9, facing: Math.random() * 6, speed: 0, groundAt: an.H });
       }
+    }
+
+    // Brindle, Hollis häst, springer fritt på fältet
+    const brindle = this.animals.find((a) => a.kind === 'horse');
+    if (brindle) {
+      brindle.speedMul = 3.2;
+      story.interactions.push({
+        label: () => (story.state.talked.hollis ? 'Approach Brindle' : 'Approach the horse'), area: brindle.area, pos: () => brindle.pos, radius: 2.6,
+        ok: () => story.phase === 'free' && !story.state.brindleSeen, run: () => this.meetBrindle(brindle),
+      });
     }
 
     // Övningsdockan vid Cellos hus: går att slå på och låsa fast vid, men sliter inte på svärdet
@@ -254,7 +304,7 @@ export class Folk {
       const lit = !!this.story.state.torches?.[t.id];
       this.setTorch(t, lit);
     }
-    this.world.reach?.onEnter?.(id, this.story.state);
+    this.world.onEnterArea?.(id, this.story.state);
   }
 
   setTorch(t, lit) {
@@ -279,7 +329,7 @@ export class Folk {
     this.sfx.play('torch');
     this.fx.burst('spark', t.top, 16, 0xffb060);
     this.lights.pickT = 0;
-    this.world.reach?.onTorch?.(t.id, this.story);
+    this.world.onTorch?.(t.id, this.story);
   }
 
   openChest(ch) {
@@ -304,6 +354,17 @@ export class Folk {
         story.cinematic = false;
       }
     });
+  }
+
+  meetBrindle(b) {
+    const story = this.story, s = story.state;
+    b.wait = 6;
+    b.facing = Math.atan2(story.player.feet.x - b.pos.x, story.player.feet.z - b.pos.z);
+    this.sfx.play('neigh');
+    story.read(s.talked.hollis
+      ? ['A brown mare with a white blaze... Brindle! Hollis\' horse from Thistledown.', 'She sniffs Cello\'s hand, snorts, and lets him stroke her mane. Then she trots off into the tall grass.', 'Hollis will want to hear that she is alive.']
+      : ['A brown mare with a white blaze, wild-eyed but unhurt.', 'She sniffs Cello\'s hand, then trots off across the plain. Someone must be missing her.'],
+    () => { s.brindleSeen = true; story.save(true); });
   }
 
   // ---------- butiken ----------
@@ -407,6 +468,16 @@ export class Folk {
         "Hollowbrook, you say? ...I saw the smoke from the hill. I'm sorry, lad.",
         'If you are heading north, the road runs past the barn and up through Galewind Pass. Garrick keeps the gate there.',
       ], () => { s.talked.hollis = true; });
+      return;
+    }
+    if (s.brindleSeen && !s.brindleTold) {
+      this.say(n, [
+        "You saw Brindle? On the Stormvale? ...Alive?",
+        'Hah! I knew it. That stubborn old mare. She will come home when she is ready, she always does.',
+        "Here. It is not much, but I put it aside for whoever brought news of her.",
+        { run: () => { this.inventory.addShards(50); this.sfx.play('fanfare'); this.music?.duckFor(2.0, 0.15); this.hud.toast('Hollis gives you a purple shard, worth 50!', 3600); } },
+        "And when you are done saving the world, come back and ride her. She likes you, I can tell.",
+      ], () => { s.brindleTold = true; this.story.save(true); });
       return;
     }
     if (s.bastionDone) {
@@ -594,6 +665,27 @@ export class Folk {
       : [['Are you from the Stormvale? Did you see any monsters? Did you hit them?'], ["Mira's scared of the windmill. I'm not. I'm not scared of anything. Except Grandma Ysolde."]]));
   }
 
+  // Kartritaren på fältet: hon vet hur stort riket är
+  talkWren(n) {
+    const s = this.story.state;
+    if (!s.talked.wren) {
+      this.say(n, [
+        "Careful where you step! That's three weeks of work under your boot.",
+        "I'm Wren. I map the Stormvale. Or I try to; the storm keeps moving the edges.",
+        'South lies the Long Bridge and the pass. East, Willowmere by the mere. North, Stormreach, where nobody sane goes.',
+        'And far in the east, past the Storm Stone, a golden gate. Beyond it... a pyramid, glowing like a coal. No map of mine reaches that far.',
+        'Press K to see where you are. Ha! I wish my maps were that easy.',
+      ], () => { s.talked.wren = true; });
+      return;
+    }
+    this.say(n, this.rotate('wrenN', [
+      ['The Stormvale is bigger than three villages put together. People get lost out here. Follow the roads.'],
+      ['There is a chest under the old watchtower by the north road. Nobody can see it. The old rangers only opened it by firelight.'],
+      ['A brown mare runs wild west of the crossroads. Fast as a rumor. I tried to draw her once.'],
+      ["Mags at the crossroads sells oil, if your lantern's thirsty. Robbery, but convenient robbery."],
+    ]));
+  }
+
   talkFenn(n) {
     const story = this.story, s = story.state;
     const L = (t) => story.line(n, t);
@@ -630,7 +722,7 @@ export class Folk {
       const dx = a.target.x - a.pos.x, dz = a.target.z - a.pos.z, dist = Math.hypot(dx, dz);
       let moving = false;
       if (a.wait <= 0 && dist > 0.2) {
-        const sp = a.kind === 'chicken' ? 1.2 : 0.8;
+        const sp = (a.kind === 'chicken' ? 1.2 : 0.8) * (a.speedMul ?? 1);
         a.pos.x += (dx / dist) * Math.min(dist, sp * dt);
         a.pos.z += (dz / dist) * Math.min(dist, sp * dt);
         a.facing += wrap(Math.atan2(dx, dz) - a.facing) * (1 - Math.exp(-dt * 4));
@@ -642,9 +734,9 @@ export class Folk {
         a.target.set(a.home.x + Math.cos(ang) * r, a.home.y, a.home.z + Math.sin(ang) * r);
       }
       // Cello går inte igenom djuren
-      const px = P.feet.x - a.pos.x, pz = P.feet.z - a.pos.z, pd = Math.hypot(px, pz), min = a.kind === 'chicken' ? 0.4 : a.kind === 'cow' ? 1.0 : 0.7;
+      const px = P.feet.x - a.pos.x, pz = P.feet.z - a.pos.z, pd = Math.hypot(px, pz), min = a.kind === 'chicken' ? 0.4 : a.kind === 'cow' || a.kind === 'horse' ? 1.0 : 0.7;
       if (pd < min && pd > 1e-4) P.nudge((px / pd) * (min - pd), (pz / pd) * (min - pd));
-      if (pd < 6 && Math.random() < dt * 0.06) this.sfx.play(a.kind === 'goat' ? 'goat' : a.kind === 'cow' ? 'moo' : 'cluck', { vol: Math.max(0.2, 1 - pd / 6) });
+      if (pd < 6 && Math.random() < dt * 0.06) this.sfx.play(a.kind === 'goat' ? 'goat' : a.kind === 'cow' ? 'moo' : a.kind === 'horse' ? 'neigh' : 'cluck', { vol: Math.max(0.2, 1 - pd / 6) });
       const m = a.m;
       m.root.position.copy(a.pos);
       m.root.rotation.y = a.facing;

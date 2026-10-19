@@ -189,7 +189,7 @@ export function createBuilder(scene, lights) {
   let A = null; // området som byggs just nu
   const fires = [];
   const B = {
-    M, tex, rand, noise, flameMat, flameMat2, smokeTex: softTex, fires,
+    M, tex, rand, noise, flameMat, flameMat2, smokeTex: softTex, fires, lights,
     potSpots: [], enemySpots: [], chests: [], signs: [], torches: [],
     get area() { return A; },
   };
@@ -652,7 +652,9 @@ export function createBuilder(scene, lights) {
         const drift = Math.sin(t * it.sp0 + it.ph) * 1.4;
         if (axisX) it.sp.position.set(x + it.oz, y + it.oy + Math.sin(t * 0.3 + it.ph) * 0.4, z + it.ox + drift);
         else it.sp.position.set(x + it.ox + drift, y + it.oy + Math.sin(t * 0.3 + it.ph) * 0.4, z + it.oz);
-        it.sp.material.opacity = it.base * (0.85 + Math.sin(t * 0.5 + it.ph) * 0.15);
+        // Molnen tunnas ut när kameran är mitt i dem, så att bilden inte blir helt vit
+        const near = B.camera ? smooth(2, 9, it.sp.position.distanceTo(B.camera.position)) : 1;
+        it.sp.material.opacity = it.base * (0.85 + Math.sin(t * 0.5 + it.ph) * 0.15) * (0.25 + 0.75 * near);
       }
     });
     return g;
@@ -871,7 +873,7 @@ export function createBuilder(scene, lights) {
   // Krukor och kistor registreras här och byggs i main.js / story.js
   B.pot = (x, y, z, s = 1) => B.potSpots.push({ x, y, z, s, area: A.id });
   B.chest = (id, x, y, z, ry, contents, o = {}) => {
-    B.chests.push({ id, area: A.id, x, y, z, ry, contents, big: !!o.big, hidden: !!o.hidden });
+    B.chests.push({ id, area: A.id, x, y, z, ry, contents, big: !!o.big, hidden: !!o.hidden, reveal: o.reveal ?? null });
   };
   B.enemy = (home, path, opts = {}) => B.enemySpots.push({ home, path, ...opts, area: A.id });
   // Fackla eller eldfat som kan tändas med lyktan

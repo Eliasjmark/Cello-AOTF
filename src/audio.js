@@ -499,6 +499,18 @@ export class Sfx {
       case 'moo':
         this.voice(120 * r, 95 * r, 0.9, 0.35 * v, [[380, 4], [800, 5]], t);
         break;
+      case 'neigh': { // en häst gnäggar: en darrande ton som stiger och faller
+        const g = this.lowpass(this.gain(t, 0.03, 0.2 * v, 0.9), 2600);
+        const o = this.ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(520 * r, t);
+        for (let k = 0; k < 16; k++) o.frequency.setValueAtTime((k % 2 ? 560 : 640) * r * (1 - k * 0.025), t + k * 0.05);
+        o.connect(g);
+        o.start(t);
+        o.stop(t + 0.9);
+        this.noiseThrough('lowpass', 500, 300, 1, t + 0.7, 0.3, this.gain(t + 0.7, 0.02, 0.12 * v, 0.3));
+        break;
+      }
       case 'cluck':
         for (let i = 0; i < 3; i++) this.voice(620 * r, 480 * r, 0.06, 0.15 * v, [[1100, 4], [2200, 5]], t + i * 0.11);
         break;

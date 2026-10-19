@@ -197,8 +197,15 @@ export class Inventory {
 
   enterArea(a) {
     // I mörka områden påminner spelet om lyktan
-    if (a.dark && this.s.lantern && !this.lit && (this.s.oil ?? 0) > 0) this.story.after(1.6, () => this.hud.toast('It is pitch dark. Light the lantern!', 3000));
-    if (a.dark && !this.s.lantern) this.story.after(1.6, () => this.hud.toast('It is too dark to see much. A lantern would help here.', 3600));
+    if (!a.dark) return;
+    this.story.after(1.6, () => {
+      if (this.story.areas.cur !== a || this.lit) return;
+      if (!this.s.lantern) this.hud.toast('It is too dark to see much. A lantern would help here.', 3600);
+      else if ((this.s.oil ?? 0) > 0) {
+        const k = this.s.slots.indexOf('lantern');
+        this.hud.toast(k >= 0 ? `It is pitch dark. Press ${KEYS[k]} to light the lantern!` : 'It is pitch dark. Put the lantern on a button (Tab) and light it!', 3600);
+      } else this.noOil();
+    });
   }
 
   update(dt) {
@@ -241,7 +248,7 @@ export class Inventory {
   // Navigering i menyn (tangentbord och handkontroll)
   menu(dt, inp) {
     const items = this.owned();
-    if (inp.bag || inp.cancel) { this.toggle(false); return; }
+    if (inp.cancel) { this.toggle(false); return; }
     if (items.length) {
       const move = (inp.right || inp.down ? 1 : 0) - (inp.left || inp.up ? 1 : 0);
       if (move) {

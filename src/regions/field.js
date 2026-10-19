@@ -29,11 +29,11 @@ export function buildField(B, areas) {
     pads: [
       { x: X0, z: 224, r: 7, h: 0 }, { x: X0, z: -224, r: 7, h: 0.1 }, { x: X0 + 222, z: -40, r: 7, h: 0.1 },
       { x: cross.x, z: cross.z, r: 14, h: 0.5 }, { x: X0 + 190, z: 90, r: 12, h: 0.3 }, { x: X0 - 224, z: 0, r: 6, h: 0.1 },
-      { x: X0 - 100, z: 120, r: 14, h: 1.5 }, { x: X0 - 70, z: -60, r: 12, h: 0.4 },
+      { x: X0 - 100, z: 120, r: 14, h: 1.5 }, { x: X0 - 70, z: -60, r: 12, h: 0.4 }, { x: X0 + 203, z: 90, r: 9, h: 0.25 },
     ],
     roads,
     dips: [{ x: X0 + 60, z: -160, r: 22, depth: 2.4 }, { x: X0 - 60, z: 60, r: 10, depth: 1.4 }],
-    grass: 3600,
+    grass: 6500,
     tint: (x, z) => 0.9 + 0.12 * Math.sin(x * 0.03 + Math.cos(z * 0.025) * 2),
   });
   const H = isl.H;
@@ -119,6 +119,26 @@ export function buildField(B, areas) {
     const x = X0 + 18, z = -190;
     B.watchtower(x, H(x, z), z, 0.3, 6);
     B.torch('fieldTower', x - 4, H(x - 4, z), z + 3);
+    // En kista som bara syns när eldfatet brinner
+    B.chest('fieldTowerChest', x, H(x, z), z, 0.3, { shards: 50 }, { reveal: 'fieldTower' });
+  }
+
+  // Kartritaren Wren sitter vid statyns fot med sina papper
+  {
+    const x = X0 + 62.5, z = 128.5, y = H(x, z);
+    B.deco(new THREE.Mesh(box(0.9, 0.04, 0.7, 1), M.linen), x + 0.9, y + 0.03, z + 0.6).rotation.y = 0.4;
+    B.deco(new THREE.Mesh(box(0.5, 0.04, 0.4, 1), M.linen), x - 0.7, y + 0.03, z + 0.9).rotation.y = -0.3;
+    B.crate(x + 1.4, y, z - 0.8, 0.6, 0.5);
+    B.campfire(x - 1.6, y, z + 2.4, 18);
+  }
+  for (const [px, pz] of [[6, 200], [-10, 165], [-18, 120], [-12, 84], [24, 46], [70, 26], [125, 6], [170, -14], [-50, 34], [-120, 22], [18, -20], [-2, -60], [-20, -100], [6, -140], [8, -180]]) {
+    const x = X0 + px + (hash2(px, pz) > 0.5 ? 7 : -7), z = pz;
+    (hash2(pz, px) > 0.45 ? B.oak : B.pine)(x, H(x, z), z, 1.0 + hash2(px, pz) * 0.5);
+  }
+  for (const [px, pz] of [[4, 210], [-6, 140], [30, 40], [110, 12], [-80, 26], [14, -40], [-12, -110], [4, -190]]) {
+    const x = X0 + px + 4, z = pz;
+    B.deco(new THREE.Mesh(box(0.16, 1.0, 0.16, 1), M.woodDark), x, H(x, z) + 0.4, z);
+    B.deco(new THREE.Mesh(rockGeo(0.35, Math.floor(px + pz), 0.7), M.rock), x + 0.4, H(x + 0.4, z) + 0.1, z + 0.3);
   }
 
   // ---------- det stora trädet, sjöarna och skogsdungarna ----------
@@ -191,16 +211,16 @@ export function buildField(B, areas) {
   a.map.pois.push({ x: stonePos.x, z: stonePos.z, label: 'Storm Stone', icon: 'stone' });
   // Stenvägen österut (reser sig när stormstenen vaknar)
   const eastStones = [];
-  for (let i = 0; i < 12; i++) eastStones.push({ x: X0 + 230 + i * 2.9, z: 90 + (hash2(i, 7) - 0.5) * 0.5 });
+  for (let i = 0; i < 16; i++) eastStones.push({ x: X0 + 206 + i * 2.9, z: 90 + (hash2(i, 7) - 0.5) * 0.5 });
   const eastPath = new StonePath(a.root, eastStones, M);
   a.connectFns.push((c) => eastPath.connect(c));
   a.updaters.push((t, dt) => eastPath.update(dt));
-  a.map.lines.push({ pts: [[X0 + 228, 90], [X0 + 264, 90]], kind: 'stones', when: 'eastPath' });
+  a.map.lines.push({ pts: [[X0 + 205, 90], [X0 + 252, 90]], kind: 'stones', when: 'eastPath' });
   // Udden med den gyllene porten
-  const gateIsl = B.island({ cx: X0 + 278, cz: 90, baseR: 9, rNoise: 1, seed: 329, amp: 0.25, keepAngles: [Math.PI], depth: 14, rings: 14, segs: 48, pads: [{ x: X0 + 278, z: 90, r: 8, h: 0.05 }], grass: 40, label: '' });
-  const gy = gateIsl.H(X0 + 281, 90);
+  const gateIsl = B.island({ cx: X0 + 260, cz: 90, baseR: 9, rNoise: 1, seed: 329, amp: 0.25, keepAngles: [Math.PI], depth: 14, rings: 14, segs: 48, pads: [{ x: X0 + 260, z: 90, r: 8, h: 0.05 }], grass: 40, label: '' });
+  const gy = gateIsl.H(X0 + 263, 90);
   {
-    const gx = X0 + 281.5;
+    const gx = X0 + 263.5;
     [-1.8, 1.8].forEach((dz) => B.solid(place(new THREE.Mesh(box(0.9, 4.6, 0.9, 1.5), M.marble), gx, gy + 2.3, 90 + dz)));
     B.deco(new THREE.Mesh(box(1.2, 0.7, 4.8, 1.5), M.marble), gx, gy + 4.9, 90);
     const disc = new THREE.Mesh(cyl(0.9, 0.9, 0.16, 16, 1), M.gold);
@@ -208,7 +228,7 @@ export function buildField(B, areas) {
     B.deco(disc, gx - 0.5, gy + 4.9, 90);
     B.solid(place(new THREE.Mesh(box(0.3, 3.6, 2.8, 1.2), M.gold), gx, gy + 1.8, 90));
   }
-  a.map.pois.push({ x: X0 + 281, z: 90, label: 'Golden Gate', icon: 'gate', when: 'eastPath' });
+  a.map.pois.push({ x: X0 + 263, z: 90, label: 'Golden Gate', icon: 'gate', when: 'eastPath' });
   // Pyramiden långt i öster
   {
     const p = B.backdrop(X0 + 560, 70, 40, 30, 341, { topMat: M.rockTop, rings: 8, segs: 36 });
@@ -289,11 +309,21 @@ export function buildField(B, areas) {
   return {
     npcs: {
       mags: { area: 'field', pos: VV(26.5, 49.5), face: -2.6 },
+      wren: { area: 'field', pos: VV(62.5, 128.5), face: 0.4, pose: 'sit' },
     },
     animals: [{ kind: 'horse', area: 'field', pos: VV(-150, 60), center: VV(-150, 60), radius: 22, H }],
-    east: { plate, stone: stonePos, end: V3(X0 + 278, gy, 90), gate: V3(X0 + 279.6, gy, 90) },
+    east: { plate, stone: stonePos, end: V3(X0 + 260, gy, 90), gate: V3(X0 + 261.6, gy, 90) },
     eastPath,
     slamEast: (p) => areas.id === 'field' && Math.hypot(p.x - plate.x, p.z - plate.z) < 1.9,
+    onTorch(id, story) {
+      if (id !== 'fieldTower') return false;
+      story.after(0.6, () => {
+        story.sfx.play('secret');
+        story.fx.burst('ash', V3(X0 + 18, H(X0 + 18, -190) + 0.6, -190), 24);
+        story.hud.toast('The flame reveals something under the old watchtower...', 3600);
+      });
+      return true;
+    },
     lightEast(on) {
       stoneRunes.color.set(on ? 0x7fdcff : 0x2a3440);
       plateMat.emissive.set(on ? 0x2a6a88 : 0x000000);

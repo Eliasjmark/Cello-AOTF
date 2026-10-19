@@ -636,7 +636,7 @@ export class Story {
     this.state.entry = entry;
     this.fx.clearHearts();
     this.rig.snap(P);
-    if (a.card && !this.state.seen[to]) this.after(1.1, () => this.hud.card(a.name, a.sub, 3800));
+    if (a.card && !this.state.seen[to]) this.after(1.1, () => { if (this.areas.cur === a) this.hud.card(a.name, a.sub, 3800); });
     this.state.seen[to] = true;
     if (this.phase === 'free') this.save(true);
   }
@@ -728,6 +728,9 @@ export class Story {
 
   wakeInAetheria() {
     const P = this.player, A = this.world.aetheria;
+    if (this.areas.id !== 'village') this.areas.activate('village');
+    this.state.area = 'village';
+    this.state.entry = 'aetheria';
     this.titan.hide();
     this.finishPrologue('fought');
     P.revive(A.spawn, A.spawnFacing);
@@ -755,6 +758,7 @@ export class Story {
     const s = this.state;
     s.choice1 = choice;
     s.karma += choice === 'saved' ? 1 : -1;
+    s.entry = 'aetheria'; // efter prologen börjar Cello om vid lägerelden i Aetheria
     this.phase = 'free';
     this.setupFree(false);
     this.hud.setHearts(this.player.hp, this.player.maxHp);
@@ -1052,7 +1056,7 @@ export class Story {
     }
 
     // Prologen: går Cello mot titanen utan att hjälpa Maren blir det striden
-    if (this.phase === 'prologue' && !this.dialog.active && P.feet.distanceTo(this.titan.pos) < 11) {
+    if (this.phase === 'prologue' && here === 'village' && !this.dialog.active && P.feet.distanceTo(this.titan.pos) < 11) {
       this.startTitanFight(true);
     }
     if (this.phase === 'carry' && !this.arriving && this.world.inAetheria(P.feet.x, P.feet.z) && P.feet.z < -52.5) {

@@ -205,6 +205,24 @@ export class MapView {
         g.lineWidth = 1 * dpr;
         g.stroke();
       }
+      // Grottans gångar och salar
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      for (const l of a.map.lines) {
+        if (l.kind !== 'tunnel') continue;
+        g.strokeStyle = '#2e2c30';
+        g.lineWidth = Math.max(4 * dpr, l.w * T.s);
+        g.beginPath();
+        l.pts.forEach(([x, z], i) => (i ? g.lineTo(T.X(x), T.Z(z)) : g.moveTo(T.X(x), T.Z(z))));
+        g.stroke();
+      }
+      for (const hl of a.map.halls || []) {
+        g.beginPath();
+        g.arc(T.X(hl.x), T.Z(hl.z), hl.r * T.s, 0, Math.PI * 2);
+        g.fillStyle = '#2e2c30';
+        g.fill();
+      }
+      g.lineCap = 'butt';
       for (const r of a.map.rects) {
         if (r.kind === 'water') {
           g.beginPath();
@@ -214,7 +232,7 @@ export class MapView {
         }
       }
       for (const l of a.map.lines) {
-        if (l.when && !st[l.when]) continue;
+        if (l.kind === 'tunnel' || (l.when && !st[l.when])) continue;
         g.strokeStyle = l.kind === 'road' ? '#6a5640' : l.kind === 'bridge' ? '#8a6a44' : COL.storm;
         g.lineWidth = (l.kind === 'road' ? 2.6 : 2.2) * dpr;
         g.setLineDash(l.kind === 'stones' ? [3 * dpr, 4 * dpr] : []);
@@ -279,9 +297,9 @@ export class MapView {
   drawRealm(areas, story, box) {
     const g = this.ctx, dpr = Math.min(2, window.devicePixelRatio || 1);
     const N = {
-      bastion: [0.3, 0.03, 'Tempest Bastion'], cave: [0.3, 0.15, 'Hollow Cave'], stormreach: [0.3, 0.27, 'Stormreach'],
-      field: [0.3, 0.42, 'The Stormvale'], willowmere: [0.78, 0.42, 'Willowmere'], pass: [0.3, 0.57, 'Galewind Pass'],
-      ranch: [0.3, 0.7, 'Thistledown'], village: [0.3, 0.84, 'Hollowbrook'], home: [0.3, 0.97, "Cello's Home"],
+      bastion: [0.1, 0.03, 'Tempest Bastion'], cave: [0.1, 0.15, 'Hollow Cave'], stormreach: [0.1, 0.27, 'Stormreach'],
+      field: [0.1, 0.42, 'The Stormvale'], willowmere: [0.55, 0.34, 'Willowmere'], pass: [0.1, 0.57, 'Galewind Pass'],
+      ranch: [0.1, 0.7, 'Thistledown'], village: [0.1, 0.84, 'Hollowbrook'], home: [0.1, 0.97, "Cello's Home"],
     };
     const parent = { shop: 'willowmere', house: 'home' };
     const here = parent[areas.id] ?? areas.id;
