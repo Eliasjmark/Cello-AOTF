@@ -23,6 +23,9 @@ export const ICONS = {
   gloves: px('<rect x="2" y="2" width="4" height="4" fill="#6a4a30"/><rect x="2" y="1" width="1" height="1" fill="#6a4a30"/><rect x="3.2" y="0.5" width="1" height="1.5" fill="#6a4a30"/><rect x="4.4" y="1" width="1" height="1" fill="#6a4a30"/><rect x="6" y="3" width="1" height="2" fill="#6a4a30"/><rect x="2" y="6" width="4" height="2" fill="#c9a24f"/>'),
   letter: px('<rect x="0" y="1" width="8" height="6" fill="#d8cfb4"/><rect x="0" y="1" width="4" height="1" fill="#b8ad96"/><rect x="4" y="1" width="4" height="1" fill="#b8ad96"/><rect x="1" y="2" width="2" height="1" fill="#b8ad96"/><rect x="5" y="2" width="2" height="1" fill="#b8ad96"/><rect x="3" y="3" width="2" height="2" fill="#a8302a"/>'),
   shard: px('<rect x="3" y="0" width="2" height="1" fill="#7af09a"/><rect x="2" y="1" width="4" height="6" fill="#4ad06a"/><rect x="3" y="7" width="2" height="1" fill="#2a9a4a"/><rect x="3" y="2" width="1" height="4" fill="#b8ffd0"/>'),
+  prism: px('<rect x="3" y="0" width="2" height="1" fill="#ffe8a8"/><rect x="2" y="1" width="4" height="2" fill="#ffd27a"/><rect x="1" y="3" width="6" height="2" fill="#ffc040"/><rect x="2" y="5" width="4" height="1" fill="#e0a030"/><rect x="3" y="6" width="2" height="1" fill="#c08020"/><rect x="3" y="2" width="1" height="3" fill="#fff6d8"/><rect x="0" y="3" width="1" height="1" fill="#c9a24f"/><rect x="7" y="3" width="1" height="1" fill="#c9a24f"/><rect x="3.5" y="7" width="1" height="1" fill="#c9a24f"/>'),
+  whetstone: px('<rect x="1" y="3" width="6" height="2" fill="#8a8c94"/><rect x="2" y="2" width="4" height="1" fill="#a8aab2"/><rect x="1" y="5" width="6" height="1" fill="#5a5c66"/><rect x="5" y="1" width="1" height="2" fill="#dfe6ee"/>'),
+  horn: px('<rect x="1" y="1" width="3" height="2" fill="#d8c8a4"/><rect x="4" y="2" width="2" height="2" fill="#c8b48c"/><rect x="5" y="4" width="2" height="2" fill="#b09c74"/><rect x="4" y="6" width="2" height="1" fill="#9a8460"/><rect x="2" y="3" width="2" height="1" fill="#8c2a27"/><rect x="1" y="1" width="1" height="1" fill="#f0e6cc"/>'),
   heart: px('<rect x="1" y="1" width="2" height="1" fill="#d8382f"/><rect x="5" y="1" width="2" height="1" fill="#d8382f"/><rect x="0" y="2" width="8" height="2" fill="#d8382f"/><rect x="1" y="4" width="6" height="1" fill="#d8382f"/><rect x="2" y="5" width="4" height="1" fill="#d8382f"/><rect x="3" y="6" width="2" height="1" fill="#d8382f"/><rect x="1" y="2" width="1" height="1" fill="#f4a196"/>'),
 };
 
@@ -31,8 +34,10 @@ export const ITEMS = {
   weight: { name: 'Weight of Thunder', desc: 'The shard makes Cello heavy: slow, but unmoved by storm winds. He sinks through cracked floors.', icon: 'weight' },
   lantern: { name: 'Lantern', desc: 'An oil lantern. Lights the dark and old braziers. Uses oil while it burns.', icon: 'lantern' },
   potion: { name: 'Healing Draught', desc: 'Restores four hearts. Bitter, but it works.', icon: 'potion' },
+  prism: { name: "Ra's Shattered Prism", desc: 'Raise it to catch sunlight and throw it where Cello faces. Lock on to aim. Sunlight burns shadow and wakes sun eyes.', icon: 'prism' },
+  horn: { name: "Grumble's Horn", desc: 'Blow it outdoors and Grumble comes running. Press E next to him to ride; he is twice as fast as Cello.', icon: 'horn' },
 };
-const ORDER = ['strike', 'weight', 'lantern', 'potion'];
+const ORDER = ['strike', 'weight', 'prism', 'lantern', 'horn', 'potion'];
 
 export class Inventory {
   constructor(ctx) {
@@ -55,6 +60,9 @@ export class Inventory {
   reset() {
     this.lit = false;
     this.player.setLantern(false, false);
+    this.player.hasPrism = false;
+    this.player.setPrism(false);
+    this.player.wearMul = 1;
     this.refresh(true);
   }
   load(s) {
@@ -62,6 +70,8 @@ export class Inventory {
     while (s.slots.length < 3) s.slots.push(null);
     // Sparningar från 0.5: hammaren låg alltid på F och G
     if (s.items?.hammer && !s.slots.includes('strike') && !s.slots.includes('weight')) s.slots = ['strike', 'weight', s.slots[2]];
+    this.player.hasPrism = !!s.items?.prism;
+    this.player.wearMul = s.whetstone ? 0.5 : 1;
     this.lit = false;
     this.player.setLantern(!!s.lantern, false);
     this.refresh(true);
@@ -72,7 +82,8 @@ export class Inventory {
 
   owned() {
     const s = this.s;
-    return ORDER.filter((id) => (id === 'strike' || id === 'weight' ? s.items?.hammer : id === 'lantern' ? s.lantern : id === 'potion' ? s.potions > 0 : false));
+    return ORDER.filter((id) => (id === 'strike' || id === 'weight' ? s.items?.hammer : id === 'prism' ? s.items?.prism : id === 'lantern' ? s.lantern
+      : id === 'horn' ? !!s.goat?.have : id === 'potion' ? s.potions > 0 : false));
   }
 
   // ---------- skärvor ----------
@@ -94,6 +105,19 @@ export class Inventory {
     if (sl.includes(id)) return;
     const free = sl.indexOf(null);
     if (free >= 0) sl[free] = id;
+  }
+  gotPrism() {
+    this.autoSlot('prism');
+    this.refresh(true);
+  }
+  gotHorn() {
+    this.autoSlot('horn');
+    this.refresh(true);
+  }
+  // Knappen ett föremål ligger på (F, G eller V), eller null
+  keyFor(id) {
+    const i = this.s.slots.indexOf(id);
+    return i >= 0 ? KEYS[i] : null;
   }
   gotHammer() {
     this.autoSlot('strike');
@@ -124,7 +148,7 @@ export class Inventory {
   // ---------- att använda föremål ----------
   // Knapptryckningar blir handlingar: markslag och tung vikt går till Cello, resten sköts här
   actions(inp) {
-    const out = { ...inp, slam: false, heavy: false };
+    const out = { ...inp, slam: false, heavy: false, prism: false };
     const P = this.player;
     ['item1', 'item2', 'item3'].forEach((key, i) => {
       if (!inp[key]) return;
@@ -137,8 +161,13 @@ export class Inventory {
         return;
       }
       if (P.carried) return;
+      if (P.mount && id !== 'horn' && id !== 'potion' && id !== 'lantern') {
+        this.hud.toast('Climb down from Grumble first (E).', 2200);
+        return;
+      }
       if (id === 'strike') out.slam = true;
       else if (id === 'weight') out.heavy = true;
+      else if (id === 'prism') out.prism = true;
       else this.use(id);
     });
     return out;
@@ -161,6 +190,8 @@ export class Inventory {
       if (this.lit) this.setLit(false);
       else if ((this.s.oil ?? 0) <= 0) this.noOil();
       else this.setLit(true);
+    } else if (id === 'horn') {
+      this.story.goat?.call();
     } else if (id === 'potion') {
       if (!this.s.potions) return;
       if (P.hp >= P.maxHp) {
@@ -357,6 +388,7 @@ export class Inventory {
     ];
     if (s.amulet) gear.push({ icon: 'amulet', name: "Maren's Amulet", info: '+1 heart' });
     if (s.gloves) gear.push({ icon: 'gloves', name: "Smith's Gloves", info: 'Faster strike' });
+    if (s.whetstone) gear.push({ icon: 'whetstone', name: "Tarek's Whetstone", info: 'Sword wears slower' });
     if (s.kaelLetter && !s.letterGiven) gear.push({ icon: 'letter', name: 'Letter to Kael', info: '' });
     this.el.gear.innerHTML = gear.map((g) => `<div class="gear"><span class="ico">${ICONS[g.icon]}</span><span class="gear-text"><b>${g.name}</b>${g.info ? `<small>${g.info}</small>` : ''}${g.bar !== undefined ? `<span class="bar"><i style="width:${g.bar}%"></i></span>` : ''}</span></div>`).join('');
     this.el.shards.textContent = s.shards || 0;
@@ -370,7 +402,7 @@ export class Inventory {
     const s = this.s, P = this.player;
     if (!s) return;
     const sw = P.sword;
-    const key = [s.slots.join(','), this.owned().join(','), s.potions, Math.round(s.oil ?? 0), this.lit, sw.broken, Math.round(sw.dur), s.shards, P.heavy, P.gloves, this.hud.started].join('|');
+    const key = [s.slots.join(','), this.owned().join(','), s.potions, Math.round(s.oil ?? 0), this.lit, sw.broken, Math.round(sw.dur), s.shards, P.heavy, P.gloves, P.prismUp, this.hud.started].join('|');
     if (!force && key === this.hudKey) return;
     this.hudKey = key;
     const show = this.hud.started && this.story.phase !== 'intro';
@@ -387,7 +419,7 @@ export class Inventory {
       const ok = id && owned.includes(id);
       b.querySelector('.ico').innerHTML = ok ? ICONS[ITEMS[id].icon] : '';
       b.classList.toggle('empty', !ok);
-      b.classList.toggle('on', ok && ((id === 'weight' && P.heavy) || (id === 'lantern' && this.lit)));
+      b.classList.toggle('on', ok && ((id === 'weight' && P.heavy) || (id === 'lantern' && this.lit) || (id === 'prism' && P.prismUp)));
       b.classList.toggle('gloves', ok && id === 'strike' && P.gloves);
       b.querySelector('.count').textContent = ok && id === 'potion' ? s.potions : '';
       const oil = b.querySelector('.oil');

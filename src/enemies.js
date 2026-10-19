@@ -203,8 +203,42 @@ class Askling {
     scene.add(this.excl);
     this.chestPos = new THREE.Vector3();
     if (this.kind === 'shield') this.addShield();
+    if (this.kind === 'shade') this.makeShade();
+    this.lightT = 0;
+    this.blindT = 0;
     mergeRigid(this.model.root);
     this.reset();
+  }
+
+  // Skuggvarelse (pyramiden): svart och violett. Svärdet går rakt igenom tills solljus har bränt den.
+  makeShade() {
+    const M = this.model.M;
+    const set = (mat, c) => mat?.color?.set(c);
+    for (const mat of this.model.mats) set(mat, 0x1c1424);
+    set(this.model.mats[1], 0x0c0812);
+    set(this.model.mats[2], 0x3a2a4a);
+    M.glow.color.set(0x9a5aff);
+    M.eye.color.set(0xd8a0ff);
+  }
+
+  // Solljuset från prisman (eller en stråle): bländar vanliga asklingar och bränner skuggvarelser
+  get beamable() {
+    return this.targetable;
+  }
+  onBeam(dt, g) {
+    if (this.kind === 'shade') {
+      const first = this.lightT <= 0;
+      this.lightT = 3.2;
+      if (first) {
+        g.sfx.play('sizzle', { vol: 0.9 });
+        g.fx.burst('spark', this.chest, 10, 0xffd070);
+        if (this.state !== 'stagger' && this.state !== 'hurt') this.stagger({ director: g.enemies });
+      }
+    } else if (this.blindT <= 0) {
+      this.blindT = 2.6;
+      g.fx.burst('spark', this.chest, 8, 0xffe0a0);
+      this.stagger({ director: g.enemies });
+    }
   }
 
   // Sköldvakten bär en stor rund sköld som tar emot svärdshugg framifrån
@@ -377,6 +411,10 @@ class Askling {
   // --- skada ---
   hurt(dmg, from, w) {
     if (!this.targetable) return false;
+    if (this.kind === 'shade' && this.lightT <= 0 && !w.unblockable) {
+      this.cooldown = Math.min(this.cooldown, 0.3);
+      return 'immune';
+    }
     if (this.hasShield && !w.unblockable) {
       const a = Math.atan2(from.x - this.pos.x, from.z - this.pos.z);
       if (Math.abs(wrap(a - this.facing)) < 1.3 && this.state !== 'stagger') {
@@ -409,6 +447,10 @@ class Askling {
     if (!this.targetable) return;
     const d = Math.hypot(point.x - this.pos.x, point.z - this.pos.z);
     if (d > 3.3 || Math.abs(point.y - this.pos.y) > 2) return;
+    if (this.kind === 'shade' && this.lightT <= 0) {
+      this.stagger(w);
+      return;
+    }
     if (this.hasShield) {
       this.hasShield = false;
       this.shieldMesh.visible = false;
@@ -433,6 +475,8 @@ class Askling {
   update(dt, w) {
     const { player, director } = w;
     this.st += dt;
+    this.lightT = Math.max(0, this.lightT - dt);
+    this.blindT = Math.max(0, this.blindT - dt);
     this.flash = Math.max(0, this.flash - dt);
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.exclT = Math.max(0, this.exclT - dt);
@@ -667,10 +711,18 @@ class Askling {
     }
 
     const flashing = this.flash > 0;
-    for (const mat of m.mats) mat.emissive.setRGB(flashing ? 0.9 : 0, flashing ? 0.9 : 0, flashing ? 0.9 : 0);
     const glow = this.state === 'windup' ? 1 : 0.55 + Math.sin(a.phase * 0.5) * 0.1;
-    m.M.eye.color.setRGB(1, 0.62 + glow * 0.3, 0.25 + glow * 0.2);
-    m.M.glow.color.setRGB(1 * (0.6 + glow * 0.4), 0.42 * (0.6 + glow * 0.4), 0.12);
+    if (this.kind === 'shade') {
+      // Bränd av solljus: gyllene sprickor och ett svagt sken, annars kall violett skugga
+      const lit = Math.min(1, this.lightT / 0.6);
+      for (const mat of m.mats) mat.emissive.setRGB(flashing ? 0.9 : 0.35 * lit, flashing ? 0.9 : 0.22 * lit, flashing ? 0.9 : 0.05 * lit);
+      m.M.eye.color.setRGB(0.85 + 0.15 * lit, 0.63 + 0.2 * lit, 1 - 0.6 * lit);
+      m.M.glow.color.setRGB(0.6 + 0.4 * lit, 0.35 + 0.4 * lit, 1 - 0.75 * lit);
+    } else {
+      for (const mat of m.mats) mat.emissive.setRGB(flashing ? 0.9 : 0, flashing ? 0.9 : 0, flashing ? 0.9 : 0);
+      m.M.eye.color.setRGB(1, 0.62 + glow * 0.3, 0.25 + glow * 0.2);
+      m.M.glow.color.setRGB(1 * (0.6 + glow * 0.4), 0.42 * (0.6 + glow * 0.4), 0.12);
+    }
 
     m.root.position.copy(this.pos);
     m.root.rotation.y = this.facing;
@@ -893,7 +945,7 @@ export class Enemies {
     const e = opts.kind === 'bat'
       ? new Bat(this.scene, this.octree, home, opts)
       : new Askling(this.scene, this.octree, home, waypoints, this.list.length, opts);
-    e.isSafe = opts.group === 'bastion' ? null : this.isSafe;
+    e.isSafe = opts.group && opts.group !== 'world' ? null : this.isSafe;
     e.bounds = opts.bounds || null;
     e.trapGroup = opts.dormant ? opts.room : null;
     e.group = opts.group || 'world';

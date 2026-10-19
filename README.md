@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.6 · en större värld (fas 0–5 klara, fas 6 påbörjad i utvecklingsplanen)
+**Version:** prototyp 0.7 · The Sun-Scorched Pyramid (fas 0–6 klara, fas 7 påbörjad i utvecklingsplanen)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -23,7 +23,76 @@ npm install          # en gång, hämtar esbuild
 npm run build:artifact   # → build/play.html
 ```
 
-## Vad är nytt i 0.6: en större värld
+## Vad är nytt i 0.7: öknen och pyramiden
+
+### Den gyllene porten och The Ember Wastes
+
+Kopparplattan framför **den gyllene porten** på fältets östra udde väcks med hammarens markslag, precis som stormstenen. Porten slår upp och en bro leder ut i **The Ember Wastes**: ett ökenland lika stort som fältet, med dyner, halvt begravda ruiner (ett fallet kungahuvud, en sfinx, en pelarsal och ett begravt tempel med en kista), obelisker längs vägen och längst i öster en stor trappa upp till pyramiden som svävar över avgrunden.
+
+- **Oasen Sunwell** är öknens fristad: en damm med palmer, tält, en eld att vila vid och två kameler.
+  - **Nefret**, den sista prästinnan av Ra, vet hur pyramiden fungerar och ger tips längs vägen.
+  - **Hamid** säljer lampolja, röda drycker och ett nytt böjt ökensvärd.
+  - Barnet **Sabi** springer runt dammen.
+- **Valet vid karavanen.** Handelsmannen **Tarek** ligger fast under en vagn som asklingar har vält, med en full börs bredvid sig.
+  - *Lyft vagnen:* han haltar till oasen och ger Cello sin **slipsten** (svärdet slits hälften så fort).
+  - *Ta börsen:* Cello får 60 skärvor, men Tarek försvinner och hans kusin Hamid tar 50 % mer betalt av tjuven.
+
+### The Sun-Scorched Pyramid
+
+Den andra fängelsehålan har sju salar, karta, två små nycklar och en Solnyckel. Allt bygger på solljus:
+
+- **Solstrålar** faller in genom fönster och ner genom schakt i taket.
+- **Speglar** vrids ett åttondels varv i taget (E) och kastar strålen vidare.
+- **Solögon** vaknar när ljuset träffar dem. Vissa lyser bara så länge strålen ligger kvar.
+- **Skuggslöjor** brinner upp i solljus.
+- **Skuggvarelser** som svärdet går rakt igenom blir fasta när ljuset bränner dem.
+
+| Sal | Vad som händer |
+| --- | --- |
+| **Förkammaren** | Kartkistan, och en spegel som vänds så att ljuset väcker ögat över dörren till solgården |
+| **Solgården** | Två speglar leder ljuset till ett öga som lyfter guldburen runt den första nyckeln |
+| **Skuggkryptan** | Ett fällrum med den andra nyckeln, och en skuggslöja framför en alkov med en guldskärva (värd 100) |
+| **Ras sal** | Ett ljusschakt mitt i salen och en slöja framför dörren i väster |
+| **Skarabégropen** | Minibossen **Khepri**, en jätteskarabé. Svärdet studsar på skalet: vänd den på rygg med markslaget och hugg buken. Sedan stiger **Ra's Shattered Prism** upp ur sanden |
+| **Spegelgalleriet** | Två solögon måste se solen samtidigt: ett får fönstrets ljus via två speglar, det andra ljuset Cello själv kastar från schaktet via en tredje spegel |
+| **Apophis helgedom** | Bossen **Apophis**, kaosormen av skugga, som reser sig ur fyra hål i golvet |
+
+**Ra's Shattered Prism** läggs på en föremålsknapp. Med prisman uppe fångar Cello en stråle (i ett fönsters ljus eller under ett schakt) och kastar den dit han tittar. Med lock-on (Q) siktar han rakt på ett solöga, en spegel, en slöja eller en fiende.
+
+Apophis tar bara skada av solljus som studsar tillbaka: ställ dig i ljuset mitt i helgedomen, höj prisman och lås fast på ormen. Då faller huvudet ner och ädelstenen i pannan går att hugga.
+
+### Titanernas hemlighet
+
+Lyra vet inte längre allt från början. Hon har läst de gamla stenarna och känner till gudarnas reliker, men inte vad titanerna vill.
+
+Det berättar **Apophis**, den tredje titanen Cello möter, när han faller:
+- att titanerna var gudarnas äldsta fiender, fängslade djupt under jorden;
+- att de bröt sig loss och brände Olympus;
+- att de blir starkare för varje människa som dör;
+- att det enda de vill är en tyst, tom värld för sig själva.
+
+Ljuset bär sedan Cello hem till Lyra i Aetheria.
+
+### Grumble, bocken man rider på
+
+Den som hittar hästen Brindle på fältet och berättar det för Hollis på Thistledown Ranch får **Grumble**, gårdens jättelika bock, och **hornet** som kallar på honom.
+- Grumble springer dubbelt så fort som Cello och hoppar längre. Han är tänkt som resesättet innan Hermes sandaler finns.
+- Lägg hornet på en föremålsknapp och blås i det utomhus, så kommer Grumble springande.
+- **E** kliver upp och ner.
+- Han väntar utanför grottor, hus och fängelsehålor. Blir Cello träffad ramlar han av.
+
+### Smygandet i prologen
+
+Väljer Cello att bära Maren till Aetheria ger sig titanen inte av längre. Den går fram och tillbaka längs muren i norr och spanar över torget. Ett rött ljus på marken visar vart den tittar, och husen, muren och klippan skymmer den. Ser den Cello en stund vrålar den, och han får börja om där Maren låg.
+
+### Övrigt
+
+- **The Stormvale** har fått ett långsammare och kusligare spår: *Fields of the Forgotten Crown*. Ett nattligt fält i moll i stället för den glada galoppen.
+- I öknen hörs *Whispers of the Hollow Woods*, och vid oasen *The Quiet Hour Before Quest*. I pyramiden *The Hollow Mask Watches*, vid Khepri *March of the Hollow Crown*, vid Apophis *The Warlord's Approach* och efter segern *Dawn Over the Kingdom*.
+- Kartan har en egen vy för pyramiden, och översikten över riket visar öknen och pyramiden.
+- Nya röster för Nefret, Hamid, Sabi, Tarek, Wren och Apophis.
+
+## Vad var nytt i 0.6: en större värld
 
 Världen är nu uppdelad i områden som laddas vid gränserna. När Cello går in i dimman vid en bro tonar skärmen till svart och nästa område tar vid. Fästningen syns inte längre från byn; resan dit är lång.
 
@@ -69,7 +138,7 @@ Det tar ungefär fyra minuter att springa raka vägen från Aetheria till fästn
 | Lyras berättelse och Galewind Pass | The Quiet Hour Before Quest |
 | The Long Bridge, och när stenar och dörrar vaknar | Ballad of the Wandering Hero |
 | Thistledown Ranch | The Green Road Calls |
-| The Stormvale | Gallop Across the Wildlands |
+| The Stormvale | Fields of the Forgotten Crown (från 0.7) |
 | Willowmere och butiken | Morning in Willowmere |
 | Stormreach och fästningens förgård | March of the Hollow Crown |
 | The Hollow Cave | Whispers of the Hollow Woods |
@@ -134,14 +203,18 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/main.js` | Startar allt, spelslingan, avståndsgallring av saker långt bort |
 | `src/areas.js` | Områdena: var och en har sin egen grupp, sitt kollisionsträd, ingångar och utgångar |
 | `src/build.js` | Byggverktygen alla områden använder: öar, vägar, broar, hus, ladan, träd, staket, eldar, dimma vid gränserna |
-| `src/world.js` | Cellos hem, byn och Aetheria, fästningens område, och kopplingen mellan områdena |
-| `src/regions/` | `ranch.js`, `pass.js`, `field.js`, `willowmere.js`, `stormreach.js` (med grottan) och `interiors.js` (butiken och Cellos hus) |
+| `src/world.js` | Cellos hem, byn och Aetheria, fästningens och pyramidens områden, och kopplingen mellan områdena |
+| `src/regions/` | `ranch.js`, `pass.js`, `field.js`, `willowmere.js`, `stormreach.js` (med grottan), `desert.js` (The Ember Wastes) och `interiors.js` (butiken och Cellos hus) |
 | `src/folk.js` | Folket ute i världen, butikerna, kistorna, eldfaten, djuren och övningsdockan |
 | `src/inventory.js` | Föremålsmenyn, snabbknapparna, skärvorna, lyktan och dryckerna |
 | `src/bastion.js` | The Tempest Bastion: rum, dörrar, kistor, kretsar, pussel, fällor och bossarna |
 | `src/bosses.js` | Järnväktaren och Hrungnir |
+| `src/pyramid.js` | The Sun-Scorched Pyramid: salar, dörrar, kistor, burar, speglar, solögon, slöjor, fällor och bossarna |
+| `src/beams.js` | Solstrålarna: fönster, schakt, speglar, solögon, slöjor och prisman |
+| `src/sunbosses.js` | Khepri och Apophis |
+| `src/goat.js` | Grumble, bocken man rider på |
 | `src/enemies.js` | Asklingar, sköldvakter och stormfladdrare |
-| `src/player.js` | Cello: rörelse, svärd, sköld, hammaren, tung vikt |
+| `src/player.js` | Cello: rörelse, svärd, sköld, hammaren, tung vikt, prisman och ridning |
 | `src/story.js` | Berättelsen, samtal, val, föremål och sparning |
 | `src/collide.js` | Kollisioner mot världen plus rörliga lådor (dörrar, stenar, golv) |
 | `src/lights.js` | En pool med åtta punktljus som flyttas till eldarna närmast Cello |

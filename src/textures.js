@@ -323,8 +323,57 @@ export function createTextures() {
     }
   });
 
+  // ---- 0.7: öknen och pyramiden ----
+  // Sand med vindrippel
+  const sand = canvasTexture(32, 251, (g, s, r) => {
+    noisyFill(g, s, r, [196, 160, 104], 9);
+    for (let y = 0; y < s; y += 4) {
+      g.fillStyle = 'rgba(150,112,64,0.45)';
+      for (let x = 0; x < s; x++) {
+        const yy = y + Math.round(Math.sin((x / s) * Math.PI * 2 + y * 0.7) * 1.2);
+        g.fillRect(x, (yy + s) % s, 1, 1);
+      }
+    }
+    for (let i = 0; i < 20; i++) {
+      g.fillStyle = 'rgba(235,206,150,0.5)';
+      g.fillRect(Math.floor(r() * s), Math.floor(r() * s), 1, 1);
+    }
+  });
+  // Sandsten i stora block (pyramidens väggar och golv)
+  const sandstone = canvasTexture(32, 257, (g, s, r) => {
+    noisyFill(g, s, r, [176, 140, 92], 8);
+    g.fillStyle = 'rgba(96,70,40,0.7)';
+    for (let y = 0; y < s; y += 8) {
+      g.fillRect(0, y, s, 1);
+      const off = (y / 8) % 2 ? 8 : 0;
+      for (let x = off; x < s; x += 16) g.fillRect(x, y, 1, 8);
+    }
+    for (let i = 0; i < 10; i++) {
+      g.fillStyle = 'rgba(120,90,56,0.4)';
+      g.fillRect(Math.floor(r() * s), Math.floor(r() * s), 2, 1);
+    }
+  });
+  // Hieroglyfer inristade i sandsten
+  const hiero = canvasTexture(32, 263, (g, s, r) => {
+    noisyFill(g, s, r, [170, 134, 88], 6);
+    g.fillStyle = 'rgba(90,64,36,0.85)';
+    g.fillRect(0, 0, s, 1);
+    g.fillRect(0, 16, s, 1);
+    for (let col = 0; col < 4; col++) {
+      for (let row = 0; row < 2; row++) {
+        const x0 = col * 8 + 2, y0 = row * 16 + 3;
+        const k = Math.floor(r() * 5);
+        if (k === 0) { g.fillRect(x0 + 1, y0, 2, 9); g.fillRect(x0, y0 + 2, 4, 1); } // ankh-stam
+        else if (k === 1) { g.fillRect(x0, y0 + 3, 4, 4); g.fillStyle = 'rgba(170,134,88,1)'; g.fillRect(x0 + 1, y0 + 4, 2, 2); g.fillStyle = 'rgba(90,64,36,0.85)'; } // öga
+        else if (k === 2) { for (let w = 0; w < 4; w++) g.fillRect(x0 + w, y0 + 2 + (w % 2), 1, 1); g.fillRect(x0, y0 + 6, 4, 1); } // vatten
+        else if (k === 3) { g.fillRect(x0, y0 + 8, 4, 1); g.fillRect(x0 + 1, y0 + 4, 2, 4); g.fillRect(x0 + 2, y0 + 2, 1, 2); } // fågel
+        else { g.fillRect(x0, y0 + 1, 4, 1); g.fillRect(x0, y0 + 9, 4, 1); g.fillRect(x0 + 1, y0 + 2, 2, 7); }
+      }
+    }
+  });
+
   return {
     grass, rock, cliff, marble, brick, wood, tuft, mosaic, runes, charred, iron, ironFloor, cracked,
-    dirt, plaster, shingle, cobble, hay, leaf, bark, floor, water,
+    dirt, plaster, shingle, cobble, hay, leaf, bark, floor, water, sand, sandstone, hiero,
   };
 }

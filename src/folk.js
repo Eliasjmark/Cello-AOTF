@@ -10,7 +10,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 // Priser i skärvor
-export const PRICES = { lantern: 40, oil: 10, potion: 20, sword: 30, reforge: 20, magsOil: 14, magsPotion: 25 };
+export const PRICES = { lantern: 40, oil: 10, potion: 20, sword: 30, reforge: 20, magsOil: 14, magsPotion: 25, hamidOil: 12, hamidPotion: 22, hamidSword: 34 };
 
 const LOOKS = {
   hollis: { name: 'Hollis', look: { skin: 0xb88a68, hairStyle: 'bald', beard: 0x8a7a6a, top: 0x6a5238, bottom: 0x3a3228, extraColor: 0x4a3a28, width: 1.18, scale: 1.0 } },
@@ -28,6 +28,11 @@ const LOOKS = {
   tob: { name: 'Tob', look: { skin: 0xc49f83, hair: 0x8a5a2a, top: 0x6a6aa0, scale: 0.55 } },
   wren: { name: 'Wren', look: { skin: 0xc8a080, hair: 0xb0603a, hairStyle: 'long', top: 0x5a6a4a, extraColor: 0x8a7a50, item: 'scroll', scale: 0.88 } },
   fenn: { name: 'Fenn', look: { skin: 0xc49f83, hair: 0x4a3020, hairStyle: 'hood', hood: 0x3a4a3a, top: 0x3a4a3a, extraColor: 0x5a4632, item: 'spear', scale: 0.95 } },
+  // 0.7: öknen
+  nefret: { name: 'Nefret', look: { skin: 0x9a6a48, hairStyle: 'hood', hood: 0xd8ccb0, top: 0xd8ccb0, robe: true, shawl: 0xc9a24f, extraColor: 0x2a4a8a, item: 'scroll', scale: 0.9 } },
+  hamid: { name: 'Hamid', look: { skin: 0x8a5a3a, hairStyle: 'hood', hood: 0x3a7a78, beard: 0x2a1a14, top: 0x3a7a78, apron: true, extraColor: 0xd8ccb0, width: 1.18, scale: 0.98 } },
+  sabi: { name: 'Sabi', look: { skin: 0x8a5a3a, hair: 0x1a1210, top: 0xd8a050, scale: 0.55 } },
+  tarek: { name: 'Tarek', look: { skin: 0x9a6a48, hairStyle: 'hood', hood: 0x8a6a3a, beard: 0x3a2a1c, top: 0x6a4a2a, extraColor: 0x8a6a3a, scale: 0.95 } },
 };
 
 // ---------- djur ----------
@@ -65,6 +70,36 @@ function buildAnimal(kind, M) {
       const leg = B(0.14, 1.0, 0.14, coat, x, 0.5, z);
       body.add(leg);
       leg.add(B(0.16, 0.12, 0.18, dark, 0, -0.46, 0.02));
+      legs.push(leg);
+    }
+    g.userData.head = neck;
+  } else if (kind === 'camel') {
+    // En kamel: lång hals, puckel och långa ben
+    const coat = M.sack, dark = M.furBrown;
+    body.add(B(0.6, 0.6, 1.5, coat, 0, 1.55, 0));
+    const hump = new THREE.Mesh(new THREE.SphereGeometry(0.42, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), coat);
+    hump.scale.set(1, 1.1, 1.3);
+    hump.position.set(0, 1.82, -0.05);
+    body.add(hump);
+    body.add(B(0.66, 0.08, 0.7, M.clothRed, 0, 1.86, 0.4));
+    const neck = new THREE.Group();
+    neck.position.set(0, 1.6, 0.7);
+    neck.rotation.x = -0.5;
+    body.add(neck);
+    neck.add(B(0.24, 0.9, 0.3, coat, 0, 0.4, 0.1));
+    const head = new THREE.Group();
+    head.position.set(0, 0.86, 0.12);
+    neck.add(head);
+    head.add(B(0.24, 0.24, 0.52, coat, 0, 0, 0.18));
+    head.add(B(0.2, 0.14, 0.14, dark, 0, -0.04, 0.44));
+    for (const sx of [-1, 1]) head.add(B(0.05, 0.12, 0.05, coat, 0.1 * sx, 0.14, -0.04));
+    const tail = B(0.06, 0.5, 0.06, dark, 0, 1.4, -0.78);
+    tail.rotation.x = 0.3;
+    body.add(tail);
+    for (const [x, z] of [[-0.2, 0.55], [0.2, 0.55], [-0.2, -0.55], [0.2, -0.55]]) {
+      const leg = B(0.13, 1.3, 0.13, coat, x, 0.65, z);
+      body.add(leg);
+      leg.add(B(0.2, 0.08, 0.22, dark, 0, -0.62, 0.03));
       legs.push(leg);
     }
     g.userData.head = neck;
@@ -144,7 +179,7 @@ export class Folk {
     this.npcs = {};
     // Alla platser för folk som områdena har bestämt
     const spots = {};
-    for (const r of [world.ranch, world.pass, world.field, world.willow, world.reach, world.interiors]) Object.assign(spots, r?.npcs || {});
+    for (const r of [world.ranch, world.pass, world.field, world.willow, world.reach, world.interiors, world.desert]) Object.assign(spots, r?.npcs || {});
     for (const [id, sp] of Object.entries(spots)) {
       const def = LOOKS[id];
       if (!def) continue;
@@ -177,6 +212,10 @@ export class Folk {
     talk('tob', (n) => this.talkKid(n, 'tob'));
     talk('fenn', (n) => this.talkFenn(n));
     talk('wren', (n) => this.talkWren(n));
+    talk('nefret', (n) => this.talkNefret(n));
+    talk('hamid', (n) => this.talkHamid(n));
+    talk('sabi', (n) => this.talkSabi(n));
+    talk('tarek', (n) => this.talkTarek(n));
 
     // Butiken: varorna på hyllorna
     const shop = world.interiors?.shop;
@@ -241,7 +280,7 @@ export class Folk {
 
     // Djur på ranchen och i Cellos trädgård
     this.animals = [];
-    for (const r of [world.ranch, world.home, world.willow, world.field]) {
+    for (const r of [world.ranch, world.home, world.willow, world.field, world.desert]) {
       for (const an of r?.animals || []) {
         const m = buildAnimal(an.kind, M);
         m.root.position.copy(an.pos);
@@ -298,6 +337,7 @@ export class Folk {
   }
 
   enterArea(id) {
+    if (id === 'desert') this.placeTarek();
     // Eldfaten i området: tända om de har tänts förut
     for (const t of this.torches) {
       if (t.area !== id) continue;
@@ -476,8 +516,13 @@ export class Folk {
         'Hah! I knew it. That stubborn old mare. She will come home when she is ready, she always does.',
         "Here. It is not much, but I put it aside for whoever brought news of her.",
         { run: () => { this.inventory.addShards(50); this.sfx.play('fanfare'); this.music?.duckFor(2.0, 0.15); this.hud.toast('Hollis gives you a purple shard, worth 50!', 3600); } },
-        "And when you are done saving the world, come back and ride her. She likes you, I can tell.",
-      ], () => { s.brindleTold = true; this.story.save(true); });
+        ...this.grumbleLines(),
+      ], () => { s.brindleTold = true; this.giveGrumble(); });
+      return;
+    }
+    // Äldre sparningar: nyheten om Brindle är redan berättad, men Grumble har inte bytt ägare
+    if (s.brindleTold && !s.goat?.have) {
+      this.say(n, ["I've been thinking about what you did for Brindle, lad.", ...this.grumbleLines()], () => this.giveGrumble());
       return;
     }
     if (s.bastionDone) {
@@ -489,6 +534,20 @@ export class Folk {
       ['The Ashlings came for the goats last month. Nell chased them off with a pitchfork.', "Don't tell her I told you. She'll want a medal."],
       ["Short on shards? Cut the tall grass. Funny how they turn up there, like the storm sows them.", 'And break a pot or two. Not mine.'],
     ]));
+  }
+
+  grumbleLines() {
+    return [
+      'And there is something else. See that big brute by the post? That is Grumble.',
+      'Meanest ram in three valleys, and the fastest thing on four legs since Brindle left. He has been sulking ever since.',
+      'He needs a long road, and you need legs. Take him.',
+      'And take this. His old horn. Blow it, and he will come running. Mostly.',
+    ];
+  }
+
+  giveGrumble() {
+    const story = this.story;
+    story.after(0.2, () => story.itemGet('horn'));
   }
 
   talkNell(n) {
@@ -504,6 +563,11 @@ export class Folk {
 
   talkTilly(n) {
     const s = this.story.state;
+    if (s.goat?.have && !s.talked.tillyGoat) {
+      s.talked.tillyGoat = true;
+      this.say(n, ["Dad gave you Grumble?! He only bites people he likes. ...He bit Dad twice."]);
+      return;
+    }
     if (s.bastionDone) { this.say(n, ['Is it true you fought a giant made of stone?! I knew you were a knight!']); return; }
     this.say(n, this.rotate('tillyN', [
       ['Are you a knight? You have a sword! And a shield!'],
@@ -613,7 +677,10 @@ export class Folk {
     if (!s.items.hammer) return 'cave';
     if (!s.bastionDone) return 'boss';
     if (!s.eastPath) return 'stone';
-    return 'gate';
+    if (!s.sunGate) return 'gate';
+    if (!s.items.prism) return 'desert';
+    if (!s.pyramidDone) return 'pyramid';
+    return 'later';
   }
   goalText(key = this.story.state.hint) {
     return {
@@ -622,7 +689,10 @@ export class Folk {
       cave: 'Cross the Stormvale to the north and climb into Stormreach. In the Hollow Cave, light the old braziers with your lantern. The Tempest Bastion waits beyond.',
       boss: "The shard is yours, but the fortress still has a heart of stone. Hrungnir waits beyond the Storm Key's door. Lure him to the pylons and let thunder do the rest.",
       stone: 'Thunder sleeps in the Storm Stone on the eastern edge of the Stormvale. Strike the copper at its feet with the hammer.',
-      gate: 'The golden gate is sealed by the sun. Its key lies further than my sight can reach... for now.',
+      gate: 'The golden gate sleeps, as the Storm Stone slept. Thunder woke the stone. Let thunder wake the gate: strike the copper before it.',
+      desert: "Beyond the golden gate, the Ember Wastes. The sun god's pyramid waits at their far edge. Nefret, the priestess at the Sunwell oasis, keeps its secrets.",
+      pyramid: 'A serpent of endless night coils in the heart of the pyramid. Steel cannot touch it. Only sunlight, caught and thrown, can bring it low.',
+      later: 'The threads end at the sand... The rest of your road is not yet woven. Rest, child.',
     }[key] ?? null;
   }
 
@@ -683,6 +753,8 @@ export class Folk {
       ['There is a chest under the old watchtower by the north road. Nobody can see it. The old rangers only opened it by firelight.'],
       ['A brown mare runs wild west of the crossroads. Fast as a rumor. I tried to draw her once.'],
       ["Mags at the crossroads sells oil, if your lantern's thirsty. Robbery, but convenient robbery."],
+      ["Hollis at Thistledown keeps a ram the size of a pony. Grumble. If anyone ever crossed the Stormvale on a goat, it'd be on him."],
+      [s.sunGate ? 'You opened the golden gate! I added a whole new edge to my map. Then I ran out of paper.' : 'The golden gate in the east has a copper plate in front of it. Like the Storm Stone. Funny, that.'],
     ]));
   }
 
@@ -702,6 +774,165 @@ export class Folk {
     story.talk(n, [L(s.lantern
       ? (s.caveOpen ? "You got through! I heard the stone grind open from out here." : 'Light both braziers inside. The stone door will feel the heat.')
       : 'No lantern, no way through. Willowmere is east across the Stormvale.')]);
+  }
+
+  // ---------- öknen: Nefret, Hamid, Sabi och Tarek ----------
+  // Tarek: vid karavanen tills Cello har valt, sedan vid oasen (räddad) eller borta (rånad)
+  placeTarek() {
+    const n = this.npcs.tarek, d = this.world.desert;
+    if (!n || !d) return;
+    const t = this.story.state.tarek;
+    if (d.satchel) d.satchel.visible = !t;
+    if (t === 'robbed') { n.setVisible(false); return; }
+    n.setVisible(true);
+    if (t === 'saved') n.place(d.tarekOasis.pos, d.tarekOasis.face, 'sit');
+    else n.place(d.npcs.tarek.pos, d.npcs.tarek.face, 'hurt');
+  }
+
+  talkTarek(n) {
+    const story = this.story, s = story.state, P = story.player;
+    const L = (t) => story.line(n, t);
+    if (s.tarek === 'saved') {
+      if (!s.whetstone) {
+        story.talk(n, [
+          L('You came! I made it here on one good leg and a lot of cursing.'),
+          L('I am Tarek. I trade blades from here to the edge of the world. Or I did, until the Ashlings found my caravan.'),
+          L('They took everything but this. A whetstone from the old quarries of Qadesh. A blade kept on it stays sharp twice as long.'),
+          L('Take it. A life is worth more than a stone.'),
+          { run: () => { s.whetstone = true; P.wearMul = 0.5; this.sfx.play('fanfare'); this.music?.duckFor(2.0, 0.15); this.inventory.refresh(true); this.hud.toast("You got Tarek's Whetstone! Your sword wears down half as fast.", 4600); } },
+        ], () => story.save(true));
+        return;
+      }
+      this.say(n, this.rotate('tarekN', [
+        ['My leg will heal. My caravan will not. Still, I am alive to complain about it.'],
+        ['Hamid is my cousin. He says you are a fool for lifting that cart. He says it the way people say "friend".'],
+        ['The pyramid? My grandfather said it was built to hold the sun in. Or to hold something out of it.'],
+      ]));
+      return;
+    }
+    story.talk(n, [
+      L('Water... Is someone there?'),
+      L('Ashlings. They came out of the dunes and tore the caravan apart. My leg is caught under the cart.'),
+      L("I can't lift it alone. Please..."),
+      { who: '', text: "A heavy leather satchel lies in the sand beside him, half open. It is full of shards." },
+      {
+        who: '', prompt: 'What does Cello do?',
+        choices: [{ text: 'Lift the cart', id: 'lift' }, { text: 'Take the satchel', id: 'take' }],
+        onChoose: (id) => {
+          if (id === 'lift') {
+            return [
+              { run: () => { this.sfx.play('stomp', { vol: 0.7 }); this.story.rig.shake(0.3); } },
+              { who: '', text: 'Cello sets his shoulder against the cart and heaves. The wood groans, and Tarek drags himself free.' },
+              L('By the sun... thank you. I can walk. Barely.'),
+              L('I will make for the Sunwell oasis. Find me there, stranger. I owe you a debt.'),
+              { run: () => { s.tarek = 'saved'; s.karma += 1; story.save(true); } },
+            ];
+          }
+          return [
+            { run: () => { this.inventory.addShards(60); this.sfx.play('shard', { vol: 2 }); } },
+            { who: '', text: 'Cello picks up the satchel. It is heavy with shards: 60 of them.' },
+            L('...You would rob a dying man?'),
+            L('Go, then. The desert remembers.'),
+            { run: () => { s.tarek = 'robbed'; s.karma -= 1; story.save(true); } },
+          ];
+        },
+      },
+    ], () => {
+      if (s.tarek === 'saved') {
+        story.startFade(1.6, 'Tarek limps away toward the oasis...', () => this.placeTarek());
+      } else if (s.tarek === 'robbed') {
+        story.startFade(1.6, 'When Cello looks back, the sand has covered the tracks...', () => this.placeTarek());
+      }
+    });
+  }
+
+  talkNefret(n) {
+    const story = this.story, s = story.state;
+    if (!s.talked.nefret) {
+      this.say(n, [
+        'A traveler from beyond the golden gate? Then the gate has opened. The sun has not forgotten us after all.',
+        'I am Nefret, the last priestess of Ra. Once this whole land sang to him. Now there is only this oasis, and the pyramid.',
+        'The pyramid is his tomb. Or his prison. The old texts disagree.',
+        'Inside, the light of Ra still falls through cracks and windows. Mirrors turn it. Eyes of gold wake when it touches them.',
+        "Somewhere in its heart lies Ra's own crystal. Find it, and the light will answer to you.",
+      ], () => { s.talked.nefret = true; });
+      return;
+    }
+    if (s.pyramidDone) {
+      this.say(n, this.rotate('nefretD', [
+        ['The night is thinner over the Wastes since you came back. Ra thanks you, even if he cannot say it.'],
+        ['South of here, the old necropolis sank into the sand long ago. Lately... the sand there has started to move.'],
+      ]));
+      return;
+    }
+    if (s.items.prism) {
+      this.say(n, [
+        "You carry the Shattered Prism... I can feel its warmth from here.",
+        'Stand where the light falls, raise the crystal, and it will throw the sun where your eyes fix.',
+        'The serpent Apophis waits in the deepest chamber. Steel slides off its shadow-scales. Only Ra\'s light, thrown back at it, can bring it down.',
+      ]);
+      return;
+    }
+    this.say(n, this.rotate('nefretN', [
+      ['Turn the mirrors, and follow the light with your eyes. Where it ends, something should wake.'],
+      ['Shadows walk in the pyramid. Things your sword passes through like smoke. Do not fight them in the dark.'],
+      ['A great scarab guards the crystal. Its shell turns any blade. But even a scarab can be turned on its back.'],
+    ]));
+  }
+
+  talkHamid(n) {
+    const story = this.story, s = story.state, inv = this.inventory, P = story.player;
+    const L = (t) => story.line(n, t);
+    const robbed = s.tarek === 'robbed';
+    const k = robbed ? 1.5 : 1;
+    const price = (key) => Math.round(PRICES[key] * k);
+    const first = !s.talked.hamid;
+    s.talked.hamid = true;
+    const menu = () => ({
+      who: '', prompt: `What will it be? (You have ${s.shards || 0} shards.)`,
+      choices: [
+        { text: `Lantern Oil — ${price('hamidOil')}`, id: 'oil' },
+        { text: `Healing Draught — ${price('hamidPotion')}`, id: 'potion' },
+        { text: `Desert Blade — ${price('hamidSword')}`, id: 'sword' },
+        { text: 'Nothing', id: 'no' },
+      ],
+      onChoose: (id) => {
+        if (id === 'no') return [L(robbed ? 'Then go. Sand gets in everywhere, even in thieves.' : 'May the sun keep your back warm, friend.')];
+        if (id === 'oil' && !s.lantern) return [L('Oil without a lantern? You want to drink it? No, no.')];
+        if (id === 'oil' && inv.oilFull) return [L('Your lantern is full, friend.')];
+        if (id === 'potion' && inv.potionsFull) return [L('Your belt is full. Three bottles, no more.')];
+        if (id === 'sword' && P.sword.dur >= SWORD_MAX) return [L('Your blade is as good as new. Come back when it is not.')];
+        const p = price(id === 'oil' ? 'hamidOil' : id === 'potion' ? 'hamidPotion' : 'hamidSword');
+        if (!inv.spend(p)) { this.sfx.play('denied'); return [L('Not enough shards. The desert does not give credit.')]; }
+        this.sfx.play('buy');
+        if (id === 'oil') { inv.fillOil(); return [L('Filled. It burns cleaner than the swamp oil up north.')]; }
+        if (id === 'potion') { inv.givePotion(); return [L('Healing Draught. Cactus and something I will not tell you.')]; }
+        P.setSword(SWORD_MAX);
+        inv.refresh(true);
+        return [L('A desert blade, curved like the moon. Sharper than anything north of the gate.'), { run: () => this.hud.toast('Cello has a new sword!', 3000) }];
+      },
+    });
+    if (first) {
+      story.talk(n, robbed
+        ? [L('So. You are the one who took my cousin\'s satchel.'), L('Word travels fast in the desert. Faster than you.'), L('I will still sell to you. A trader trades. But the price of thieves is higher.'), menu()]
+        : [L('Welcome to the Sunwell, stranger! Hamid has oil, potions and the finest blades between here and nowhere.'), L('Everything you need for the pyramid. Except courage. That you bring yourself.'), menu()]);
+      return;
+    }
+    story.talk(n, [s.tarek === 'saved' && !s.talked.hamidThanks
+      ? (s.talked.hamidThanks = true, L('You carried my cousin out of the sand. Tarek says you lifted a whole cart. ...Hamid will not forget.'))
+      : L(robbed ? 'What now, thief?' : 'Back again, friend?'), menu()]);
+  }
+
+  talkSabi(n) {
+    const s = this.story.state;
+    this.say(n, this.rotate('sabiN', s.pyramidDone
+      ? [['You fought a snake as big as a river?! Was it slimy?'], ['Mama says the sun feels warmer since you came back. I think so too!']]
+      : [
+        ['Are you going to the pyramid? Mama says the sun lives inside it!'],
+        ["The camels are called Dust and Other Dust. I named them. Don't laugh."],
+        ['Nefret says not to play near the pyramid because the shadows bite. I think shadows are scared of me.'],
+        [s.tarek === 'saved' ? 'Uncle Tarek says you lifted a whole cart! Can you lift me?' : s.tarek === 'robbed' ? "Uncle Hamid is angry. He says someone hurt Uncle Tarek. Was it Ashlings?" : 'Uncle Tarek was supposed to come home with the caravan. He is late.'],
+      ]));
   }
 
   // ---------- varje bildruta ----------
@@ -734,9 +965,9 @@ export class Folk {
         a.target.set(a.home.x + Math.cos(ang) * r, a.home.y, a.home.z + Math.sin(ang) * r);
       }
       // Cello går inte igenom djuren
-      const px = P.feet.x - a.pos.x, pz = P.feet.z - a.pos.z, pd = Math.hypot(px, pz), min = a.kind === 'chicken' ? 0.4 : a.kind === 'cow' || a.kind === 'horse' ? 1.0 : 0.7;
+      const px = P.feet.x - a.pos.x, pz = P.feet.z - a.pos.z, pd = Math.hypot(px, pz), min = a.kind === 'chicken' ? 0.4 : a.kind === 'cow' || a.kind === 'horse' || a.kind === 'camel' ? 1.0 : 0.7;
       if (pd < min && pd > 1e-4) P.nudge((px / pd) * (min - pd), (pz / pd) * (min - pd));
-      if (pd < 6 && Math.random() < dt * 0.06) this.sfx.play(a.kind === 'goat' ? 'goat' : a.kind === 'cow' ? 'moo' : a.kind === 'horse' ? 'neigh' : 'cluck', { vol: Math.max(0.2, 1 - pd / 6) });
+      if (pd < 6 && Math.random() < dt * 0.06 && a.kind !== 'camel') this.sfx.play(a.kind === 'goat' ? 'goat' : a.kind === 'cow' ? 'moo' : a.kind === 'horse' ? 'neigh' : 'cluck', { vol: Math.max(0.2, 1 - pd / 6) });
       const m = a.m;
       m.root.position.copy(a.pos);
       m.root.rotation.y = a.facing;

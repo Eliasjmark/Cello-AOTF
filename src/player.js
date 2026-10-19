@@ -6,7 +6,7 @@ import { mergeRigid } from './geom.js';
 
 const R = 0.35, HEIGHT = 1.7;
 export const RUN_SPEED = 6.6;
-const WALK_SPEED = 2.4, LOCK_SPEED = 4.6, SHIELD_SPEED = 1.9;
+const WALK_SPEED = 2.4, LOCK_SPEED = 4.6, SHIELD_SPEED = 1.9, PRISM_SPEED = 2.2;
 const ACCEL = 48, DECEL = 40, AIR_ACCEL = 10;
 const GRAVITY = 30, MAX_FALL = 42;
 const JUMP_V = 7.6, AUTO_JUMP_V = 7.4, JUMP_MIN_SPEED = 4.2;
@@ -16,6 +16,9 @@ export const MAX_HP = 6; // tre hjärtan, varje träff tar ett halvt
 export const SWORD_MAX = 150; // svärdets hållbarhet: ett hugg som träffar sliter 1, en sköld 2
 // Mjölnirs skärva: tung vikt och markslaget
 const HEAVY_SPEED = 2.3, HEAVY_SPEED_GLOVES = 3.3;
+// Grumble, getabocken: dubbelt så fort som Cello springer, vidare svängar och högre hopp
+export const RIDE_SPEED = 12.5;
+const RIDE_ACCEL = 20, RIDE_JUMP_V = 9.4;
 const SLAM_WIND = 0.42, SLAM_WIND_GLOVES = 0.3, SLAM_RECOVER = 0.38, SLAM_REACH = 1.25;
 
 // Tre slag i kombination: från höger, från vänster, och ett tungt slag uppifrån
@@ -238,6 +241,26 @@ function buildModel() {
   hammerBack.rotation.set(0.12, 0, 0.62);
   hammerBack.visible = false;
   torso.add(hammerBack);
+  // Ra's Shattered Prism: en sprucken kristall i en gyllene ram, hålls framför Cello i höger hand
+  const prism = new THREE.Group();
+  {
+    const crystalMat = new THREE.MeshBasicMaterial({ color: 0xffe8a8, transparent: true, opacity: 0.9 });
+    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.15, 0), crystalMat);
+    crystal.scale.set(0.8, 1.4, 0.8);
+    crystal.userData.solo = true;
+    prism.add(crystal);
+    const goldMat = new THREE.MeshLambertMaterial({ color: 0xc9a24f, emissive: 0x3a2808, flatShading: true });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 4, 10), goldMat);
+    ring.rotation.x = Math.PI / 2;
+    prism.add(ring);
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.22, 0.04), goldMat);
+    handle.position.y = -0.2;
+    prism.add(handle);
+    prism.position.set(0, -0.42, 0.06);
+    prism.visible = false;
+    elbowR.add(prism);
+    prism.userData.crystalMat = crystalMat;
+  }
 
   // Lyktan hänger i bältet vid vänster höft
   const lantern = new THREE.Group();
@@ -256,7 +279,7 @@ function buildModel() {
   const lL = leg(-1), lR = leg(1);
   const parts = {
     body, hips, torso, head, tail, scarf, armL, armR, elbowL, elbowR, legL: lL.g, legR: lR.g, kneeL: lL.knee, kneeR: lR.knee,
-    skirt, sword, shield, eyes, lids, M, hammerHand, hammerBack, hammerGlow: glow, blade, tip, jag, lantern, lanternGlass,
+    skirt, sword, shield, eyes, lids, M, hammerHand, hammerBack, hammerGlow: glow, blade, tip, jag, lantern, lanternGlass, prism,
   };
   root.scale.setScalar(0.9);
   return { root, ...parts };
@@ -319,6 +342,15 @@ export class Player {
     this.lockTarget = null;
     this.assistTarget = null;
     this.hasHammer = false;
+    this.hasPrism = false;
+    this.prismUp = false;
+    this.prismPoint = new THREE.Vector3();
+    this.aimDir = new THREE.Vector3(0, 0, 1);
+    this.onPrism = null; // (uppe: true/false)
+    this.wearMul = 1; // Tareks slipsten gör att svärdet slits långsammare
+    this.mount = null; // getabocken Cello rider på (goat.js), eller null
+    this.onKnockedOff = null; // (bocken) när Cello blir träffad och ramlar av
+    this.onHoof = null; // hovslag
     this.heavy = false;
     this.gloves = false;
     this.slamBuf = 0;
@@ -463,6 +495,7 @@ export class Player {
       this.onBlock?.();
       return 'blocked';
     }
+    if (this.mount) this.onKnockedOff?.(this.mount);
     this.hp = Math.max(opt.nonLethal ? 1 : 0, this.hp - dmg);
     this.invuln = 1.1;
     const kb = this.heavy ? 0.3 : 1; // med tung vikt står Cello nästan still
@@ -481,7 +514,7 @@ export class Player {
     const s = this.sword;
     if (s.broken || n <= 0) return;
     const before = s.dur;
-    s.dur = Math.max(0, s.dur - n);
+    s.dur = Math.max(0, s.dur - n * this.wearMul);
     if (s.dur <= 0) {
       this.setSword(0);
       this.onSwordWear?.('broken');
@@ -505,6 +538,26 @@ export class Player {
     this.model.lanternGlass.color.set(lit ? 0xffd27a : 0x5a4a30);
   }
 
+  // Prisman upp eller ner
+  setPrism(on) {
+    if (on === this.prismUp) return;
+    this.prismUp = on;
+    if (on) this.shielding = false;
+    this.onPrism?.(on);
+  }
+
+  // Var prismans ljus kommer ifrån och vart det går (mot låst mål, annars rakt fram)
+  updateAim() {
+    const fx = Math.sin(this.facing), fz = Math.cos(this.facing);
+    this.prismPoint.set(this.feet.x + fx * 0.55, this.feet.y + 1.3, this.feet.z + fz * 0.55);
+    const t = this.lockTarget;
+    if (t) {
+      this.aimDir.copy(t.chest).sub(this.prismPoint);
+      if (this.aimDir.lengthSq() < 1e-4) this.aimDir.set(fx, 0, fz);
+      this.aimDir.normalize();
+    } else this.aimDir.set(fx, 0, fz);
+  }
+
   // ---------- uppdatering ----------
   update(dt, input, camYaw) {
     if (this.autoWalk) {
@@ -519,10 +572,14 @@ export class Player {
     this.attackBuf = input.attack ? 0.25 : Math.max(0, this.attackBuf - dt);
     this.dodgeBuf = input.dodge ? 0.15 : Math.max(0, this.dodgeBuf - dt);
     this.slamBuf = input.slam ? 0.2 : Math.max(0, this.slamBuf - dt);
-    if (input.heavy && this.hasHammer && !this.carried && (this.state === 'move' || this.state === 'attack')) {
+    if (input.heavy && this.hasHammer && !this.carried && !this.mount && (this.state === 'move' || this.state === 'attack')) {
       this.heavy = !this.heavy;
       this.onHeavy?.(this.heavy);
+      if (this.heavy) this.setPrism(false);
     }
+    if (input.prism && this.hasPrism && !this.carried && !this.mount && this.state === 'move') this.setPrism(!this.prismUp);
+    // Prisman sänks när Cello hugger, hoppar, rullar, tar upp skölden eller blir träffad
+    if (this.prismUp && (this.state !== 'move' || input.attack || input.jump || input.dodge || input.shield || input.slam)) this.setPrism(false);
     this.jumpHeld = !!input.jumpHeld;
     this.stateT += dt;
 
@@ -535,21 +592,39 @@ export class Player {
     const fx = Math.sin(this.facing), fz = Math.cos(this.facing);
     let tvx = 0, tvz = 0, accel = DECEL, airControl = false, allowAuto = false, turnRate = 0;
     let faceAngle = null;
-    if (this.lockTarget) faceAngle = Math.atan2(this.lockTarget.pos.x - this.feet.x, this.lockTarget.pos.z - this.feet.z);
+    if (this.lockTarget && !this.mount) faceAngle = Math.atan2(this.lockTarget.pos.x - this.feet.x, this.lockTarget.pos.z - this.feet.z);
 
     switch (this.state) {
       case 'move': {
+        if (this.mount) {
+          // Ridning: bara styra och hoppa. Inga hugg, ingen sköld, ingen rullning.
+          this.shielding = false;
+          tvx = this.wish.x * RIDE_SPEED * mag;
+          tvz = this.wish.z * RIDE_SPEED * mag;
+          accel = mag > 0.01 ? RIDE_ACCEL : RIDE_ACCEL * 1.2;
+          airControl = mag > 0.01;
+          allowAuto = true;
+          turnRate = this.grounded ? 5.5 : 3;
+          this.attackBuf = 0;
+          this.dodgeBuf = 0;
+          this.slamBuf = 0;
+          if (this.jumpBuf > 0 && this.coyote > 0) {
+            this.jump();
+            this.vel.y = RIDE_JUMP_V;
+          }
+          break;
+        }
         const carrying = !!this.carried;
         this.shielding = !!input.shield && this.grounded && !carrying;
         const heavySpeed = this.gloves ? HEAVY_SPEED_GLOVES : HEAVY_SPEED;
         const speed = carrying ? 3.6 : this.heavy ? Math.min(heavySpeed, this.shielding ? SHIELD_SPEED : heavySpeed)
-          : this.shielding ? SHIELD_SPEED : this.lockTarget ? LOCK_SPEED : input.walk ? WALK_SPEED : RUN_SPEED;
+          : this.prismUp ? PRISM_SPEED : this.shielding ? SHIELD_SPEED : this.lockTarget ? LOCK_SPEED : input.walk ? WALK_SPEED : RUN_SPEED;
         tvx = this.wish.x * speed * mag;
         tvz = this.wish.z * speed * mag;
         accel = mag > 0.01 ? ACCEL : DECEL;
         airControl = mag > 0.01;
-        allowAuto = !this.lockTarget && !this.shielding && !carrying && !this.heavy;
-        turnRate = this.grounded ? (this.shielding ? 0 : carrying ? 10 : this.heavy ? 9 : 16) : 6;
+        allowAuto = !this.lockTarget && !this.shielding && !carrying && !this.heavy && !this.prismUp;
+        turnRate = this.grounded ? (this.shielding ? 0 : carrying ? 10 : this.heavy ? 9 : this.prismUp ? 7 : 16) : 6;
         if (carrying) break;
         const wantSlam = this.hasHammer && (this.slamBuf > 0 || (this.heavy && this.attackBuf > 0));
         if (wantSlam && this.grounded) this.startSlam();
@@ -637,6 +712,7 @@ export class Player {
     this.facing = wrap(this.facing);
 
     this.updateFeet();
+    this.updateAim();
     this.trackSafe(dt);
     this.animate(dt);
     this.syncModel();
@@ -844,10 +920,14 @@ export class Player {
     a.air = approach(a.air, this.grounded ? 0 : 1, this.grounded ? 18 : 8, dt);
     a.land = Math.max(0, a.land - dt * 3.5);
     a.shield = approach(a.shield, this.shielding ? 1 : 0, 22, dt);
+    a.prism = approach(a.prism ?? 0, this.prismUp ? 1 : 0, 16, dt);
     if (this.grounded && this.state === 'move') {
       const before = Math.floor(a.phase / Math.PI);
-      a.phase += dt * (2.2 + this.speed * (this.heavy ? 1.9 : 1.55));
-      if (Math.floor(a.phase / Math.PI) !== before && this.speed > 1.2) this.onStep?.(this.heavy ? -1 : this.speed / RUN_SPEED);
+      a.phase += dt * (this.mount ? 2 + this.speed * 0.75 : 2.2 + this.speed * (this.heavy ? 1.9 : 1.55));
+      if (Math.floor(a.phase / Math.PI) !== before && this.speed > 1.2) {
+        if (this.mount) this.onHoof?.(this.speed / RIDE_SPEED);
+        else this.onStep?.(this.heavy ? -1 : this.speed / RUN_SPEED);
+      }
     }
 
     const swing = Math.sin(a.phase) * 0.95 * Math.min(1, a.run * 1.5) * (1 - a.air);
@@ -880,6 +960,33 @@ export class Player {
       P.armLz = P.armLz * (1 - a.shield) + 0.35 * a.shield;
       P.torsoX = P.torsoX * (1 - a.shield) + 0.12 * a.shield;
       P.torsoY = P.torsoY * (1 - a.shield) + 0.2 * a.shield;
+    }
+
+    // Prisman hålls fram i höger hand
+    if (a.prism > 0.01 && this.state === 'move') {
+      const k = a.prism;
+      P.armRx = P.armRx * (1 - k) - 1.45 * k;
+      P.armRz = P.armRz * (1 - k) - 0.15 * k;
+      P.elbowR = P.elbowR * (1 - k) - 0.3 * k;
+      P.torsoY = P.torsoY * (1 - k) - 0.15 * k;
+      P.headX = P.headX * (1 - k) + 0.05 * k;
+    }
+
+    // På Grumbles rygg: grensle över sadeln, händerna på hornen, framåtlutad i galopp
+    if (this.mount && (this.state === 'move' || this.state === 'hurt')) {
+      const gal = Math.min(1, this.speed / RIDE_SPEED);
+      const bob = Math.abs(Math.sin(a.phase)) * 0.08 * gal * (1 - a.air);
+      P.hipsY = this.mount.saddleY + bob;
+      P.legL = P.legR = -0.55;
+      P.kneeL = P.kneeR = 1.15;
+      P.armLx = P.armRx = -0.95 - gal * 0.15;
+      P.armLz = 0.18; P.armRz = -0.18;
+      P.elbowL = P.elbowR = -0.75;
+      P.torsoX = 0.12 + gal * 0.28 + a.air * 0.15;
+      P.torsoY = 0;
+      P.headX = -0.1 - gal * 0.15;
+      P.swordX = -0.2;
+      rate = 20;
     }
 
     if (this.carried && this.state === 'move') {
@@ -995,6 +1102,11 @@ export class Player {
     ap(m.elbowR.rotation, 'x', P.elbowR);
     // Tunikans fåll följer benen, och fladdrar ut lite när han springer
     m.skirt.rotation.x = approach(m.skirt.rotation.x, (m.legL.rotation.x + m.legR.rotation.x) * 0.25 - a.run * 0.08, 20, dt);
+    // Benen isär när han rider
+    const spread = this.mount ? 0.42 : 0;
+    m.legL.rotation.z = approach(m.legL.rotation.z, -spread, 14, dt);
+    m.legR.rotation.z = approach(m.legR.rotation.z, spread, 14, dt);
+    if (this.mount) this.mount.animate(dt, this.speed, this.grounded, a.phase);
     m.skirt.scale.set(1 + a.run * 0.06 + a.air * 0.1, 1, 1 + a.run * 0.08 + a.air * 0.1);
 
     // Halsduken: tre leder med fjädring, lyfts bakåt av farten och fladdrar i vinden
@@ -1032,7 +1144,14 @@ export class Player {
     // Svärdet eller hammaren i handen, hammaren på ryggen
     const inHand = this.hasHammer && (this.state === 'slam' || (this.heavy && this.state !== 'attack'));
     const holding = this.state === 'itemget';
-    m.sword.visible = !inHand && !holding;
+    m.sword.visible = !inHand && !holding && !this.prismUp && !this.mount;
+    m.prism.visible = this.prismUp && this.state === 'move';
+    if (m.prism.visible) {
+      m.prism.rotation.y += dt * 2.5;
+      const c = m.prism.userData.crystalMat.color;
+      const k2 = 0.85 + Math.sin(a.t * 6) * 0.15;
+      c.setRGB(k2, k2 * 0.9, k2 * 0.62);
+    }
     m.hammerHand.visible = inHand && !holding;
     m.hammerBack.visible = this.hasHammer && !inHand;
     m.hammerHand.rotation.x = this.state === 'slam' ? m.sword.rotation.x - 0.3 : m.sword.rotation.x;

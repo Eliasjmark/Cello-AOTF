@@ -19,6 +19,8 @@ import { buildField } from './regions/field.js';
 import { buildWillowmere } from './regions/willowmere.js';
 import { buildStormreach } from './regions/stormreach.js';
 import { buildInteriors } from './regions/interiors.js';
+import { buildDesert } from './regions/desert.js';
+import { Pyramid, OX as PYR_X } from './pyramid.js';
 
 const AZ = -78; // Aetherias mittpunkt i z
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -856,6 +858,26 @@ export function buildWorld(scene, lights) {
   const willow = buildWillowmere(B, areas);
   const reach = buildStormreach(B, areas);
   const interiors = buildInteriors(B, areas);
+  const desert = buildDesert(B, areas);
+
+  // =====================================================================
+  // The Sun-Scorched Pyramid (x 9000)
+  // =====================================================================
+  const pyrArea = areas.create({
+    id: 'pyramid', name: 'The Sun-Scorched Pyramid', sub: 'Tomb of the forsaken sun god', card: false, indoor: true,
+    fog: { color: 0x1e140c, near: 24, far: 130 },
+    light: { hemi: 1.05, moon: 0.6, flash: 0, sky: 0xb09070, ground: 0x3a2a1c, moonColor: 0xe0c090 },
+  });
+  B.begin(pyrArea);
+  B.bounds(PYR_X - 45, PYR_X + 45, -90, 25);
+  const pyramid = new Pyramid(B, pyrArea);
+  pyrArea.entries = {
+    south: { pos: V3(PYR_X, 0, 9), facing: Math.PI },
+    entrance: { pos: V3(PYR_X, 0, 9), facing: Math.PI },
+  };
+  pyrArea.exits = [{ x0: PYR_X - 3, x1: PYR_X + 3, z0: 12.5, z1: 20, to: 'desert', entry: 'pyramid', label: 'The Ember Wastes' }];
+  pyrArea.connectFns.push((c) => pyramid.connect(c));
+  B.end();
 
   const world = {
     areas,
@@ -889,8 +911,16 @@ export function buildWorld(scene, lights) {
     prologue: { refugee: V(4.6, 12.4), titanHome: V(-16.5, 9) },
     east: field.east,
     paths: { north: paths.north, east: field.eastPath },
-    ranch, pass, field, willow, reach, interiors,
+    ranch, pass, field, willow, reach, interiors, desert,
     bastion,
+    pyramid,
+    // Fängelsehålorna: samma gränssnitt (state, interactions, trap, update, combatTargets ...)
+    dungeons: { bastion, pyramid },
+    dungeonAt: (id) => (id === 'bastion' ? bastion : id === 'pyramid' ? pyramid : null),
+    inPyramid: () => areas.id === 'pyramid',
+    slamGate: field.slamGate,
+    setSunGate: field.setSunGate,
+    sunGate: field.gate,
     fires: B.fires,
     villageFires,
     // Sant om punkten ligger där fiender inte får gå (Aetheria och broarna dit, eller ett fridfullt område)

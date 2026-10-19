@@ -36,10 +36,49 @@ export function buildHammer() {
   return g;
 }
 
+// Ra's Shattered Prism: en sprucken solkristall i en gyllene ram med vingar
+export function buildPrism() {
+  const M = ITEM_MATS;
+  const g = new THREE.Group();
+  const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), new THREE.MeshBasicMaterial({ color: 0xffe2a0 }));
+  crystal.scale.set(0.8, 1.5, 0.8);
+  g.add(crystal);
+  const crack = B(0.02, 0.4, 0.02, new THREE.MeshBasicMaterial({ color: 0xb06a10 }), 0.05, 0.02, 0.1);
+  crack.rotation.z = 0.4;
+  g.add(crack);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.035, 4, 12), M.gold);
+  g.add(ring);
+  for (const s of [-1, 1]) {
+    const wing = B(0.32, 0.08, 0.03, M.gold, s * 0.42, 0.08, 0);
+    wing.rotation.z = s * 0.35;
+    g.add(wing, B(0.22, 0.06, 0.03, M.gold, s * 0.38, -0.02, 0));
+  }
+  g.add(B(0.06, 0.24, 0.06, M.gold, 0, -0.36, 0));
+  return g;
+}
+
 export function buildItem(kind) {
   const M = ITEM_MATS;
   const g = new THREE.Group();
-  if (kind === 'hammer') {
+  if (kind === 'pmap') kind = 'map';
+  else if (kind === 'pkey') kind = 'key';
+  if (kind === 'prism') {
+    g.add(buildPrism());
+  } else if (kind === 'sunkey') {
+    g.add(B(0.08, 0.5, 0.05, M.gold, 0, 0, 0));
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 12), M.gold);
+    disc.rotation.x = Math.PI / 2;
+    disc.position.y = 0.36;
+    g.add(disc);
+    g.add(B(0.14, 0.14, 0.08, new THREE.MeshBasicMaterial({ color: 0xffc040 }), 0, 0.36, 0));
+    for (let i = 0; i < 6; i++) {
+      const r = B(0.04, 0.12, 0.04, M.gold, Math.cos(i * 1.047) * 0.27, 0.36 + Math.sin(i * 1.047) * 0.27, 0);
+      r.rotation.z = i * 1.047 - Math.PI / 2;
+      g.add(r);
+    }
+    g.add(B(0.16, 0.06, 0.05, M.gold, 0.1, -0.2, 0));
+    g.add(B(0.12, 0.06, 0.05, M.gold, 0.08, -0.08, 0));
+  } else if (kind === 'hammer') {
     const h = buildHammer();
     h.rotation.z = Math.PI;
     h.position.y = -0.3;
@@ -79,6 +118,15 @@ export function buildItem(kind) {
   } else if (kind === 'letter') {
     g.add(B(0.36, 0.24, 0.02, M.paper, 0, 0, 0));
     g.add(B(0.08, 0.08, 0.03, M.ribbon, 0, 0, 0.01));
+  } else if (kind === 'horn') {
+    // Grumbles horn: ett krökt bockhorn med ett rött snöre
+    const horn = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.06, 6, 12, Math.PI * 1.3), lam(0xd8c8a4));
+    horn.rotation.z = -0.4;
+    g.add(horn);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 6), lam(0xb09c74));
+    tip.position.set(0.2, 0.0, 0);
+    g.add(tip);
+    g.add(B(0.3, 0.03, 0.03, ITEM_MATS.ribbon, -0.02, -0.12, 0.05));
   } else if (kind === 'lantern') {
     // Mässingslykta med glas och ett varmt sken
     g.add(B(0.3, 0.05, 0.3, M.brass, 0, 0.2, 0));
@@ -104,6 +152,21 @@ export const ITEM_TEXT = {
     'Press Tab to open the item menu and choose which button each item lies on.',
   ],
   heart: ['You got a Heart Ember!', 'A new heart, filled to the brim.'],
+  pmap: ['You found the Pyramid Map!', 'Press K to view it. Every chamber of the pyramid is on it now.'],
+  pkey: ['You got a Iron Key!', 'It opens a locked door somewhere in this pyramid.'],
+  sunkey: ['You got the Sun Key!', 'It fits the great door behind which the shadow serpent waits.'],
+  prism: [
+    "You got Ra's Shattered Prism!",
+    'A crystal of the sun god, cracked through. It still drinks the light.',
+    'Put it on a button in the item menu (Tab) and press it to raise the prism. Stand in a sunbeam, or in the light from the ceiling, and the prism throws the light where you face.',
+    'Lock on (Q) to aim the light straight at a sun eye, a shadow, or a foe. Sunlight burns away darkness.',
+  ],
+  horn: [
+    "You got Grumble's Horn!",
+    'Hollis carved it from one of Grumble\'s old horns. Blow it outdoors, and the big ram will come running.',
+    'Press E next to Grumble to climb into the saddle. He runs twice as fast as Cello, and jumps further. Press E again to climb down.',
+    'He will not follow you into caves, houses or dungeons. He waits outside.',
+  ],
   lantern: [
     'You got the Lantern!',
     'A brass oil lantern. Put it on F, G or V in the item menu (Tab), then press that button to light it.',

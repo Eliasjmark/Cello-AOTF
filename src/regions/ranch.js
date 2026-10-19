@@ -110,6 +110,13 @@ export function buildRanch(B, areas) {
   }
   B.cart(X0 + 10, H(X0 + 10, 4), 4, 0.4, { load: true });
   for (const [x, z] of [[13, -12], [12.2, -13.4]]) B.pot(X0 + x, H(X0 + x, z), z);
+  // Stolpen där Grumble, gårdens stora bock, står bunden
+  {
+    const x = X0 + 7.6, z = -21.2, y = H(x, z);
+    B.solid(place(new THREE.Mesh(cyl(0.12, 0.14, 1.4, 6, 1), M.woodDark), x, y + 0.7, z));
+    B.deco(new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.03, 4, 10).rotateX(Math.PI / 2), M.rope), x, y + 1.1, z);
+    B.hayBale(X0 + 9.4, H(X0 + 9.4, -22.4), -22.4, 0.5);
+  }
 
   // ---------- betesmarken ----------
   const pc = { x: X0 - 26, z: -18 };
@@ -208,6 +215,7 @@ export function buildRanch(B, areas) {
       nell: { area: 'ranch', pos: VV(-11.2, 18.5), face: Math.PI / 2 },
       tilly: { area: 'ranch', pos: VV(-12, -9), face: 0, wander: { center: VV(-12, -9), radius: 2.6 } },
     },
+    grumble: { pos: VV(6.6, -19.6), facing: 0.35 },
     animals: [
       ...[0, 1, 2, 3, 4].map((i) => ({ kind: 'goat', area: 'ranch', pos: VV(-26 + Math.cos(i * 1.3) * 6, -18 + Math.sin(i * 1.3) * 5), center: VV(-26, -18), radius: 8.5, H })),
       ...[0, 1].map((i) => ({ kind: 'cow', area: 'ranch', pos: VV(-30 + i * 6, -22 + i * 3), center: VV(-27, -19), radius: 7, H })),

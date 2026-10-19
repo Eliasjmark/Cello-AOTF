@@ -84,7 +84,9 @@ export class CameraRig {
     const locked = !!this.lockTarget;
     // Stora fiender (bossar, titaner) behöver mer avstånd och lite högre kamera för att synas
     const big = locked ? this.lockTarget.radiusBig || 0 : 0;
-    const wantDist = DIST + Math.min(3, big * 0.5) - (this.indoor ? 0.6 : 0);
+    // På Grumbles rygg sitter Cello högre och rör sig fortare: kameran backar lite
+    const riding = player.mount ? 1 : 0;
+    const wantDist = DIST + Math.min(3, big * 0.5) - (this.indoor ? 0.6 : 0) + riding * 1.6;
     this.dist += (wantDist - this.dist) * (1 - Math.exp(-dt * 3));
     this.lockBlend += ((locked ? 1 : 0) - this.lockBlend) * (1 - Math.exp(-dt * 6));
 
@@ -118,7 +120,7 @@ export class CameraRig {
       if (sp > 1.5) {
         const behind = Math.atan2(player.vel.x, player.vel.z) + Math.PI;
         const diff = wrap(behind - this.yaw);
-        if (Math.abs(diff) < 2.2) this.yaw += diff * (1 - Math.exp(-dt * 1.1 * Math.min(1, sp / RUN_SPEED)));
+        if (Math.abs(diff) < 2.2) this.yaw += diff * (1 - Math.exp(-dt * (player.mount ? 1.8 : 1.1) * Math.min(1, sp / RUN_SPEED)));
         if (this.idle > 2) this.pitch += (DEFAULT_PITCH - this.pitch) * (1 - Math.exp(-dt * 0.8));
       }
     }
@@ -139,7 +141,7 @@ export class CameraRig {
     const ky = 1 - Math.exp(-dt * (player.grounded ? 9 : 5));
     this.target.x += (player.feet.x - this.target.x) * k;
     this.target.z += (player.feet.z - this.target.z) * k;
-    this.target.y += (player.feet.y + EYE - this.target.y) * ky;
+    this.target.y += (player.feet.y + EYE + (player.mount ? 0.55 : 0) - this.target.y) * ky;
     this.place(dt, false);
   }
 

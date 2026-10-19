@@ -24,6 +24,13 @@ export const VOICES = {
   fenn: { f: 190, wave: 'sawtooth', form: [[680, 4], [1300, 5]] },
   odo: { f: 128, wave: 'triangle', form: [[540, 3], [1000, 4]], breath: 0.3 },
   nell: { f: 300, wave: 'triangle', form: [[780, 4], [1500, 5]] },
+  wren: { f: 315, wave: 'triangle', form: [[800, 4], [1600, 5]] },
+  // 0.7: öknen och pyramiden
+  nefret: { f: 240, wave: 'triangle', form: [[680, 3], [1250, 4]], breath: 0.3 },
+  hamid: { f: 122, wave: 'sawtooth', form: [[540, 4], [1080, 5]], wobble: 0.3 },
+  sabi: { f: 470, wave: 'square', form: [[960, 4], [1900, 5]] },
+  tarek: { f: 152, wave: 'sawtooth', form: [[590, 4], [1150, 5]], breath: 0.4 },
+  apophis: { f: 58, wave: 'sawtooth', form: [[280, 3], [640, 3]], wobble: 1.6, breath: 0.9 },
 };
 const STEPS = [1, 9 / 8, 5 / 4, 4 / 3, 3 / 2];
 const FANFARE = [[523.25, 0], [659.25, 0.13], [783.99, 0.26], [1046.5, 0.39], [987.77, 0.62], [1046.5, 0.78]];
@@ -511,6 +518,80 @@ export class Sfx {
         this.noiseThrough('lowpass', 500, 300, 1, t + 0.7, 0.3, this.gain(t + 0.7, 0.02, 0.12 * v, 0.3));
         break;
       }
+      // ---------- 0.7: Grumble ----------
+      case 'hoof': // hovslag när Cello rider
+        this.noiseThrough('bandpass', 900 * r, 700, 3, t, 0.06, this.gain(t, 0.002, 0.22 * v, 0.06));
+        this.osc('sine', 160 * r, 90, t, 0.07, this.gain(t, 0.002, 0.16 * v, 0.07));
+        break;
+      case 'ram': { // Grumbles djupa bräkande
+        const g = this.lowpass(this.gain(t, 0.03, 0.2 * v, 0.7), 1500);
+        const o = this.ctx.createOscillator();
+        o.type = 'sawtooth';
+        for (let k = 0; k < 14; k++) o.frequency.setValueAtTime((k % 2 ? 205 : 240) * r * (1 - k * 0.012), t + k * 0.05);
+        o.connect(g);
+        o.start(t);
+        o.stop(t + 0.72);
+        break;
+      }
+      case 'horn': // hornet som kallar på Grumble: två långa toner
+        [[220, 0, 0.5], [294, 0.45, 0.9]].forEach(([f, d, len]) => {
+          const ti = t + d;
+          const g = this.lowpass(this.gain(ti, 0.06, 0.2 * v, len), 1800);
+          this.osc('sawtooth', f, f * 0.99, ti, len, g);
+          this.osc('triangle', f * 2, f * 2, ti, len, this.gain(ti, 0.06, 0.05 * v, len));
+        });
+        break;
+      // ---------- 0.7: solljus, pyramiden och dess väktare ----------
+      case 'stonegrind': // en spegel eller stenplatta vrids
+        this.noiseThrough('bandpass', 260, 180, 2.5, t, 0.45, this.gain(t, 0.03, 0.35 * v, 0.42), this.brown);
+        this.osc('sawtooth', 48, 44, t, 0.4, this.lowpass(this.gain(t, 0.03, 0.12 * v, 0.4), 200));
+        break;
+      case 'sunchime': // ett solöga vaknar
+        [784, 988, 1175, 1568].forEach((f, i) => {
+          const ti = t + i * 0.07;
+          this.osc('sine', f, f, ti, 0.9, this.gain(ti, 0.005, 0.12 * v, 0.9));
+          this.osc('triangle', f * 2, f * 2, ti, 0.4, this.gain(ti, 0.005, 0.03 * v, 0.4));
+        });
+        break;
+      case 'sizzle': // ljuset bränner skugga
+        this.noiseThrough('highpass', 4200, 6000, 0.7, t, 0.3, this.gain(t, 0.01, 0.12 * v, 0.3));
+        break;
+      case 'veilburn': // en skuggslöja brinner upp
+        this.noiseThrough('bandpass', 600, 2400, 0.8, t, 0.9, this.gain(t, 0.05, 0.4 * v, 0.85));
+        this.osc('sine', 220, 660, t, 0.6, this.gain(t, 0.05, 0.12 * v, 0.6));
+        this.osc('sine', 1320, 1760, t + 0.2, 0.5, this.gain(t + 0.2, 0.01, 0.06 * v, 0.5));
+        break;
+      case 'prismup': // prisman lyfts: ett kristallklart ackord
+        [1047, 1319, 1568].forEach((f, i) => this.osc('triangle', f, f * 1.01, t + i * 0.03, 0.35, this.gain(t + i * 0.03, 0.004, 0.08 * v, 0.35)));
+        break;
+      case 'prismdown':
+        [1568, 1319].forEach((f, i) => this.osc('triangle', f, f * 0.98, t + i * 0.04, 0.2, this.gain(t + i * 0.04, 0.004, 0.06 * v, 0.2)));
+        break;
+      case 'hiss': { // ormen väser
+        const g = this.gain(t, 0.08, 0.35 * v, 1.1);
+        this.noiseThrough('highpass', 3200, 2200, 0.8, t, 1.1, g);
+        this.osc('sawtooth', 90, 70, t, 0.9, this.lowpass(this.gain(t, 0.1, 0.12 * v, 0.9), 300));
+        break;
+      }
+      case 'shriek': { // ormen skriker när solljuset bränner den
+        const g = this.lowpass(this.gain(t, 0.02, 0.4 * v, 1.0), 2400);
+        this.osc('sawtooth', 820 * r, 260, t, 1.0, g);
+        this.osc('square', 410 * r, 140, t, 1.0, this.lowpass(this.gain(t, 0.02, 0.12 * v, 1.0), 1200));
+        this.noiseThrough('bandpass', 1800, 700, 1.5, t, 0.8, this.gain(t, 0.02, 0.25 * v, 0.8));
+        break;
+      }
+      case 'scarab': // skalbaggen klickar och skrapar
+        for (let i = 0; i < 5; i++) {
+          const ti = t + i * 0.06;
+          this.noiseThrough('bandpass', 2400 + i * 200, 1800, 4, ti, 0.04, this.gain(ti, 0.001, 0.2 * v, 0.04));
+        }
+        this.osc('sawtooth', 70, 50, t, 0.35, this.lowpass(this.gain(t, 0.02, 0.15 * v, 0.35), 260));
+        break;
+      case 'flip': // skalbaggen vänds på rygg
+        this.osc('sine', 120, 40, t, 0.5, this.gain(t, 0.004, 0.7 * v, 0.5));
+        this.noiseThrough('lowpass', 800, 200, 0.8, t, 0.5, this.gain(t, 0.01, 0.4 * v, 0.5), this.brown);
+        this.osc('triangle', 520, 260, t + 0.05, 0.3, this.gain(t + 0.05, 0.003, 0.12 * v, 0.3));
+        break;
       case 'cluck':
         for (let i = 0; i < 3; i++) this.voice(620 * r, 480 * r, 0.06, 0.15 * v, [[1100, 4], [2200, 5]], t + i * 0.11);
         break;

@@ -166,6 +166,19 @@ export function createBuilder(scene, lights) {
     furDark: lam({ color: 0x2a2624, flatShading: true }),
     horn: lam({ color: 0x8a8070, flatShading: true }),
     water: new THREE.MeshLambertMaterial({ map: tex.water, transparent: true, opacity: 0.82, depthWrite: false }),
+    // 0.7: öknen och pyramiden
+    sand: lam({ map: tex.sand, vertexColors: true }),
+    sandRock: lam({ map: tex.sand, color: 0xa8865a, flatShading: true }),
+    sandstone: lam({ map: tex.sandstone }),
+    roadStone: lam({ map: tex.sandstone, color: 0xc0a078, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
+    sandstoneDark: lam({ map: tex.sandstone, color: 0x8a7458 }),
+    hiero: lam({ map: tex.hiero }),
+    goldPlate: lam({ map: tex.sandstone, color: 0xe0b450, emissive: 0x3a2808 }),
+    palm: lam({ color: 0x5a7a3a, flatShading: true, side: THREE.DoubleSide }),
+    palmTrunk: lam({ map: tex.bark, color: 0xb09070 }),
+    lapis: lam({ color: 0x2a4a8a, flatShading: true }),
+    clothWhite: lam({ color: 0xd8ccb0, side: THREE.DoubleSide, flatShading: true }),
+    clothTeal: lam({ color: 0x3a7a78, side: THREE.DoubleSide, flatShading: true }),
   };
   tex.water.wrapS = tex.water.wrapT = THREE.RepeatWrapping;
 
@@ -1055,6 +1068,76 @@ export function createBuilder(scene, lights) {
     });
     A.map.rects.push({ kind: 'house', x, z, w, d, ry, label: o.label });
     return { g, door: local(g, 0, 0, d / 2 + 1.5), facing: ry };
+  };
+
+  // ---------- öknen (0.7) ----------
+  // Palm: en böjd stam av sex delar och en krona av hängande blad
+  B.palm = (x, y, z, s = 1, lean = 0.25, dir = 0) => {
+    const g = groupAt(x, y, z, dir);
+    let px = 0, py = 0, ang = 0;
+    for (let i = 0; i < 6; i++) {
+      const h = 0.9 * s;
+      ang += lean * 0.18;
+      const seg = new THREE.Mesh(cyl(0.16 * s * (1 - i * 0.06), 0.2 * s * (1 - i * 0.06), h + 0.06, 6, 1), M.palmTrunk);
+      seg.rotation.z = -ang;
+      put(g, seg, px + Math.sin(ang) * h / 2, py + Math.cos(ang) * h / 2, 0, i === 0);
+      px += Math.sin(ang) * h;
+      py += Math.cos(ang) * h;
+    }
+    // Kollision för stammens nedre del
+    hidden(new THREE.CylinderGeometry(0.3 * s, 0.3 * s, 2.2 * s, 6), x, y + 1.1 * s, z);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + hash2(x, i) * 0.3;
+      for (let k = 0; k < 2; k++) {
+        const frond = new THREE.Mesh(new THREE.BoxGeometry(0.42 * s * (1 - k * 0.3), 0.03, 1.2 * s), M.palm);
+        const r0 = 0.55 * s + k * 1.05 * s;
+        frond.position.set(px + Math.cos(a) * r0, py + 0.15 * s - k * 0.45 * s, Math.sin(a) * r0);
+        frond.rotation.set(0, -a + Math.PI / 2, 0);
+        frond.rotateX(0.25 + k * 0.6);
+        g.add(frond);
+      }
+    }
+    for (let i = 0; i < 3; i++) put(g, new THREE.Mesh(new THREE.IcosahedronGeometry(0.13 * s, 0), M.woodDark), px + Math.cos(i * 2.1) * 0.2 * s, py - 0.15 * s, Math.sin(i * 2.1) * 0.2 * s);
+    return g;
+  };
+  // Obelisk av sandsten med en gyllene topp
+  B.obelisk = (x, y, z, h = 8, ry = 0, broken = false) => {
+    const g = groupAt(x, y, z, ry);
+    put(g, new THREE.Mesh(box(1.6, 0.6, 1.6, 1.5), M.sandstoneDark), 0, 0.3, 0, true);
+    const shaftH = broken ? h * 0.55 : h;
+    const geo = new THREE.CylinderGeometry(0.42, 0.62, shaftH, 4, 1);
+    geo.rotateY(Math.PI / 4);
+    if (broken) breakTop(geo, shaftH, 0.6);
+    put(g, new THREE.Mesh(geo, M.hiero), 0, 0.6 + shaftH / 2, 0, true);
+    if (!broken) {
+      const top = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.7, 4), M.goldPlate);
+      top.rotation.y = Math.PI / 4;
+      put(g, top, 0, 0.6 + shaftH + 0.35, 0);
+    }
+    return g;
+  };
+  // Pelare med lotuskapitäl
+  B.lotusColumn = (x, y, z, h = 5, broken = false) => {
+    const shaftH = broken ? h * (0.3 + hash2(x, z) * 0.4) : h;
+    let geo = cyl(0.5, 0.55, shaftH, 10, 2);
+    if (broken) geo = breakTop(geo, shaftH, 0.5);
+    solid(place(new THREE.Mesh(geo, M.hiero), x, y + shaftH / 2, z));
+    if (!broken) {
+      deco(new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.5, 0.8, 10), M.sandstone), x, y + h + 0.4, z);
+      deco(new THREE.Mesh(box(1.8, 0.3, 1.8, 1.5), M.sandstoneDark), x, y + h + 0.95, z);
+    }
+  };
+  // Baldakin av tyg på fyra stolpar (ökentält)
+  B.canopy = (x, y, z, ry, mat, w = 3.4, d = 2.8, h = 2.3) => {
+    const g = groupAt(x, y, z, ry);
+    for (const [cx, cz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) put(g, new THREE.Mesh(box(0.1, h, 0.1, 1), M.woodDark), cx * w / 2, h / 2, cz * d / 2, true);
+    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(w + 0.3, d + 0.3, 4, 4), mat);
+    const p = cloth.geometry.attributes.position;
+    for (let i = 0; i < p.count; i++) p.setZ(i, Math.cos(p.getX(i) / (w / 2) * Math.PI / 2) * Math.cos(p.getY(i) / (d / 2) * Math.PI / 2) * 0.3);
+    cloth.geometry.computeVertexNormals();
+    cloth.rotation.x = Math.PI / 2;
+    put(g, cloth, 0, h, 0);
+    return g;
   };
 
   // Väderkvarn med vingar som snurrar

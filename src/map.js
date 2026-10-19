@@ -160,6 +160,91 @@ export class MapView {
     g.fillText(items.join('   ·   '), 14 * dpr, 42 * dpr);
   }
 
+  // Pyramiden: rummen Cello har besökt, med kartan alla rum, dörrar och kistor
+  drawPyramid(pz, player) {
+    const { w, h, dpr } = this.size();
+    const g = this.ctx;
+    g.clearRect(0, 0, w, h);
+    const s = pz.state, R = pz.rooms;
+    const known = (id) => s.visited.includes(id) || s.map;
+    const ox = R.P1.x0 + 9; // pyramidens mitt i x
+    const T = this.fit(ox - 39, ox + 39, -84, 15, w, h * 0.92, 18 * dpr);
+    g.lineJoin = 'round';
+    const SAND = { room: '#2a2418', visited: '#43382a', here: '#5e4c34', stroke: '#c9a24f' };
+    for (const [id, r] of Object.entries(R)) {
+      if (id === 'E') continue;
+      if (!known(id) && id !== 'C7') continue;
+      if (id === 'C7' && !known('P4')) continue;
+      const visited = s.visited.includes(id);
+      const here = pz.room === id;
+      const fill = here ? SAND.here : visited ? SAND.visited : SAND.room;
+      const stroke = visited ? SAND.stroke : COL.dim;
+      if (id === 'P7') {
+        g.beginPath();
+        g.arc(T.X(r.cx), T.Z(r.cz), r.r * T.s, 0, Math.PI * 2);
+        g.fillStyle = fill;
+        g.fill();
+        g.strokeStyle = stroke;
+        g.lineWidth = 1.5 * dpr;
+        g.stroke();
+        if (!s.cleared.boss && s.map) this.skull(g, T.X(r.cx), T.Z(r.cz), 9 * dpr);
+        continue;
+      }
+      const x = T.X(r.x0), y = T.Z(r.z0), ww = (r.x1 - r.x0) * T.s, hh = (r.z1 - r.z0) * T.s;
+      g.fillStyle = fill;
+      g.fillRect(x, y, ww, hh);
+      g.strokeStyle = stroke;
+      g.lineWidth = 1.5 * dpr;
+      g.strokeRect(x, y, ww, hh);
+    }
+    // Ingångsgången
+    if (known('P1')) {
+      const r = R.E;
+      g.strokeStyle = COL.dim;
+      g.setLineDash([3 * dpr, 3 * dpr]);
+      g.lineWidth = 1 * dpr;
+      g.strokeRect(T.X(r.x0), T.Z(r.z0), (r.x1 - r.x0) * T.s, (r.z1 - r.z0) * T.s);
+      g.setLineDash([]);
+    }
+    // Ljusschakten
+    for (const sh of pz.beams.shafts) {
+      const id = pz.roomAt(sh.pos);
+      if (!id || !known(id)) continue;
+      g.beginPath();
+      g.arc(T.X(sh.pos.x), T.Z(sh.pos.z), Math.max(2.5 * dpr, sh.radius * T.s), 0, Math.PI * 2);
+      g.fillStyle = '#ffd070';
+      g.fill();
+    }
+    // Dörrar
+    for (const d of Object.values(pz.doors)) {
+      const sides = [d.neg, d.pos].filter((x) => x && R[x]);
+      if (!sides.some((id) => known(id))) continue;
+      const veil = d.type === 'veil';
+      const open = veil ? s.veils.includes('v45') : d.slabTarget > 1 && d.barsTarget > 1;
+      const x = T.X(d.x), y = T.Z(d.z), L = 2.4 * T.s, W = Math.max(3 * dpr, 0.8 * T.s);
+      g.fillStyle = open ? SAND.here : d.type === 'boss' ? COL.red : d.type === 'key' ? COL.gold : veil ? '#6a3a9a' : d.type === 'eye' ? '#ff9a3a' : COL.dim;
+      if (d.axis === 'x') g.fillRect(x - W / 2, y - L / 2, W, L);
+      else g.fillRect(x - L / 2, y - W / 2, L, W);
+    }
+    // Kistor
+    for (const c of Object.values(pz.chests)) {
+      if (!(s.map || s.visited.includes(c.room)) || !c.g.visible) continue;
+      this.chest(g, T.X(c.x), T.Z(c.z), 5 * dpr, c.open, c.big);
+    }
+    // Cello
+    const p = player.feet;
+    if (pz.inside(p)) this.arrow(g, T.X(p.x), T.Z(p.z), player.facing, 7 * dpr, COL.ink);
+    // Rubrik och föremål
+    g.textAlign = 'left';
+    g.fillStyle = COL.ink;
+    g.font = `700 ${15 * dpr}px Cinzel, serif`;
+    g.fillText('The Sun-Scorched Pyramid', 14 * dpr, 24 * dpr);
+    g.font = `${12 * dpr}px "Barlow Semi Condensed", sans-serif`;
+    g.fillStyle = COL.dim;
+    const items = [`Keys: ${s.keys}`, s.map ? 'Map ✓' : 'No map', s.bossKey ? 'Sun Key ✓' : '', s.prismTaken ? 'Prism ✓' : ''].filter(Boolean);
+    g.fillText(items.join('   ·   '), 14 * dpr, 42 * dpr);
+  }
+
   chest(g, x, y, r, open, big) {
     g.fillStyle = open ? COL.dim : big ? COL.red : COL.gold;
     g.fillRect(x - r, y - r * 0.7, r * 2, r * 1.4);
@@ -300,10 +385,12 @@ export class MapView {
       bastion: [0.1, 0.03, 'Tempest Bastion'], cave: [0.1, 0.15, 'Hollow Cave'], stormreach: [0.1, 0.27, 'Stormreach'],
       field: [0.1, 0.42, 'The Stormvale'], willowmere: [0.55, 0.34, 'Willowmere'], pass: [0.1, 0.57, 'Galewind Pass'],
       ranch: [0.1, 0.7, 'Thistledown'], village: [0.1, 0.84, 'Hollowbrook'], home: [0.1, 0.97, "Cello's Home"],
+      desert: [0.42, 0.5, 'Ember Wastes'], pyramid: [0.42, 0.62, 'Sun Pyramid'],
     };
     const parent = { shop: 'willowmere', house: 'home' };
     const here = parent[areas.id] ?? areas.id;
-    const E = [['home', 'village'], ['village', 'ranch'], ['ranch', 'pass'], ['pass', 'field'], ['field', 'willowmere'], ['field', 'stormreach'], ['stormreach', 'cave'], ['cave', 'bastion']];
+    const E = [['home', 'village'], ['village', 'ranch'], ['ranch', 'pass'], ['pass', 'field'], ['field', 'willowmere'], ['field', 'stormreach'], ['stormreach', 'cave'], ['cave', 'bastion'],
+      ['field', 'desert'], ['desert', 'pyramid']];
     const P = (id) => [box.x + N[id][0] * box.w, box.y + N[id][1] * box.h];
     g.fillStyle = 'rgba(12,15,21,0.75)';
     g.fillRect(box.x - 6 * dpr, box.y - 20 * dpr, box.w + 12 * dpr, box.h + 30 * dpr);

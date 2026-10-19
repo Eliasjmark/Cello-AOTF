@@ -39,7 +39,7 @@ function capsuleBox(cap, b) {
   return { nx: vx / d, ny: vy / d, nz: vz / d, depth: r - d };
 }
 
-function rayBox(ray, b, far) {
+export function rayBox(ray, b, far) {
   const o = ray.origin, d = ray.direction;
   let tmin = -Infinity, tmax = Infinity, axis = -1, sign = 0;
   for (let k = 0; k < 3; k++) {

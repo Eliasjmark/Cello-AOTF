@@ -1,4 +1,4 @@
-// Cello: Ashes of the Fallen – prototyp 0.6: en större värld i områden, föremålsmeny, butik och skärvor.
+// Cello: Ashes of the Fallen – prototyp 0.7: öknen The Ember Wastes, The Sun-Scorched Pyramid och Ra's Shattered Prism.
 import * as THREE from 'three';
 import { WorldCollider } from './collide.js';
 import { buildWorld } from './world.js';
@@ -18,6 +18,7 @@ import { Music } from './music.js';
 import { Pots } from './pots.js';
 import { Inventory } from './inventory.js';
 import { Folk } from './folk.js';
+import { Goat } from './goat.js';
 
 const PIXEL_LINES = 360; // retroläge: spelet ritas i ungefär så här många rader
 const FLASH = new THREE.Color(0x8d98b4);
@@ -78,10 +79,16 @@ function start(saved = {}) {
     if (s.kind === 'shield') e.blockHint = 'The shield stops the sword. Strike the ground with the hammer to shatter it!';
   }
   const bastion = world.bastion;
-  for (const s of bastion.enemySpots) {
-    const e = enemies.add(s.home, s.path, { kind: s.kind, room: s.room, dormant: s.dormant, respawn: false, bounds: s.bounds, group: 'bastion', area: 'bastion' });
-    if (s.kind === 'shield') e.blockHint = 'The shield stops the sword. Strike the ground with the hammer to shatter it!';
+  const pyramid = world.pyramid;
+  for (const [id, dg] of Object.entries(world.dungeons)) {
+    for (const s of dg.enemySpots) {
+      const e = enemies.add(s.home, s.path, { kind: s.kind, room: s.room, dormant: s.dormant, respawn: false, bounds: s.bounds, group: id, area: id });
+      if (s.kind === 'shield') e.blockHint = 'The shield stops the sword. Strike the ground with the hammer to shatter it!';
+      if (s.kind === 'shade') e.immuneHint = 'The blade passes through the shadow. Only sunlight can make it solid!';
+    }
   }
+  // Fängelsehålan i området Cello är i (eller null)
+  const dungeon = () => world.dungeonAt(areas.id);
   // Krukor i alla områden
   const pots = new Pots(scene);
   for (const p of B.potSpots) pots.add(p.x, p.y, p.z, p.s, p.area);
@@ -92,8 +99,14 @@ function start(saved = {}) {
   story.inventory = inventory;
   const folk = new Folk({ story, world, inventory, sfx, hud, fx, lights, music, enemies });
   story.folk = folk;
+  // Grumble, getabocken man kan rida på
+  const goat = new Goat({ areas, scene, player, sfx, fx, hud, story, groundAt, M: B.M });
+  if (world.ranch.grumble) goat.setTether(world.ranch.grumble.pos, world.ranch.grumble.facing);
+  story.goat = goat;
+  player.onKnockedOff = (g) => g.dismount({ thrown: true });
+  player.onHoof = (k) => sfx.play('hoof', { vol: 0.45 + k * 0.5 });
   hud.onItems = () => inventory.refresh(true);
-  bastion.game = { player, enemies, sfx, fx, hud, rig, dialog, story, lights };
+  for (const dg of Object.values(world.dungeons)) dg.game = { player, enemies, sfx, fx, hud, rig, dialog, story, lights };
   const world2 = { player, fx, sfx, onBlocked() {}, onPlayerHit() {} };
 
   // ---------- skärvor, hjärtan och vad fiender och krukor lämnar efter sig ----------
@@ -144,7 +157,7 @@ function start(saved = {}) {
     for (const o of objs) if (o) h.add(o);
     culled.push({ obj: h, pos, r2: r * r, area });
   };
-  for (const e of enemies.list) holder([e.model.root, e.excl], e.pos, e.group === 'bastion' ? 42 : 72, e.area);
+  for (const e of enemies.list) holder([e.model.root, e.excl], e.pos, e.group !== 'world' ? 46 : 72, e.area);
   for (const n of Object.values(story.npcs)) if (n.id !== 'maren') holder([n.model.root], n.pos, 62, n.area);
   for (const f of world.fires) culled.push({ obj: f.group, pos: f.pos, r2: (f.smokeHeight > 6 ? 700 : 90) ** 2, area: f.area });
   holder([bastion.warden.model.root], bastion.warden.pos, 48, 'bastion');
@@ -169,7 +182,11 @@ function start(saved = {}) {
     base.hemi = a.light.hemi;
     base.moon = a.light.moon;
     base.flash = a.light.flash;
+    hemi.color.set(a.light.sky ?? 0x9aa7bd);
+    hemi.groundColor.set(a.light.ground ?? 0x3a3029);
+    moon.color.set(a.light.moonColor ?? 0xc6d0e6);
     sky.setIndoor?.(!!a.indoor);
+    goat.enterArea(a.id);
     enemies.enterArea(a.id);
     pots.setArea(a.id);
     B.regrow(a);
@@ -257,8 +274,11 @@ function start(saved = {}) {
     pots.slam(point);
     // Hammaren plattar till gräset runt slaget
     for (const at of B.cutGrass(areas.cur, point, 0, 2.6, Math.PI)) fx.drop(at, 'grass');
-    if (areas.id === 'bastion') {
-      for (const b of [bastion.warden, bastion.boss]) {
+    const dg = dungeon();
+    if (dg) {
+      const bosses = dg === bastion ? [bastion.warden, bastion.boss] : [pyramid.khepri, pyramid.boss];
+      for (const b of bosses) {
+        if (!b) continue;
         const hp = b.hp;
         b.slamHit(point, ctx);
         if (b.hp < hp) {
@@ -269,7 +289,7 @@ function start(saved = {}) {
         }
       }
     }
-    if (!(areas.id === 'bastion' && bastion.slam(point, player.feet))) story.slam(point);
+    if (!(dg && dg.slam(point, player.feet))) story.slam(point);
   };
   sky.onBolt = (dist) => { if (base.flash > 0) sfx.play('thunder', { delay: 0.4 + dist / 340, vol: 0.7 }); };
 
@@ -301,8 +321,19 @@ function start(saved = {}) {
   resize();
 
   // Kartan pausar spelet
-  const inDungeon = () => story.phase === 'free' && areas.id === 'bastion';
-  const drawMap = (mv) => (inDungeon() && player.feet.z < -142 ? mv.drawBastion(bastion, player) : mv.drawArea(areas, story, player));
+  const inDungeon = () => story.phase === 'free' && !!dungeon();
+  const inRooms = () => {
+    const dg = inDungeon() ? dungeon() : null;
+    if (!dg) return null;
+    if (dg === bastion) return player.feet.z < -142 ? dg : null;
+    return dg.inside(player.feet) ? dg : null;
+  };
+  const drawMap = (mv) => {
+    const dg = inRooms();
+    if (dg === bastion) return mv.drawBastion(bastion, player);
+    if (dg === pyramid) return mv.drawPyramid(pyramid, player);
+    return mv.drawArea(areas, story, player);
+  };
   const toggleMap = (on) => {
     hud.showMap(on, drawMap);
     sfx.play('choice');
@@ -330,6 +361,13 @@ function start(saved = {}) {
     if (ph === 'intro') return { id: story.introRoar ? 'whispers' : 'fieldsdawn', now: story.introRoar };
     if (ph === 'prologue') return { id: 'fieldsdawn', now: true };
     if (ph === 'carry') return { id: world.inAetheria(P.x, P.z) || story.arriving ? 'hearth' : 'whispers' };
+    if (here === 'pyramid') {
+      if (pyramid.trap === 'boss') return { id: 'warlord', now: true };
+      if (pyramid.trap === 'khepri') return { id: 'march', now: true };
+      if (pyramid.trap === 'P2' || pyramid.trap === 'P4') return { id: 'march', now: true };
+      if (pyramid.state.cleared.boss && P.z < -51) return { id: 'dawn', now: true };
+      return { id: 'skull' };
+    }
     if (here === 'bastion') {
       if (bastion.trap === 'boss') return { id: 'warlord', now: true };
       if (bastion.trap === 'warden') return { id: 'march', now: true };
@@ -343,8 +381,11 @@ function start(saved = {}) {
       if (P.z < -108) return { id: 'quiet' };
       return { id: undefined };
     }
+    // Öknen: lugnt vid oasen, kusligt ute bland dynerna
+    if (here === 'desert') return { id: world.areas.cur.isSafe?.(P.x, P.z) ? 'quiet' : 'whispers' };
+    // Fältet: ett långsamt spår i moll (Elias ville ha något kusligare än galoppen)
     const byArea = {
-      home: 'fieldsdawn', house: 'fieldsdawn', ranch: 'greenroad', pass: 'quiet', field: 'gallop', willowmere: 'willowmere',
+      home: 'fieldsdawn', house: 'fieldsdawn', ranch: 'greenroad', pass: 'quiet', field: 'forgotten', willowmere: 'willowmere',
       shop: 'willowmere', stormreach: 'march', cave: 'whispers',
     };
     if (here === 'pass' && P.z < -62) return { id: 'ballad' };
@@ -431,15 +472,17 @@ function start(saved = {}) {
       const blocked = talking || story.cinematic || !!story.fade || !!respawn;
       const pin = blocked ? input.empty : inventory.actions(inp);
       if (sim > 0) {
-        combat.extra = story.combatTargets().concat(areas.id === 'bastion' ? bastion.combatTargets() : []).concat(folk.combatTargets());
+        const dg = dungeon();
+        combat.extra = story.combatTargets().concat(dg ? dg.combatTargets() : []).concat(folk.combatTargets());
         player.update(sim, pin, rig.yaw);
+        goat.update(sim);
         if (!talking && !story.shown) enemies.update(sim, world2);
         combat.update(sim, pin);
         cutGrass();
         pots.update(sim, player);
         story.update(sim, blocked ? input.empty : inp);
         folk.update(sim, blocked);
-        if (areas.id === 'bastion') bastion.update(sim, t, talking || !!story.shown || !!story.fade);
+        if (dg) dg.update(sim, t, talking || !!story.shown || !!story.fade);
         inventory.update(sim);
         fx.update(sim, player);
       }
@@ -460,7 +503,7 @@ function start(saved = {}) {
         respawn.t += dt;
         if (before < 0.9 && respawn.t >= 0.9) {
           if (respawn.kind === 'death') {
-            if (story.phase === 'free' && areas.id === 'bastion') bastion.onPlayerDeath();
+            if (story.phase === 'free' && dungeon()) dungeon().onPlayerDeath();
             const sp = story.phase === 'free' ? story.respawnPoint() : areas.get('home').entry('start');
             player.revive(sp.pos, sp.facing);
             enemies.enterArea(areas.id);
@@ -479,10 +522,10 @@ function start(saved = {}) {
         }
         if (respawn.t > 1.3) respawn = null;
       }
-      rig.indoor = (inDungeon() && player.feet.z < -150) || !!areas.cur?.indoor;
+      rig.indoor = (inDungeon() && areas.id === 'bastion' && player.feet.z < -150) || !!areas.cur?.indoor;
       rig.update(dt, blocked ? input.empty : inp, player);
       player.model.root.visible = (rig.cur > 0.95 || rig.fallLock || !!rig.cinematic) && player.visibleBlink;
-      hud.setDungeon(inDungeon() && player.feet.z < -142 ? bastion.state : null);
+      hud.setDungeon(inRooms()?.state ?? null);
     } else {
       // Startskärmen: kameran glider långsamt runt den brinnande byn
       const a = t * 0.05 + 0.6;
@@ -506,8 +549,8 @@ function start(saved = {}) {
 
   // Handtag för felsökning i webbläsarens konsol
   window.__realm = {
-    player, rig, world, areas, input, hud, scene, camera, enemies, combat, fx, sfx, story, dialog, bastion, lights, collider, renderer,
-    culled, cullS, music, pots, inventory, folk, THREE,
+    player, rig, world, areas, input, hud, scene, camera, enemies, combat, fx, sfx, story, dialog, bastion, pyramid, lights, collider, renderer,
+    culled, cullS, music, pots, inventory, folk, goat, THREE,
     tick: (dt, inp) => update(dt, { ...input.empty, ...inp }),
   };
   requestAnimationFrame(frame);

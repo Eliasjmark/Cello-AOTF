@@ -75,7 +75,7 @@ export class Combat {
       const d = Math.hypot(e.pos.x - p.feet.x, e.pos.z - p.feet.z);
       if (!e.targetable || d > KEEP_RANGE || p.state === 'dead') this.unlock(!e.targetable);
     }
-    if (input.lock && p.state !== 'dead' && !p.carried) {
+    if (input.lock && p.state !== 'dead' && !p.carried && !p.mount) {
       if (this.lock) this.unlock();
       else {
         const c = this.candidate();

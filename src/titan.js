@@ -4,6 +4,35 @@ import * as THREE from 'three';
 import { mergeRigid } from './geom.js';
 
 const RADIUS = 1.7;
+// Smygandet i prologen: hur långt och hur brett titanen ser
+export const SEE_RANGE = 15.5, SEE_HALF = 0.55;
+
+// "?" och "!" ovanför titanens huvud när den anar eller ser Cello
+function alertSprite() {
+  const mk = (ch, col) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    g.font = 'bold 56px Cinzel, Georgia, serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.lineWidth = 8;
+    g.strokeStyle = '#1a0a04';
+    g.strokeText(ch, 32, 34);
+    g.fillStyle = col;
+    g.fillText(ch, 32, 34);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  const q = mk('?', '#ffd27a'), ex = mk('!', '#ff5a3a');
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: q, transparent: true, depthTest: false, fog: false }));
+  sp.renderOrder = 22;
+  sp.scale.setScalar(1.4);
+  sp.visible = false;
+  sp.userData = { q, ex };
+  return sp;
+}
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const approach = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
 
@@ -103,7 +132,15 @@ export class Titan {
     this.slamRing = ring(2.5, 2.9);
     this.sweepArc = ring(1.6, 7.6, 0, 2.6);
     this.wave = ring(0.2, 0.6);
-    scene.add(this.slamRing, this.sweepArc, this.wave);
+    // Synfältet när titanen letar efter Cello (en röd solfjäder på marken)
+    this.cone = ring(0.8, SEE_RANGE, -Math.PI / 2 - SEE_HALF, SEE_HALF * 2);
+    this.cone.material.color.set(0xff3a1a);
+    this.alert = alertSprite();
+    scene.add(this.slamRing, this.sweepArc, this.wave, this.cone, this.alert);
+    this.los = null; // (från, till) → sant om inget skymmer (sätts av berättelsen)
+    this.aware = 0;
+    this.seen = false;
+    this.spotted = false;
     this.waveT = -1;
     this.onImpact = null; // (kind, pos)
     this.onRoar = null;
@@ -131,8 +168,36 @@ export class Titan {
     this.sweepArc.material.opacity = 0;
   }
 
+  // Prologen, om Cello bär Maren: titanen går fram och tillbaka längs muren och spanar över torget
+  search(path) {
+    this.state = 'search';
+    this.st = 0;
+    this.path = path;
+    this.pi = 0;
+    this.pauseT = 1.5;
+    this.lookBase = path[path.length - 1].look;
+    this.aware = 0;
+    this.seen = false;
+    this.spotted = false;
+    this.attack = null;
+    const p = path[path.length - 1];
+    this.pos.set(p.x, p.y, p.z);
+    this.facing = p.look;
+  }
+
+  canSee(player) {
+    const dx = player.feet.x - this.pos.x, dz = player.feet.z - this.pos.z, d = Math.hypot(dx, dz);
+    if (d > SEE_RANGE || Math.abs(wrap(Math.atan2(dx, dz) - this.facing)) > SEE_HALF + 0.04) return false;
+    if (!this.los) return true;
+    const eye = new THREE.Vector3(this.pos.x + Math.sin(this.facing) * 0.8, this.pos.y + 5.2, this.pos.z + Math.cos(this.facing) * 0.8);
+    // Huvudet eller bröstet räcker för att synas
+    return this.los(eye, new THREE.Vector3(player.feet.x, player.feet.y + 1.5, player.feet.z)) || this.los(eye, new THREE.Vector3(player.feet.x, player.feet.y + 0.6, player.feet.z));
+  }
+
   hide() {
     this.state = 'gone';
+    this.cone.material.opacity = 0;
+    this.alert.visible = false;
     this.model.root.visible = false;
     this.slamRing.material.opacity = 0;
     this.sweepArc.material.opacity = 0;
@@ -198,6 +263,45 @@ export class Titan {
         }
         if (this.pos.y < this.home.y - 45) this.hide();
       }
+    } else if (this.state === 'search') {
+      if (this.pauseT > 0) {
+        // Stannar och spanar: huvudet sveper fram och tillbaka över torget
+        this.pauseT -= dt;
+        const target = this.lookBase + Math.sin(this.st * 1.15) * 0.95;
+        this.facing += wrap(target - this.facing) * (1 - Math.exp(-dt * 2.5));
+        if (this.pauseT <= 0) this.pi = (this.pi + 1) % this.path.length;
+      } else {
+        const p = this.path[this.pi];
+        const d = Math.hypot(p.x - this.pos.x, p.z - this.pos.z);
+        this.turnTo(p.x, p.z, 2.4, dt);
+        const aligned = Math.abs(wrap(Math.atan2(p.x - this.pos.x, p.z - this.pos.z) - this.facing)) < 0.5;
+        if (d > 0.4) {
+          if (aligned) {
+            const step = Math.min(d, 1.7 * dt);
+            this.pos.x += Math.sin(this.facing) * step;
+            this.pos.z += Math.cos(this.facing) * step;
+            walk = 1;
+          }
+        } else {
+          this.pauseT = p.pause;
+          this.lookBase = p.look;
+          this.st = 0;
+        }
+        const gy = this.groundAt(this.pos.x, this.pos.y + 2, this.pos.z);
+        if (gy !== null) this.pos.y = approach(this.pos.y, gy, 6, dt);
+      }
+      // Ser titanen Cello? Ju närmare, desto fortare märker den honom
+      this.seen = player.state !== 'dead' && this.canSee(player);
+      if (this.seen) this.aware = Math.min(1, this.aware + dt * (0.6 + 1.3 * (1 - dist / SEE_RANGE)));
+      else this.aware = Math.max(0, this.aware - dt * 0.4);
+      if (this.aware >= 1) {
+        this.state = 'alert';
+        this.st = 0;
+        this.spotted = true;
+        this.roar();
+      }
+    } else if (this.state === 'alert') {
+      this.turnTo(player.feet.x, player.feet.z, 4, dt);
     } else if (this.state === 'fight' || this.state === 'finale') {
       this.fightT += dt;
       this.cooldown -= dt;
@@ -235,6 +339,19 @@ export class Titan {
     // Cello kan inte gå igenom titanen
     if (this.state !== 'gone' && dist < RADIUS + 0.4 && dist > 1e-3 && Math.abs(player.feet.y - this.pos.y) < 5) {
       player.nudge((dx / dist) * (RADIUS + 0.4 - dist), (dz / dist) * (RADIUS + 0.4 - dist));
+    }
+
+    // Synfältet och frågetecknet/utropstecknet
+    const searching = this.state === 'search' || this.state === 'alert';
+    this.cone.position.set(this.pos.x, this.pos.y + 0.14, this.pos.z);
+    this.cone.rotation.y = this.facing;
+    this.cone.material.opacity = searching ? 0.2 + 0.35 * this.aware + (this.seen ? 0.1 + Math.sin(this.t * 20) * 0.05 : 0) : 0;
+    this.alert.visible = searching && (this.aware > 0.08 || this.state === 'alert');
+    if (this.alert.visible) {
+      const ex = this.state === 'alert' || this.aware > 0.6;
+      this.alert.material.map = ex ? this.alert.userData.ex : this.alert.userData.q;
+      this.alert.position.set(this.pos.x, this.pos.y + 7.1 + Math.sin(this.t * 6) * 0.08, this.pos.z);
+      this.alert.scale.setScalar(1.2 + this.aware * 0.6);
     }
 
     this.animate(dt, walk);

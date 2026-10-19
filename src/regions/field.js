@@ -15,7 +15,7 @@ export function buildField(B, areas) {
     fog: { color: 0x3a404b, near: 70, far: 520 },
   });
   B.begin(a);
-  B.bounds(X0 - 240, X0 + 300, -262, 262);
+  B.bounds(X0 - 240, X0 + 320, -262, 262);
   const R = (pts) => pts.map(([x, z]) => [X0 + x, z]);
   const mainRoad = R([[0, 224], [0, 190], [-8, 150], [-14, 110], [-6, 70], [10, 40], [12, 0], [4, -40], [-8, -80], [-10, -120], [-2, -160], [0, -200], [0, -224]]);
   const eastRoad = R([[10, 40], [50, 30], [100, 10], [150, -10], [190, -30], [222, -40]]);
@@ -219,15 +219,62 @@ export function buildField(B, areas) {
   // Udden med den gyllene porten
   const gateIsl = B.island({ cx: X0 + 260, cz: 90, baseR: 9, rNoise: 1, seed: 329, amp: 0.25, keepAngles: [Math.PI], depth: 14, rings: 14, segs: 48, pads: [{ x: X0 + 260, z: 90, r: 8, h: 0.05 }], grass: 40, label: '' });
   const gy = gateIsl.H(X0 + 263, 90);
+  const gx = X0 + 263.5;
+  const sunDiscMat = new THREE.MeshLambertMaterial({ color: 0xb08a3c, emissive: 0x2a1c06, flatShading: true });
+  const gatePlateMat = new THREE.MeshLambertMaterial({ color: 0x7a4c2e, emissive: 0x000000, flatShading: true });
+  const leaves = [];
   {
-    const gx = X0 + 263.5;
     [-1.8, 1.8].forEach((dz) => B.solid(place(new THREE.Mesh(box(0.9, 4.6, 0.9, 1.5), M.marble), gx, gy + 2.3, 90 + dz)));
     B.deco(new THREE.Mesh(box(1.2, 0.7, 4.8, 1.5), M.marble), gx, gy + 4.9, 90);
-    const disc = new THREE.Mesh(cyl(0.9, 0.9, 0.16, 16, 1), M.gold);
+    // Solskivan över porten (lyser när porten vaknar)
+    const disc = new THREE.Mesh(cyl(0.9, 0.9, 0.16, 16, 1), sunDiscMat);
     disc.rotation.z = Math.PI / 2;
-    B.deco(disc, gx - 0.5, gy + 4.9, 90);
-    B.solid(place(new THREE.Mesh(box(0.3, 3.6, 2.8, 1.2), M.gold), gx, gy + 1.8, 90));
+    disc.position.set(gx - 0.5, gy + 4.9, 90);
+    disc.userData.keep = true;
+    B.add(disc);
+    for (let i = 0; i < 8; i++) {
+      const ray = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, 0.5), sunDiscMat);
+      const ang = (i / 8) * Math.PI * 2;
+      ray.position.set(gx - 0.55, gy + 4.9 + Math.sin(ang) * 1.15, 90 + Math.cos(ang) * 1.15);
+      ray.rotation.x = -ang;
+      B.add(ray);
+    }
+    // Två gyllene portflyglar på gångjärn vid pelarna
+    for (const s2 of [-1, 1]) {
+      const hinge = new THREE.Group();
+      hinge.position.set(gx, gy, 90 + s2 * 1.38);
+      B.add(hinge);
+      const leaf = new THREE.Mesh(box(0.22, 3.6, 1.38, 1.2), M.gold);
+      leaf.position.set(0, 1.8, -s2 * 0.69);
+      hinge.add(leaf);
+      const sun = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 10), sunDiscMat);
+      sun.rotation.z = Math.PI / 2;
+      sun.position.set(-0.13, 2.3, -s2 * 0.62);
+      hinge.add(sun);
+      leaves.push({ hinge, s: s2 });
+    }
+    // Låga murar från pelarna ut till uddens kant, så att ingen går runt porten
+    for (const s2 of [-1, 1]) {
+      B.solid(place(new THREE.Mesh(box(0.7, 1.7, 7.4, 1.5), M.marble), gx, gy + 0.6, 90 + s2 * 5.9));
+      B.solid(place(new THREE.Mesh(box(0.9, 0.3, 7.6, 1.5), M.marble), gx, gy + 1.55, 90 + s2 * 5.9));
+    }
+    // Kopparplattan framför porten
+    const pl = new THREE.Mesh(cyl(0.95, 1.0, 0.14, 10, 1), gatePlateMat);
+    pl.userData.keep = true;
+    B.add(place(pl, gx - 3.4, gateIsl.H(gx - 3.4, 90) + 0.04, 90));
   }
+  const gatePlate = V3(gx - 3.4, gateIsl.H(gx - 3.4, 90), 90);
+  let gateBox = null;
+  a.connectFns.push((c) => { gateBox = c.addBox(gx - 0.25, gy, 88.4, gx + 0.25, gy + 3.7, 91.6, 'sunGate'); });
+  const G = { open: false, t: 0 };
+  a.updaters.push((t, dt) => {
+    G.t = G.open ? Math.min(1, G.t + dt / 2.4) : 0;
+    const k = 1 - Math.pow(1 - G.t, 3);
+    for (const l of leaves) l.hinge.rotation.y = l.s * k * 1.75;
+  });
+  // Bron österut, mot The Ember Wastes, och dimman där den börjar
+  B.bridge('x', X0 + 265.6, X0 + 298, 90, DECK, { rails: true });
+  B.mist(X0 + 298, -3, 90, 11, 5, 9, { axis: 'x' });
   a.map.pois.push({ x: X0 + 263, z: 90, label: 'Golden Gate', icon: 'gate', when: 'eastPath' });
   // Pyramiden långt i öster
   {
@@ -292,17 +339,20 @@ export function buildField(B, areas) {
     south: { pos: V3(X0, DECK, 247), facing: Math.PI },
     north: { pos: V3(X0, DECK, -236), facing: 0 },
     east: { pos: V3(X0 + 246, DECK, -40), facing: -Math.PI / 2 },
+    sunGate: { pos: V3(X0 + 286, DECK, 90), facing: -Math.PI / 2 },
     rest: { pos: V3(campFire.x + 1.8, H(campFire.x + 1.8, campFire.z + 1.4), campFire.z + 1.4), facing: -2.3 },
   };
   a.exits = [
     { x0: X0 - 3, x1: X0 + 3, z0: 256.5, z1: 300, to: 'pass', entry: 'north' },
     { x0: X0 - 3, x1: X0 + 3, z0: -300, z1: -254.5, to: 'stormreach', entry: 'south' },
     { x0: X0 + 254.5, x1: X0 + 300, z0: -43, z1: -37, to: 'willowmere', entry: 'west' },
+    { x0: X0 + 296, x1: X0 + 340, z0: 87, z1: 93, to: 'desert', entry: 'west' },
   ];
   a.map.exits = [
     { x: X0, z: 255, label: 'The Long Bridge', to: 'pass' },
     { x: X0, z: -254, label: 'Stormreach', to: 'stormreach' },
     { x: X0 + 254, z: -40, label: 'Willowmere', to: 'willowmere' },
+    { x: X0 + 296, z: 90, label: 'The Ember Wastes', to: 'desert', when: 'sunGate' },
   ];
   B.end();
 
@@ -315,6 +365,19 @@ export function buildField(B, areas) {
     east: { plate, stone: stonePos, end: V3(X0 + 260, gy, 90), gate: V3(X0 + 261.6, gy, 90) },
     eastPath,
     slamEast: (p) => areas.id === 'field' && Math.hypot(p.x - plate.x, p.z - plate.z) < 1.9,
+    // Den gyllene porten: hammaren på kopparplattan framför den
+    gate: { plate: gatePlate, disc: V3(gx - 0.5, gy + 4.9, 90), pos: V3(gx, gy, 90) },
+    slamGate: (p) => areas.id === 'field' && Math.hypot(p.x - gatePlate.x, p.z - gatePlate.z) < 1.9,
+    setSunGate(open, instant = false) {
+      G.open = open;
+      if (instant || !open) {
+        G.t = open ? 1 : 0;
+        for (const l of leaves) l.hinge.rotation.y = open ? l.s * 1.75 : 0;
+      }
+      sunDiscMat.emissive.set(open ? 0xa06a10 : 0x2a1c06);
+      gatePlateMat.emissive.set(open ? 0x6a4a10 : 0x000000);
+      if (gateBox) gateBox.enabled = !open;
+    },
     onTorch(id, story) {
       if (id !== 'fieldTower') return false;
       story.after(0.6, () => {
