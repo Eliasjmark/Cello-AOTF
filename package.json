@@ -1,0 +1,14 @@
+{
+  "name": "the-shattered-realm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ett 3D-äventyr bland flytande öar i en evig storm, byggt med Three.js.",
+  "scripts": {
+    "start": "npx --yes http-server -c-1 -p 8080 .",
+    "build:artifact": "node tools/build-artifact.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}

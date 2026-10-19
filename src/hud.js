@@ -1,0 +1,205 @@
+// Startskärm, hjärtan, föremål, fästningens nycklar, kartan, rubriker, textremsor,
+// meddelanden, filmkanter vid lock-on och tona-till-svart.
+import { MapView } from './map.js';
+const HEART_ROWS = ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'];
+
+function heartSvg(id) {
+  let rects = '';
+  HEART_ROWS.forEach((row, y) => {
+    [...row].forEach((c, x) => { if (c === '#') rects += `<rect x="${x}" y="${y}" width="1.02" height="1.02"/>`; });
+  });
+  return `<svg viewBox="0 0 7 6" aria-hidden="true" shape-rendering="crispEdges">
+    <clipPath id="hc${id}"><rect class="clip" x="0" y="0" width="7" height="6"/></clipPath>
+    <g class="empty">${rects}</g>
+    <g class="full" clip-path="url(#hc${id})">${rects}<rect class="shine" x="1" y="1" width="1.02" height="1.02"/></g>
+  </svg>`;
+}
+
+export class Hud {
+  constructor(input) {
+    const $ = (id) => document.getElementById(id);
+    this.input = input;
+    this.started = false;
+    this.onBegin = null;
+    this.el = {
+      start: $('start'), play: $('play'), help: $('help'), info: $('info'), toast: $('toast'),
+      fade: $('fade'), fadeText: $('fade-text'), lockHint: $('lock-hint'),
+      touch: $('touch-ui'), stick: $('stick'), knob: $('knob'), hearts: $('hearts'), bars: $('bars'),
+      prompt: $('prompt'), promptText: $('prompt-text'), cont: $('continue'), talkBtn: $('talk-btn'),
+      card: $('card'), cardTitle: $('card-title'), cardSub: $('card-sub'), caption: $('caption'),
+      items: $('items'), slotHammer: $('slot-hammer'), slotHeavy: $('slot-heavy'),
+      dungeon: $('dungeon'), keys: $('dg-keys'), dgMap: $('dg-map'), dgBoss: $('dg-boss'),
+      map: $('map'), mapCanvas: $('map-canvas'), hammerBtns: document.querySelectorAll('.needs-hammer'),
+    };
+    this.mapView = new MapView(this.el.mapCanvas);
+    this.mapOpen = false;
+    this.cardTimer = 0;
+    this.captionTimer = 0;
+    this.itemKey = '';
+    this.dungeonKey = '';
+    this.el.play.addEventListener('click', () => this.begin(false, 'new'));
+    this.el.cont.addEventListener('click', () => this.begin(false, 'continue'));
+    this.promptKey = null;
+    document.querySelectorAll('[data-press]').forEach((b) => {
+      const name = b.dataset.press;
+      b.addEventListener('pointerdown', (e) => { e.preventDefault(); input.press(name, true); });
+      const up = () => input.press(name, false);
+      b.addEventListener('pointerup', up);
+      b.addEventListener('pointercancel', up);
+      b.addEventListener('pointerleave', up);
+    });
+    input.onStick = (show, x, y, dx = 0, dy = 0) => {
+      const s = this.el.stick;
+      s.hidden = !show;
+      if (!show) return;
+      s.style.left = `${x}px`;
+      s.style.top = `${y}px`;
+      this.el.knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    };
+    if (input.isTouch) document.body.classList.add('touch-device');
+    this.fps = { acc: 0, frames: 0, value: 0, infoT: 0 };
+    this.toastTimer = 0;
+    this.heartKey = '';
+  }
+
+  // Startskärmen visar Fortsätt om det finns ett sparat spel
+  showContinue(on) {
+    this.el.cont.hidden = !on;
+    this.el.play.textContent = on ? 'New game' : 'Play';
+    this.el.play.classList.toggle('secondary', on);
+    (on ? this.el.cont : this.el.play).focus?.({ preventScroll: true });
+  }
+
+  begin(fromSave = false, mode = 'new') {
+    if (this.started) return;
+    this.started = true;
+    this.el.start.hidden = true;
+    this.el.help.hidden = this.input.isTouch;
+    this.el.touch.hidden = !this.input.isTouch;
+    this.el.hearts.hidden = false;
+    if (!fromSave) this.input.requestLock();
+    this.onBegin?.(mode);
+  }
+
+  setPrompt(text) {
+    if (text === this.promptKey) return;
+    this.promptKey = text;
+    this.el.prompt.hidden = !text;
+    if (text) this.el.promptText.textContent = text;
+    this.el.talkBtn.hidden = !text;
+  }
+
+  setHearts(hp, max) {
+    const key = `${hp}/${max}`;
+    if (key === this.heartKey) return;
+    const prev = this.heartKey;
+    this.heartKey = key;
+    const el = this.el.hearts;
+    const count = Math.ceil(max / 2);
+    if (el.children.length !== count) el.innerHTML = Array.from({ length: count }, (_, i) => `<span class="heart">${heartSvg(i)}</span>`).join('');
+    [...el.children].forEach((h, i) => {
+      const fill = Math.max(0, Math.min(2, hp - i * 2));
+      h.querySelector('.clip').setAttribute('width', fill === 2 ? 7 : fill === 1 ? 3.5 : 0);
+    });
+    el.setAttribute('aria-label', `${hp / 2} of ${max / 2} hearts`);
+    el.classList.toggle('low', hp <= 2 && hp > 0);
+    if (prev) {
+      el.classList.remove('bump');
+      void el.offsetWidth;
+      el.classList.add('bump');
+    }
+  }
+
+  // Stor rubrik mitt på skärmen, när Cello kommer till ett nytt ställe eller möter en boss
+  card(title, sub = '', ms = 3400) {
+    const c = this.el.card;
+    this.el.cardTitle.textContent = title;
+    this.el.cardSub.textContent = sub;
+    this.el.cardSub.hidden = !sub;
+    c.classList.remove('show');
+    void c.offsetWidth;
+    c.classList.add('show');
+    clearTimeout(this.cardTimer);
+    this.cardTimer = setTimeout(() => c.classList.remove('show'), ms);
+  }
+
+  // Berättartext längst ner, som i en film
+  caption(text, ms = 3600) {
+    const c = this.el.caption;
+    if (!text) { c.classList.remove('show'); return; }
+    c.textContent = text;
+    c.classList.add('show');
+    clearTimeout(this.captionTimer);
+    this.captionTimer = setTimeout(() => c.classList.remove('show'), ms);
+  }
+
+  // Föremålsrutorna: Mjölnirs skärva (F) och tung vikt (G)
+  setItems(player) {
+    const key = `${player.hasHammer}|${player.heavy}|${player.gloves}`;
+    if (key === this.itemKey) return;
+    this.itemKey = key;
+    this.el.items.hidden = !player.hasHammer || !this.started;
+    this.el.slotHeavy.classList.toggle('on', player.heavy);
+    this.el.slotHammer.classList.toggle('gloves', player.gloves);
+    this.el.hammerBtns.forEach((b) => { b.hidden = !player.hasHammer; });
+  }
+
+  // Nycklar, karta och Stormnyckel visas bara inne i fästningen
+  setDungeon(s) {
+    const key = s ? `${s.keys}|${s.map}|${s.bossKey}` : '';
+    if (key === this.dungeonKey) return;
+    this.dungeonKey = key;
+    this.el.dungeon.hidden = !s;
+    if (!s) return;
+    this.el.keys.textContent = `× ${s.keys}`;
+    this.el.dgMap.classList.toggle('have', s.map);
+    this.el.dgBoss.classList.toggle('have', s.bossKey);
+  }
+
+  showMap(on, draw) {
+    this.mapOpen = on;
+    this.el.map.hidden = !on;
+    if (on) draw?.(this.mapView);
+  }
+
+  setLetterbox(on) {
+    this.el.bars.classList.toggle('on', on);
+  }
+
+  toast(text, ms = 2000) {
+    const t = this.el.toast;
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+  }
+
+  fade(on, text = '') {
+    if (on) this.el.fadeText.textContent = text;
+    this.el.fade.classList.toggle('on', on);
+  }
+
+  toggleHelp() {
+    if (this.started && !this.input.isTouch) this.el.help.hidden = !this.el.help.hidden;
+  }
+
+  toggleInfo() {
+    this.el.info.hidden = !this.el.info.hidden;
+  }
+
+  frame(dt, player) {
+    const f = this.fps;
+    f.acc += dt; f.frames++;
+    if (f.acc >= 0.5) { f.value = Math.round(f.frames / f.acc); f.acc = 0; f.frames = 0; }
+    this.el.lockHint.hidden = !(this.started && !this.input.locked && !this.input.isTouch);
+    if (!this.el.info.hidden && (f.infoT -= dt) <= 0) {
+      f.infoT = 0.2;
+      const p = player.feet;
+      this.el.info.textContent =
+        `${f.value} fps\nx ${p.x.toFixed(1)}  y ${p.y.toFixed(1)}  z ${p.z.toFixed(1)}\n` +
+        `speed ${player.speed.toFixed(1)}  ${player.grounded ? 'grounded' : 'airborne'}\n` +
+        `state ${player.state}${player.lockTarget ? '  locked' : ''}${this.input.walkMode ? '  walking' : ''}` +
+        `${this.input.hasPad ? '\ngamepad connected' : ''}`;
+    }
+  }
+}

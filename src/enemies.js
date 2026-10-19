@@ -1,0 +1,997 @@
+// Asklingar: titanernas förkrympta tjänare, gjorda av aska och glöd.
+// De patrullerar, upptäcker Cello, jagar, cirklar runt honom och anfaller en i taget.
+import * as THREE from 'three';
+import { Capsule } from 'three/addons/math/Capsule.js';
+import { mergeRigid } from './geom.js';
+
+const MAX_HP = 4;
+const RADIUS = 0.55;
+const SIGHT = 11, SIGHT_COS = Math.cos((72 * Math.PI) / 180), HEAR = 4;
+const CHASE_SPEED = 3.4, PATROL_SPEED = 1.5, CIRCLE_SPEED = 1.8;
+const ATTACK_RANGE = 2.3, HIT_RANGE = 2.6;
+const RESPAWN_TIME = 25;
+
+const _ray = new THREE.Ray(), _down = new THREE.Vector3(0, -1, 0), _v = new THREE.Vector3();
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const approach = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
+
+function exclamation() {
+  const c = document.createElement('canvas');
+  c.width = 32;
+  c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#1a1206';
+  g.fillRect(9, 2, 14, 40);
+  g.fillRect(9, 46, 14, 14);
+  g.fillStyle = '#ffcf4a';
+  g.fillRect(12, 5, 8, 34);
+  g.fillRect(12, 49, 8, 8);
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = THREE.NearestFilter;
+  t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, fog: false }));
+  s.scale.set(0.35, 0.7, 1);
+  s.renderOrder = 10;
+  s.visible = false;
+  return s;
+}
+
+// Askling: en hopkrupen varelse av sammanpressad aska, med glödande sprickor, långa armar
+// med klor, en käke som öppnas när den vrålar och en grov klubba av sten.
+function buildModel() {
+  const lam = (c, extra = {}) => new THREE.MeshLambertMaterial({ color: c, flatShading: true, ...extra });
+  const M = {
+    ash: lam(0x3a3531), dark: lam(0x23201e), bone: lam(0xb7aa92), stone: lam(0x5b5650),
+    glow: new THREE.MeshBasicMaterial({ color: 0xff7426 }),
+    eye: new THREE.MeshBasicMaterial({ color: 0xffc457 }),
+  };
+  const B = (w, h, d, m, x = 0, y = 0, z = 0) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+    mesh.position.set(x, y, z);
+    return mesh;
+  };
+  const T = (rt, rb, h, m, x = 0, y = 0, z = 0, seg = 5, sz = 1) => {
+    const g = new THREE.CylinderGeometry(rt, rb, h, seg);
+    if (sz !== 1) g.scale(1, 1, sz);
+    const mesh = new THREE.Mesh(g, m);
+    mesh.position.set(x, y, z);
+    return mesh;
+  };
+  const crack = (w, h, x, y, z, rz = 0, ry = 0) => {
+    const c = B(w, h, 0.02, M.glow, x, y, z);
+    c.rotation.set(0, ry, rz);
+    return c;
+  };
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  root.add(body);
+  const hips = new THREE.Group();
+  hips.position.y = 0.85;
+  body.add(hips);
+  // Korta, krokiga ben med knän
+  const leg = (side) => {
+    const g = new THREE.Group();
+    g.position.set(0.22 * side, 0, 0);
+    g.add(T(0.16, 0.12, 0.46, M.ash, 0, -0.2, 0));
+    const knee = new THREE.Group();
+    knee.position.y = -0.42;
+    g.add(knee);
+    knee.add(T(0.11, 0.09, 0.32, M.ash, 0, -0.14, 0));
+    knee.add(B(0.26, 0.12, 0.36, M.dark, 0, -0.37, 0.08));
+    for (const cx of [-0.08, 0, 0.08]) {
+      const claw = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.12, 4), M.bone);
+      claw.rotation.x = Math.PI / 2;
+      claw.position.set(cx, -0.4, 0.3);
+      knee.add(claw);
+    }
+    hips.add(g);
+    return { g, knee };
+  };
+  hips.add(T(0.36, 0.3, 0.26, M.dark, 0, -0.04, 0, 6, 0.8));
+  const torso = new THREE.Group();
+  torso.rotation.x = 0.35;
+  hips.add(torso);
+  // Bröstkorg som en uppochnedvänd kil, puckelrygg och taggar längs ryggen
+  torso.add(T(0.5, 0.36, 0.78, M.ash, 0, 0.42, 0, 6, 0.78));
+  torso.add(T(0.36, 0.4, 0.34, M.dark, 0, 0.8, -0.16, 6, 0.8));
+  for (let i = 0; i < 4; i++) {
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.07 - i * 0.008, 0.26 - i * 0.03, 4), M.dark);
+    spike.position.set(0, 0.92 - i * 0.2, -0.3 + i * 0.03);
+    spike.rotation.x = -0.9;
+    torso.add(spike);
+  }
+  torso.add(crack(0.05, 0.44, -0.16, 0.45, 0.3, 0.25));
+  torso.add(crack(0.04, 0.3, 0.14, 0.34, 0.3, -0.35));
+  torso.add(crack(0.28, 0.04, 0.0, 0.62, 0.29, 0.1));
+  torso.add(crack(0.04, 0.4, 0.08, 0.5, -0.3, 0.3, Math.PI));
+  torso.add(crack(0.035, 0.3, -0.12, 0.38, -0.31, -0.4, Math.PI));
+  // Huvudet: platt skalle, horn, glödande ögon och en käke som kan öppnas
+  const head = new THREE.Group();
+  head.position.set(0, 0.84, 0.22);
+  head.add(T(0.26, 0.22, 0.34, M.ash, 0, 0.12, 0.04, 6, 0.95));
+  head.add(B(0.46, 0.08, 0.2, M.dark, 0, 0.21, 0.18));
+  head.add(B(0.1, 0.06, 0.03, M.eye, -0.11, 0.14, 0.29));
+  head.add(B(0.1, 0.06, 0.03, M.eye, 0.11, 0.14, 0.29));
+  const jaw = new THREE.Group();
+  jaw.position.set(0, 0.0, 0.08);
+  jaw.add(B(0.4, 0.12, 0.3, M.dark, 0, -0.06, 0.08));
+  for (const tx of [-0.13, -0.04, 0.05, 0.14]) {
+    const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.08, 4), M.bone);
+    tooth.position.set(tx, 0.02, 0.21);
+    jaw.add(tooth);
+  }
+  head.add(jaw);
+  head.add(B(0.3, 0.03, 0.02, M.glow, 0, -0.01, 0.29));
+  [-1, 1].forEach((s) => {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.36, 4), M.bone);
+    horn.position.set(0.2 * s, 0.36, -0.05);
+    horn.rotation.set(-0.6, 0, -0.45 * s);
+    head.add(horn);
+  });
+  torso.add(head);
+  // Långa armar med armbågar och klor
+  const arm = (side) => {
+    const g = new THREE.Group();
+    g.position.set(0.48 * side, 0.68, 0.02);
+    g.add(place(new THREE.Mesh(new THREE.IcosahedronGeometry(0.17, 0), M.dark), 0, 0, 0));
+    g.add(T(0.12, 0.1, 0.46, M.ash, 0, -0.22, 0));
+    const elbow = new THREE.Group();
+    elbow.position.y = -0.44;
+    g.add(elbow);
+    elbow.add(T(0.1, 0.13, 0.4, M.ash, 0, -0.18, 0));
+    elbow.add(crack(0.03, 0.26, 0.06 * side, -0.16, 0.1, 0.2));
+    elbow.add(B(0.2, 0.16, 0.2, M.dark, 0, -0.42, 0));
+    for (const cx of [-0.07, 0.0, 0.07]) {
+      const claw = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.16, 4), M.bone);
+      claw.rotation.x = Math.PI;
+      claw.position.set(cx, -0.56, 0.06);
+      elbow.add(claw);
+    }
+    torso.add(g);
+    return { g, elbow };
+  };
+  const L = arm(-1), R = arm(1);
+  const armL = L.g, armR = R.g;
+  const club = new THREE.Group();
+  club.position.y = -0.44;
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.9, 6), M.dark);
+  handle.position.y = -0.4;
+  const knob = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), M.stone);
+  knob.position.y = -0.92;
+  knob.scale.set(1, 1.3, 1);
+  club.add(handle, knob);
+  for (const [x, y, z] of [[0.2, -0.85, 0.1], [-0.18, -1.0, -0.05], [0.05, -1.12, 0.2]]) {
+    const st = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 4), M.bone);
+    st.position.set(x, y, z);
+    st.lookAt(0, -0.92, 0);
+    st.rotateX(-Math.PI / 2);
+    club.add(st);
+  }
+  R.elbow.add(club);
+  const lL = leg(-1), lR = leg(1);
+  const mats = [M.ash, M.dark, M.bone, M.stone];
+  return {
+    root, body, hips, torso, head, jaw, armL, armR, elbowL: L.elbow, elbowR: R.elbow,
+    legL: lL.g, legR: lR.g, kneeL: lL.knee, kneeR: lR.knee, club, mats, M,
+  };
+}
+
+const place = (mesh, x, y, z) => {
+  mesh.position.set(x, y, z);
+  return mesh;
+};
+
+class Askling {
+  constructor(scene, octree, home, waypoints, index, opts = {}) {
+    this.octree = octree;
+    this.home = home.clone();
+    this.waypoints = waypoints;
+    this.index = index;
+    this.kind = opts.kind || 'askling';
+    this.room = opts.room || null;
+    this.dormant = !!opts.dormant;
+    this.respawn = opts.respawn ?? true;
+    this.permaDead = false;
+    this.flying = false;
+    this.pos = home.clone();
+    this.vel = new THREE.Vector3();
+    this.push = new THREE.Vector3();
+    this.capsule = new Capsule(new THREE.Vector3(), new THREE.Vector3(), 0.5);
+    this.model = buildModel();
+    scene.add(this.model.root);
+    this.excl = exclamation();
+    scene.add(this.excl);
+    this.chestPos = new THREE.Vector3();
+    if (this.kind === 'shield') this.addShield();
+    mergeRigid(this.model.root);
+    this.reset();
+  }
+
+  // Sköldvakten bär en stor rund sköld som tar emot svärdshugg framifrån
+  addShield() {
+    const lam = (c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
+    const g = new THREE.Group();
+    g.position.set(-0.08, -0.62, 0.34);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.09, 12), lam(0x5b3f2a));
+    disc.rotation.x = Math.PI / 2;
+    g.add(disc);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.045, 4, 12), lam(0x6a6c74));
+    g.add(rim);
+    const boss = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.12), lam(0x6a6c74));
+    boss.position.z = 0.05;
+    g.add(boss);
+    const paint = lam(0x2f4a6a);
+    for (const r of [0, Math.PI / 2]) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.0, 0.02), paint);
+      b.position.z = 0.055;
+      b.rotation.z = r + 0.4;
+      g.add(b);
+    }
+    g.position.set(-0.08, -0.3, 0.3);
+    this.model.elbowL.add(g);
+    this.shieldMesh = g;
+    this.model.mats.push(disc.material, rim.material);
+  }
+
+  reset() {
+    this.pos.copy(this.home);
+    this.vel.set(0, 0, 0);
+    this.push.set(0, 0, 0);
+    this.hp = MAX_HP;
+    this.facing = this.index * 1.7;
+    this.state = 'patrol';
+    this.st = 0;
+    this.wp = 0;
+    this.wait = 0.5 + this.index * 0.4;
+    this.cooldown = 0.6;
+    this.flash = 0;
+    this.exclT = 0;
+    this.lostT = 0;
+    this.seeT = 0;
+    this.seen = false;
+    this.stuckT = 0;
+    this.strafe = this.index % 2 ? 1 : -1;
+    this.hitDone = false;
+    this.deadT = 0;
+    this.anim = { phase: 0, sink: 0, rise: 1 };
+    this.hasShield = this.kind === 'shield';
+    if (this.shieldMesh) this.shieldMesh.visible = this.hasShield;
+    this.model.root.visible = true;
+    this.model.root.rotation.set(0, this.facing, 0);
+    this.model.body.rotation.set(0, 0, 0);
+    this.model.body.position.y = 0;
+    this.snapToGround(true);
+    this.model.root.position.copy(this.pos);
+    if (this.dormant) this.sleep();
+  }
+
+  // Sover osynlig tills ett fällrum väcker den
+  sleep() {
+    this.state = 'dormant';
+    this.model.root.visible = false;
+    this.excl.visible = false;
+  }
+
+  wake() {
+    if (this.state !== 'dormant') return;
+    this.dormant = false;
+    this.setState('spawn');
+    this.model.root.visible = true;
+  }
+
+  get targetable() {
+    return this.state !== 'dead' && this.state !== 'spawn' && this.state !== 'dormant';
+  }
+
+  get alive() {
+    return this.state !== 'dead';
+  }
+
+  get chest() {
+    return this.chestPos.set(this.pos.x, this.pos.y + 1.25, this.pos.z);
+  }
+
+  setState(s) {
+    this.state = s;
+    this.st = 0;
+  }
+
+  // --- rörelse ---
+  groundAt(x, y, z) {
+    _ray.origin.set(x, y + 1.6, z);
+    _ray.direction.copy(_down);
+    const hit = this.octree.rayIntersect(_ray, 3);
+    if (!hit || hit.distance > 1.6 + 1.3) return null;
+    return hit.position.y;
+  }
+
+  snapToGround(instant) {
+    const gy = this.groundAt(this.pos.x, this.pos.y, this.pos.z);
+    if (gy !== null) this.pos.y = instant ? gy : approach(this.pos.y, gy, 18, 1 / 60);
+  }
+
+  move(dt, tvx, tvz, accel) {
+    this.vel.x = approach(this.vel.x, tvx, accel, dt);
+    this.vel.z = approach(this.vel.z, tvz, accel, dt);
+    this.push.multiplyScalar(Math.exp(-6 * dt));
+    const dx = (this.vel.x + this.push.x) * dt, dz = (this.vel.z + this.push.z) * dt;
+    if (Math.abs(dx) + Math.abs(dz) < 1e-5) return 1;
+    const nx = this.pos.x + dx, nz = this.pos.z + dz;
+    if (this.bounds && (nx < this.bounds.x0 + 0.6 || nx > this.bounds.x1 - 0.6 || nz < this.bounds.z0 + 0.6 || nz > this.bounds.z1 - 0.6)) {
+      this.vel.set(0, 0, 0);
+      this.push.set(0, 0, 0);
+      return 0;
+    }
+    if (this.isSafe?.(nx, nz)) {
+      this.vel.set(0, 0, 0);
+      this.push.set(0, 0, 0);
+      return 0;
+    }
+    // Gå aldrig över en kant eller upp på något högt
+    const gy = this.groundAt(nx + Math.sign(dx) * 0.3, this.pos.y, nz + Math.sign(dz) * 0.3);
+    if (gy === null || gy - this.pos.y > 0.45) {
+      this.vel.set(0, 0, 0);
+      this.push.set(0, 0, 0);
+      return 0;
+    }
+    const before = this.pos.clone();
+    this.pos.x = nx;
+    this.pos.z = nz;
+    this.capsule.start.set(this.pos.x, this.pos.y + 0.6, this.pos.z);
+    this.capsule.end.set(this.pos.x, this.pos.y + 1.4, this.pos.z);
+    const r = this.octree.capsuleIntersect(this.capsule);
+    if (r && r.depth > 1e-6 && r.normal.y < 0.55) {
+      _v.set(r.normal.x, 0, r.normal.z);
+      if (_v.lengthSq() > 1e-6) {
+        _v.normalize();
+        this.pos.addScaledVector(_v, r.depth / Math.max(0.3, Math.hypot(r.normal.x, r.normal.z)));
+      }
+    }
+    const g2 = this.groundAt(this.pos.x, this.pos.y, this.pos.z);
+    if (g2 !== null) this.pos.y = approach(this.pos.y, g2, 18, dt);
+    const moved = Math.hypot(this.pos.x - before.x, this.pos.z - before.z);
+    return moved / Math.max(1e-5, Math.hypot(dx, dz));
+  }
+
+  faceTowards(x, z, rate, dt) {
+    const target = Math.atan2(x - this.pos.x, z - this.pos.z);
+    this.facing += wrap(target - this.facing) * (1 - Math.exp(-rate * dt));
+  }
+
+  canSee(player) {
+    const dx = player.feet.x - this.pos.x, dz = player.feet.z - this.pos.z;
+    const dist = Math.hypot(dx, dz);
+    if (Math.abs(player.feet.y - this.pos.y) > 6) return false;
+    if (dist < HEAR) return true;
+    if (dist > SIGHT) return false;
+    const cos = (dx * Math.sin(this.facing) + dz * Math.cos(this.facing)) / dist;
+    if (cos < SIGHT_COS) return false;
+    _ray.origin.set(this.pos.x, this.pos.y + 1.5, this.pos.z);
+    _v.set(player.feet.x, player.feet.y + 1.2, player.feet.z).sub(_ray.origin);
+    const len = _v.length();
+    _ray.direction.copy(_v.normalize());
+    const hit = this.octree.rayIntersect(_ray, len);
+    return !hit || hit.distance > len - 0.4;
+  }
+
+  // --- skada ---
+  hurt(dmg, from, w) {
+    if (!this.targetable) return false;
+    if (this.hasShield && !w.unblockable) {
+      const a = Math.atan2(from.x - this.pos.x, from.z - this.pos.z);
+      if (Math.abs(wrap(a - this.facing)) < 1.3 && this.state !== 'stagger') {
+        this.cooldown = Math.min(this.cooldown, 0.25);
+        return 'blocked';
+      }
+    }
+    this.hp -= dmg;
+    this.flash = 0.14;
+    _v.set(this.pos.x - from.x, 0, this.pos.z - from.z);
+    if (_v.lengthSq() > 1e-6) _v.normalize();
+    this.push.copy(_v).multiplyScalar(dmg > 1 ? 7.5 : 5.5);
+    w.director.release(this);
+    if (this.hp <= 0) {
+      this.setState('dead');
+      w.sfx.play('edie');
+      w.fx.burst('ash', this.chest, 26);
+      if (Math.random() < (w.player.hp < w.player.maxHp ? 0.7 : 0.35)) w.fx.spawnHeart(this.pos.clone());
+      this.exclT = 0;
+      if (!this.respawn) this.permaDead = true;
+      return 'killed';
+    }
+    w.sfx.play('ehurt');
+    this.setState('hurt');
+    return 'hit';
+  }
+
+  // Hammarslaget: krossar skölden, eller slår hårt
+  slamHit(point, w) {
+    if (!this.targetable) return;
+    const d = Math.hypot(point.x - this.pos.x, point.z - this.pos.z);
+    if (d > 3.3 || Math.abs(point.y - this.pos.y) > 2) return;
+    if (this.hasShield) {
+      this.hasShield = false;
+      this.shieldMesh.visible = false;
+      w.sfx.play('shieldbreak');
+      w.fx.burst('spark', this.chest, 16, 0xffd08a);
+      w.fx.burst('ash', this.chest, 10);
+      this.stagger(w);
+      this.st = -0.6;
+      return;
+    }
+    const res = this.hurt(3, point, { ...w, unblockable: true });
+    if (res === 'hit') this.push.multiplyScalar(1.6);
+  }
+
+  stagger(w) {
+    w.director.release(this);
+    this.push.set(-Math.sin(this.facing), 0, -Math.cos(this.facing)).multiplyScalar(4);
+    this.setState('stagger');
+  }
+
+  // --- AI ---
+  update(dt, w) {
+    const { player, director } = w;
+    this.st += dt;
+    this.flash = Math.max(0, this.flash - dt);
+    this.cooldown = Math.max(0, this.cooldown - dt);
+    this.exclT = Math.max(0, this.exclT - dt);
+    const dx = player.feet.x - this.pos.x, dz = player.feet.z - this.pos.z;
+    const dist = Math.hypot(dx, dz);
+    const playerOk = player.state !== 'dead';
+    let tvx = 0, tvz = 0, accel = 8;
+
+    const look = () => {
+      this.seeT -= dt;
+      if (this.seeT <= 0) {
+        this.seeT = 0.2;
+        this.seen = playerOk && this.canSee(player);
+      }
+      return this.seen;
+    };
+    const toward = (x, z, speed) => {
+      const ddx = x - this.pos.x, ddz = z - this.pos.z, d = Math.hypot(ddx, ddz) || 1;
+      tvx = (ddx / d) * speed;
+      tvz = (ddz / d) * speed;
+      this.faceTowards(x, z, 8, dt);
+    };
+
+    switch (this.state) {
+      case 'patrol': {
+        if (this.wait > 0) this.wait -= dt;
+        else {
+          const p = this.waypoints[this.wp];
+          if (Math.hypot(p.x - this.pos.x, p.z - this.pos.z) < 0.6) {
+            this.wp = (this.wp + 1) % this.waypoints.length;
+            this.wait = 1 + Math.random() * 1.6;
+          } else toward(p.x, p.z, PATROL_SPEED);
+        }
+        if (look()) this.alert(w);
+        break;
+      }
+      case 'alert':
+        this.faceTowards(player.feet.x, player.feet.z, 10, dt);
+        if (this.st > 0.6) this.setState('chase');
+        break;
+      case 'return': {
+        toward(this.home.x, this.home.z, 2.2);
+        if (Math.hypot(this.home.x - this.pos.x, this.home.z - this.pos.z) < 0.8) {
+          this.setState('patrol');
+          this.wait = 1;
+        }
+        if (look()) this.alert(w);
+        break;
+      }
+      case 'chase':
+      case 'circle': {
+        const farHome = Math.hypot(this.pos.x - this.home.x, this.pos.z - this.home.z) > 26;
+        this.lostT = dist > 20 || !playerOk ? this.lostT + dt : 0;
+        if (this.lostT > 2.5 || farHome) {
+          director.release(this);
+          this.setState('return');
+          break;
+        }
+        const mayAttack = this.cooldown <= 0 && director.canAttack(this);
+        if (this.state === 'chase') {
+          if (mayAttack && dist < ATTACK_RANGE) {
+            director.take(this);
+            this.setState('windup');
+            w.sfx.play('growl');
+            break;
+          }
+          if (!mayAttack && dist < 5) { this.setState('circle'); break; }
+          toward(player.feet.x, player.feet.z, CHASE_SPEED);
+          accel = 6;
+        } else {
+          if (mayAttack || dist > 7) { this.setState('chase'); break; }
+          // Cirkla runt Cello på avstånd och vänta på sin tur
+          const ux = dx / (dist || 1), uz = dz / (dist || 1);
+          const radial = (dist - 4.2) * 1.2;
+          tvx = -uz * this.strafe * CIRCLE_SPEED + ux * radial;
+          tvz = ux * this.strafe * CIRCLE_SPEED + uz * radial;
+          this.faceTowards(player.feet.x, player.feet.z, 8, dt);
+          if (Math.random() < dt * 0.25) this.strafe *= -1;
+        }
+        break;
+      }
+      case 'windup':
+        if (this.st < 0.42) this.faceTowards(player.feet.x, player.feet.z, 9, dt);
+        if (this.st > 0.66) {
+          this.setState('strike');
+          this.hitDone = false;
+        }
+        break;
+      case 'strike': {
+        const fx = Math.sin(this.facing), fz = Math.cos(this.facing);
+        tvx = fx * 3;
+        tvz = fz * 3;
+        accel = 20;
+        if (!this.hitDone && this.st > 0.05) {
+          this.hitDone = true;
+          w.sfx.play('swing', { vol: 0.8 });
+          const cos = dist > 0.01 ? (dx * fx + dz * fz) / dist : 1;
+          if (playerOk && dist < HIT_RANGE && cos > 0.45 && Math.abs(player.feet.y - this.pos.y) < 1.6) {
+            const res = player.takeHit(1, this.pos);
+            if (res === 'blocked') {
+              w.onBlocked(this);
+              this.stagger(w);
+              break;
+            }
+            if (res === 'hit') w.onPlayerHit(this);
+          }
+        }
+        if (this.st > 0.2) this.setState('recover');
+        break;
+      }
+      case 'recover':
+        if (this.st > 0.85) {
+          director.release(this);
+          this.cooldown = 1.2 + Math.random() * 1.0;
+          this.setState(dist < 5 ? 'circle' : 'chase');
+        }
+        break;
+      case 'stagger':
+        if (this.st > 0.7) {
+          this.cooldown = 1.0;
+          this.setState('chase');
+        }
+        break;
+      case 'hurt':
+        if (this.st > 0.38) {
+          this.cooldown = Math.max(this.cooldown, 0.5);
+          this.setState('chase');
+        }
+        break;
+      case 'dormant':
+        return;
+      case 'dead':
+        this.deadT += dt;
+        if (this.st > 1.5) this.model.root.visible = false;
+        if (this.respawn && this.deadT > RESPAWN_TIME && dist > 14) {
+          this.reset();
+          this.setState('spawn');
+          this.model.root.visible = true;
+          w.fx.burst('ash', this.chest, 18);
+        }
+        break;
+      case 'spawn':
+        if (this.st > 0.9) this.setState('patrol');
+        break;
+      default:
+        break;
+    }
+
+    if (this.state !== 'dead' && this.state !== 'spawn') {
+      const ratio = this.move(dt, tvx, tvz, accel);
+      // Fastnat bakom en pelare: ta ett steg åt sidan en stund
+      if (Math.hypot(tvx, tvz) > 1 && ratio < 0.3) {
+        this.stuckT += dt;
+        if (this.stuckT > 0.4) { this.strafe *= -1; this.stuckT = -0.6; }
+      } else if (this.stuckT > 0) this.stuckT = 0;
+      if (this.stuckT < 0) {
+        this.stuckT = Math.min(0, this.stuckT + dt);
+        const s = this.strafe;
+        this.move(dt, Math.cos(this.facing) * 2 * s, -Math.sin(this.facing) * 2 * s, 10);
+      }
+    }
+    this.animate(dt);
+  }
+
+  alert(w) {
+    this.setState('alert');
+    this.exclT = 0.9;
+    w.sfx.play('alert');
+  }
+
+  animate(dt) {
+    const m = this.model, a = this.anim, st = this.st;
+    const speed = Math.hypot(this.vel.x, this.vel.z);
+    a.phase += dt * (1.5 + speed * 2.1);
+    const walk = Math.min(1, speed / 2.5);
+    const sw = Math.sin(a.phase) * 0.6 * walk;
+    let armR = -sw * 0.6, armL = sw * 0.6, torsoX = 0.35, torsoY = 0, headX = 0, armRz = 0.1;
+    if (this.state === 'windup') {
+      const k = Math.min(1, st / 0.45);
+      armR = -2.8 * k;
+      torsoX = 0.35 - 0.45 * k;
+      torsoY = 0.3 * k;
+      headX = -0.2 * k;
+    } else if (this.state === 'strike') {
+      armR = -0.35;
+      torsoX = 0.85;
+      torsoY = -0.2;
+    } else if (this.state === 'recover') {
+      armR = -0.3;
+      torsoX = 0.7 + Math.sin(st * 8) * 0.04;
+    } else if (this.state === 'hurt' || this.state === 'stagger') {
+      torsoX = -0.25;
+      headX = -0.3;
+      armR = 0.4;
+      armL = 0.4;
+    } else if (this.state === 'alert') {
+      torsoX = -0.05;
+      armR = -0.9;
+      armL = -0.9;
+      headX = -0.25;
+    }
+    const r = this.state === 'windup' || this.state === 'strike' ? 30 : 12;
+    m.legL.rotation.x = -sw - 0.15;
+    m.legR.rotation.x = sw - 0.15;
+    const cp = Math.cos(a.phase) * walk;
+    m.kneeL.rotation.x = 0.3 + Math.max(0, cp) * 0.8;
+    m.kneeR.rotation.x = 0.3 + Math.max(0, -cp) * 0.8;
+    // Armbågarna: hängande och böjda, raka i slaget; käken öppnas när den vrålar eller tar sats
+    const elbowR = this.state === 'windup' ? -0.6 : this.state === 'strike' ? -0.1 : -0.35 - walk * 0.25;
+    const elbowL = this.hasShield ? -1.2 : -0.35 - walk * 0.3;
+    m.elbowR.rotation.x = approach(m.elbowR.rotation.x, elbowR, r, dt);
+    m.elbowL.rotation.x = approach(m.elbowL.rotation.x, elbowL, 12, dt);
+    const jaw = this.state === 'alert' || this.state === 'windup' ? 0.45 : this.state === 'hurt' || this.state === 'stagger' ? 0.3 : 0.05 + Math.sin(a.phase * 0.7) * 0.03;
+    m.jaw.rotation.x = approach(m.jaw.rotation.x, jaw, 14, dt);
+    m.armR.rotation.x = approach(m.armR.rotation.x, armR, r, dt);
+    m.armR.rotation.z = approach(m.armR.rotation.z, armRz, r, dt);
+    m.armL.rotation.x = approach(m.armL.rotation.x, armL, 12, dt);
+    m.torso.rotation.x = approach(m.torso.rotation.x, torsoX, r, dt);
+    m.torso.rotation.y = approach(m.torso.rotation.y, torsoY, r, dt);
+    m.head.rotation.x = approach(m.head.rotation.x, headX, 10, dt);
+    m.hips.position.y = 0.85 + Math.abs(Math.sin(a.phase)) * 0.05 * walk;
+
+    if (this.state === 'dead') {
+      m.body.rotation.x = approach(m.body.rotation.x, -1.45, 6, dt);
+      m.body.position.y = -Math.max(0, st - 0.7) * 0.9;
+    } else if (this.state === 'spawn') {
+      m.body.position.y = -1.8 * (1 - Math.min(1, st / 0.8));
+      m.body.rotation.x = 0;
+    } else {
+      m.body.position.y = 0;
+      m.body.rotation.x = 0;
+    }
+
+    const flashing = this.flash > 0;
+    for (const mat of m.mats) mat.emissive.setRGB(flashing ? 0.9 : 0, flashing ? 0.9 : 0, flashing ? 0.9 : 0);
+    const glow = this.state === 'windup' ? 1 : 0.55 + Math.sin(a.phase * 0.5) * 0.1;
+    m.M.eye.color.setRGB(1, 0.62 + glow * 0.3, 0.25 + glow * 0.2);
+    m.M.glow.color.setRGB(1 * (0.6 + glow * 0.4), 0.42 * (0.6 + glow * 0.4), 0.12);
+
+    m.root.position.copy(this.pos);
+    m.root.rotation.y = this.facing;
+    this.excl.visible = this.exclT > 0;
+    if (this.excl.visible) this.excl.position.set(this.pos.x, this.pos.y + 2.6 + Math.sin(this.exclT * 20) * 0.04, this.pos.z);
+  }
+}
+
+// Stormfladdrare: små fladdermöss som sprakar av blixt. De dyker mot Cello
+// och studsar mot skölden. Ett svärdshugg räcker.
+class Bat {
+  constructor(scene, octree, home, opts = {}) {
+    this.octree = octree;
+    this.home = home.clone();
+    this.kind = 'bat';
+    this.flying = true;
+    this.room = opts.room || null;
+    this.dormant = !!opts.dormant;
+    this.respawn = opts.respawn ?? false;
+    this.permaDead = false;
+    this.pos = new THREE.Vector3();
+    this.vel = new THREE.Vector3();
+    this.hitRadius = 0.45;
+    this.hitHeight = [-0.8, 2.4];
+    this.t = Math.random() * 10;
+    const lam = (c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
+    const dark = lam(0x22232c), wing = lam(0x34303e);
+    const glow = new THREE.MeshBasicMaterial({ color: 0x8fe4ff });
+    const root = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.24, 0.38), dark);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.2), dark);
+    head.position.set(0, 0.06, 0.24);
+    root.add(body, head);
+    [-1, 1].forEach((s) => {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 4), dark);
+      ear.position.set(0.07 * s, 0.22, 0.24);
+      root.add(ear);
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.02), glow);
+      eye.position.set(0.06 * s, 0.08, 0.345);
+      root.add(eye);
+    });
+    this.wings = [-1, 1].map((s) => {
+      const g = new THREE.Group();
+      g.position.set(0.14 * s, 0.04, 0);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.03, 0.42), wing);
+      m.position.x = 0.3 * s;
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.02, 0.03), glow);
+      edge.position.set(0.3 * s, 0.01, 0.2);
+      g.add(m, edge);
+      root.add(g);
+      return { g, s };
+    });
+    this.spark = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.06), glow);
+    root.add(this.spark);
+    scene.add(root);
+    this.model = { root, mats: [dark, wing] };
+    this.reset();
+  }
+
+  reset() {
+    this.pos.copy(this.home).y += 2.6;
+    this.vel.set(0, 0, 0);
+    this.hp = 1;
+    this.st = 0;
+    this.cooldown = 0.5 + Math.random();
+    this.model.root.visible = true;
+    this.model.root.rotation.set(0, 0, 0);
+    this.model.root.position.copy(this.pos);
+    this.state = 'hover';
+    if (this.dormant) this.sleep();
+  }
+
+  sleep() {
+    this.state = 'dormant';
+    this.model.root.visible = false;
+  }
+
+  wake() {
+    if (this.state !== 'dormant') return;
+    this.dormant = false;
+    this.state = 'spawn';
+    this.st = 0;
+    this.pos.copy(this.home).y += 0.6;
+    this.model.root.visible = true;
+  }
+
+  get targetable() {
+    return !['dead', 'dormant', 'spawn'].includes(this.state);
+  }
+
+  get alive() {
+    return this.state !== 'dead';
+  }
+
+  get chest() {
+    return this.pos;
+  }
+
+  setState(s) {
+    this.state = s;
+    this.st = 0;
+  }
+
+  die(w) {
+    this.setState('dead');
+    this.vel.set(0, 1, 0);
+    w.sfx.play('bat', { vol: 0.7 });
+    w.fx.burst('spark', this.pos, 12, 0x8fdcff);
+    if (!this.respawn) this.permaDead = true;
+    if (Math.random() < 0.3) w.fx.spawnHeart(this.pos.clone().setY(this.home.y));
+  }
+
+  hurt(dmg, from, w) {
+    if (!this.targetable) return false;
+    this.die(w);
+    return 'killed';
+  }
+
+  slamHit(point, w) {
+    if (!this.targetable) return;
+    if (Math.hypot(point.x - this.pos.x, point.z - this.pos.z) < 3.4 && this.pos.y - point.y < 3.2) this.die(w);
+  }
+
+  update(dt, w) {
+    const p = w.player;
+    this.t += dt;
+    this.st += dt;
+    this.cooldown -= dt;
+    const chest = new THREE.Vector3(p.feet.x, p.feet.y + 1.1, p.feet.z);
+    const to = chest.clone().sub(this.pos);
+    const dist = to.length();
+    let speed = 0;
+    switch (this.state) {
+      case 'dormant':
+        return;
+      case 'spawn':
+        this.pos.y += dt * 2.6;
+        if (this.st > 0.8) this.setState('hover');
+        break;
+      case 'hover': {
+        const tgt = this.home.clone().add(new THREE.Vector3(Math.cos(this.t * 0.8) * 1.3, 2.6 + Math.sin(this.t * 2.1) * 0.3, Math.sin(this.t * 0.8) * 1.3));
+        this.vel.lerp(tgt.sub(this.pos).multiplyScalar(2), 1 - Math.exp(-3 * dt));
+        if (this.cooldown <= 0 && p.state !== 'dead' && dist < 9 && Math.abs(to.y) < 5) {
+          this.setState('swoop');
+          this.vel.copy(to).normalize().multiplyScalar(4);
+          w.sfx.play('bat', { vol: 0.5 });
+        }
+        break;
+      }
+      case 'swoop': {
+        speed = 6.2;
+        const want = to.clone().normalize().multiplyScalar(speed);
+        const side = new THREE.Vector3(-to.z, 0, to.x).normalize().multiplyScalar(Math.sin(this.st * 9) * 1.6);
+        this.vel.lerp(want.add(side), 1 - Math.exp(-2.6 * dt));
+        if (dist < 0.75) {
+          const res = p.takeHit(1, this.pos);
+          if (res === 'blocked') {
+            this.setState('bounce');
+            this.vel.copy(to).normalize().multiplyScalar(-5).setY(-1);
+          } else {
+            this.setState('retreat');
+          }
+        } else if (this.st > 2.4) this.setState('retreat');
+        break;
+      }
+      case 'retreat': {
+        const away = to.clone().setY(0).normalize().multiplyScalar(-3.5);
+        this.vel.lerp(away.setY(3), 1 - Math.exp(-3 * dt));
+        if (this.st > 1.1) { this.setState('hover'); this.cooldown = 0.8 + Math.random() * 0.8; }
+        break;
+      }
+      case 'bounce':
+        this.vel.y -= 6 * dt;
+        this.vel.multiplyScalar(Math.exp(-2 * dt));
+        if (this.st > 0.8) { this.setState('hover'); this.cooldown = 1.2; }
+        break;
+      case 'dead':
+        this.vel.y -= 14 * dt;
+        if (this.st > 0.9) this.model.root.visible = false;
+        break;
+      default:
+        break;
+    }
+    this.pos.addScaledVector(this.vel, dt);
+    // Inne i rummet och ovanför golvet
+    const b = this.bounds;
+    if (b) {
+      this.pos.x = Math.max(b.x0 + 0.6, Math.min(b.x1 - 0.6, this.pos.x));
+      this.pos.z = Math.max(b.z0 + 0.6, Math.min(b.z1 - 0.6, this.pos.z));
+    }
+    const floor = this.home.y + (this.state === 'dead' ? 0.15 : 0.55);
+    if (this.pos.y < floor) { this.pos.y = floor; if (this.vel.y < 0) this.vel.y = 0; }
+    if (this.pos.y > this.home.y + 5) this.pos.y = this.home.y + 5;
+    // Vingarna slår, kroppen lutar i flykten
+    const flap = this.state === 'dead' ? 0.2 : Math.sin(this.t * (this.state === 'swoop' ? 30 : 20)) * 0.9;
+    for (const wg of this.wings) wg.g.rotation.z = wg.s * flap;
+    const r = this.model.root;
+    r.position.copy(this.pos);
+    if (this.vel.lengthSq() > 0.05) r.rotation.y = Math.atan2(this.vel.x, this.vel.z);
+    r.rotation.x = this.state === 'swoop' ? 0.35 : 0;
+    this.spark.visible = Math.random() < 0.4;
+    this.spark.position.set((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.4);
+  }
+}
+
+export class Enemies {
+  constructor(scene, octree, isSafe) {
+    this.scene = scene;
+    this.octree = octree;
+    this.isSafe = isSafe;
+    this.list = [];
+    this.attacker = null;
+    this.active = true;
+    this.cleared = new Set();
+  }
+
+  // opts: { kind: 'askling' | 'shield' | 'bat', room, dormant, respawn, bounds, group: 'world' | 'bastion' }
+  add(home, waypoints, opts = {}) {
+    const e = opts.kind === 'bat'
+      ? new Bat(this.scene, this.octree, home, opts)
+      : new Askling(this.scene, this.octree, home, waypoints, this.list.length, opts);
+    e.isSafe = opts.group === 'bastion' ? null : this.isSafe;
+    e.bounds = opts.bounds || null;
+    e.trapGroup = opts.dormant ? opts.room : null;
+    e.group = opts.group || 'world';
+    this.list.push(e);
+    return e;
+  }
+
+  // Under prologen finns inga asklingar i byn; efteråt reser de sig ur askan
+  setActive(on) {
+    this.active = on;
+    this.attacker = null;
+    for (const e of this.list) {
+      if (e.group !== 'world') continue;
+      e.reset();
+      if (on) {
+        e.setState('spawn');
+        e.model.root.visible = true;
+      } else {
+        e.state = 'dead';
+        e.deadT = -1e9;
+        e.model.root.visible = false;
+      }
+    }
+  }
+
+  canAttack(e) {
+    return !this.attacker || this.attacker === e;
+  }
+
+  take(e) {
+    this.attacker = e;
+  }
+
+  release(e) {
+    if (this.attacker === e) this.attacker = null;
+  }
+
+  // Fällrum: fienderna i rummet vaknar, och rummet är klart när alla är besegrade
+  wakeGroup(room) {
+    for (const e of this.list) if (e.room === room) e.wake?.();
+  }
+
+  groupCleared(room) {
+    return this.list.every((e) => e.room !== room || !e.alive);
+  }
+
+  // Ett klarat fällrum förblir tomt, även efter att Cello har dött eller laddat spelet
+  killGroup(room) {
+    this.cleared.add(room);
+    for (const e of this.list) {
+      if (e.room !== room || !e.trapGroup) continue;
+      e.permaDead = true;
+      e.state = 'dead';
+      e.st = 99;
+      e.model.root.visible = false;
+    }
+  }
+
+  resetAll() {
+    this.attacker = null;
+    for (const e of this.list) {
+      if (e.group === 'world' && !this.active) continue;
+      if (e.trapGroup && this.cleared.has(e.trapGroup)) continue;
+      e.permaDead = false;
+      if (e.trapGroup) e.dormant = true;
+      e.reset();
+    }
+  }
+
+  slam(point, w) {
+    const ctx = { ...w, director: this };
+    for (const e of this.list) e.slamHit?.(point, ctx);
+  }
+
+  update(dt, w) {
+    if (this.attacker && !this.attacker.targetable) this.attacker = null;
+    const ctx = { ...w, director: this };
+    const p = w.player;
+    for (const e of this.list) {
+      if (e.group === 'world' && !this.active) continue;
+      if (Math.abs(e.home.x - p.feet.x) > 60 || Math.abs(e.home.z - p.feet.z) > 60) continue;
+      e.update(dt, ctx);
+    }
+    // Knuffa isär Cello och fiender, och fiender sinsemellan
+    for (const e of this.list) {
+      if (!e.targetable || e.flying) continue;
+      const dx = p.feet.x - e.pos.x, dz = p.feet.z - e.pos.z, d = Math.hypot(dx, dz);
+      const min = RADIUS + 0.38;
+      if (d < min && d > 1e-4 && Math.abs(p.feet.y - e.pos.y) < 1.8) {
+        p.nudge((dx / d) * (min - d), (dz / d) * (min - d));
+      }
+      for (const o of this.list) {
+        if (o === e || !o.targetable || o.flying) continue;
+        const ex = e.pos.x - o.pos.x, ez = e.pos.z - o.pos.z, ed = Math.hypot(ex, ez);
+        if (ed < RADIUS * 2 && ed > 1e-4) {
+          e.pos.x += (ex / ed) * (RADIUS * 2 - ed) * 0.5;
+          e.pos.z += (ez / ed) * (RADIUS * 2 - ed) * 0.5;
+        }
+      }
+    }
+  }
+}

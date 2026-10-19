@@ -1,0 +1,44 @@
+// Bygger en fristående version av spelet (en enda HTML-fil med all kod inbakad),
+// som går att publicera som en Claude-artifact eller skicka till någon.
+// Kör: npm run build:artifact  →  build/play.html
+import { build } from 'esbuild';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+const threeLocal = {
+  name: 'three-local',
+  setup(b) {
+    b.onResolve({ filter: /^three$/ }, () => ({ path: path.join(root, 'lib/three/three.module.js') }));
+    b.onResolve({ filter: /^three\/addons\// }, (a) => ({
+      path: path.join(root, 'lib/three/addons', a.path.slice('three/addons/'.length)),
+    }));
+  },
+};
+
+const result = await build({
+  entryPoints: [path.join(root, 'src/main.js')],
+  bundle: true,
+  format: 'esm',
+  minify: true,
+  target: 'es2020',
+  write: false,
+  legalComments: 'eof',
+  plugins: [threeLocal],
+});
+const js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
+
+const html = await readFile(path.join(root, 'index.html'), 'utf8');
+const head = html.match(/<head>([\s\S]*?)<\/head>/)[1]
+  .replace(/<meta charset[^>]*>\s*/i, '')
+  .replace(/<meta name="viewport"[^>]*>\s*/i, '')
+  .replace(/<script type="importmap">[\s\S]*?<\/script>\s*/i, '');
+const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/)[1]
+  .replace(/<script type="module"[^>]*><\/script>\s*/i, '');
+
+const out = `${head.trim()}\n${body.trim()}\n<script type="module">${js}</script>\n`;
+await mkdir(path.join(root, 'build'), { recursive: true });
+await writeFile(path.join(root, 'build/play.html'), out);
+console.log(`build/play.html  ${(out.length / 1024).toFixed(0)} kB`);
