@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { Npc } from './npcs.js';
 import { Titan } from './titan.js';
 import { buildItem, ITEM_TEXT } from './items.js';
+import { SWORD_MAX } from './player.js';
 
 const SAVE_KEY = 'cello-ashes-of-the-fallen:save';
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -16,7 +17,7 @@ export function loadSave() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const d = JSON.parse(raw);
-    return d && d.v === 1 && d.state ? d : null;
+    return d && (d.v === 1 || d.v === 2) && d.state ? d : null;
   } catch {
     return null;
   }
@@ -36,15 +37,23 @@ const freshState = () => ({
   // 0.4: stenvägarna, föremålen och fästningen
   northPath: false, eastPath: false, items: { hammer: false }, hearts: 0, bastion: null,
   bastionDone: false, kaelLetter: false, letterGiven: false, gloves: false, spawnAt: 'aetheria',
+  // 0.6: en större värld
+  area: 'home', entry: 'start', seen: {}, shards: 0, sword: SWORD_MAX, lantern: false, oil: 0, potions: 0,
+  slots: [null, null, null], opened: {}, torches: {}, hint: null, caveOpen: false,
 });
 
 export class Story {
   constructor(ctx) {
     Object.assign(this, ctx); // scene, world, player, enemies, combat, rig, hud, dialog, sfx, fx, groundAt, lights
     this.bastion = this.world.bastion;
+    this.areas = this.world.areas;
     const A = this.world.aetheria.npcs;
-    const mk = (id, name, voice, spot, look, pose, extra = {}) =>
-      new Npc(this.scene, { id, name, voice, pos: spot.pos, face: spot.face, look, pose, ...extra });
+    const villageRoot = this.areas.get('village').root;
+    const mk = (id, name, voice, spot, look, pose, extra = {}) => {
+      const n = new Npc(villageRoot, { id, name, voice, pos: spot.pos, face: spot.face, look, pose, ...extra });
+      n.area = 'village';
+      return n;
+    };
     this.npcs = {
       lyra: mk('lyra', 'Lyra', 'lyra', A.lyra, {
         skin: 0xd4b096, hair: 0x3b2a20, hairStyle: 'hood', hood: 0x34405a, top: 0x34405a, robe: true,
@@ -78,7 +87,7 @@ export class Story {
     this.lyraStone = V(-4.3, gy(-4.3, -100.9, ns.y), -100.9);
     this.lyraStoneFace = Math.atan2(-2.4 - -4.3, -103.5 - -100.9);
 
-    this.titan = new Titan(this.scene, this.world.prologue.titanHome, this.groundAt);
+    this.titan = new Titan(villageRoot, this.world.prologue.titanHome, this.groundAt);
     this.titan.onRoar = (t) => {
       const d = t.pos.distanceTo(this.player.feet);
       this.sfx.play('roar', { vol: Math.max(0.15, 1 - d / 60) });
@@ -100,6 +109,7 @@ export class Story {
 
     const spot = (v) => () => v;
     const east = this.world.east;
+    this.traveling = false;
     this.interactions = [
       { label: 'Help Maren', npc: this.npcs.maren, ok: () => this.phase === 'prologue', run: () => this.talkMarenPrologue() },
       { label: 'Talk to Lyra', npc: this.npcs.lyra, ok: () => this.phase === 'free', run: () => this.talkLyra() },
@@ -112,21 +122,21 @@ export class Story {
         npc: this.npcs.kael, ok: () => this.phase === 'free', run: () => this.talkKael(),
       },
       { label: 'Talk to Maren', npc: this.npcs.maren, ok: () => this.phase === 'free' && this.state.choice1 === 'saved', run: () => this.talkMarenCot() },
-      { label: 'Rest by the fire', pos: spot(this.world.aetheria.camp), radius: 2.4, ok: () => this.phase === 'free', run: () => this.askRest() },
+      { label: 'Rest by the fire', area: 'village', pos: spot(this.world.aetheria.camp), radius: 2.4, ok: () => this.phase === 'free', run: () => this.askRest('aetheria') },
       {
-        label: 'Examine the stone gate', pos: spot(V(0, ns.y, -101.6)), radius: 2.0,
+        label: 'Examine the stone gate', area: 'village', pos: spot(V(0, ns.y, -101.6)), radius: 2.0,
         ok: () => this.phase === 'free' && !this.state.northPath && !this.cinematic,
         run: () => this.read(['Two obelisks of black stone. Their runes are dead and cold.', 'Beyond them there is nothing but storm. Perhaps Lyra knows more.']),
       },
       {
-        label: 'Examine the Storm Stone', pos: spot(V(east.stone.x - 0.2, east.stone.y, east.stone.z + 1.6)), radius: 2.0,
+        label: 'Examine the Storm Stone', area: 'field', pos: spot(V(east.stone.x - 0.2, east.stone.y, east.stone.z + 1.6)), radius: 2.0,
         ok: () => this.phase === 'free' && !this.state.eastPath,
         run: () => this.read(this.player.hasHammer
           ? ['A black stone covered in runes, just like the ones on the gate in the north.', 'A copper plate lies at its foot. Perhaps the hammer could wake it?']
           : ['A black stone covered in dead runes.', 'A copper plate lies at its foot, green with age and cold.']),
       },
       {
-        label: 'Examine the golden gate', pos: spot(V(101.6, east.end.y, 0)), radius: 2.4,
+        label: 'Examine the golden gate', area: 'field', pos: spot(east.gate ?? east.end), radius: 2.4,
         ok: () => this.phase === 'free',
         run: () => this.read([
           'A gate of gold, sealed with the sign of the sun.',
@@ -135,6 +145,7 @@ export class Story {
         ]),
       },
     ];
+    this.addAreaInteractions();
     this.prompt = null;
     this.cinematic = false;
     this.gateT = 0;
@@ -174,6 +185,7 @@ export class Story {
     this.capeSeen = false;
     this.musicHold = null;
     this.phase = 'intro';
+    this.traveling = false;
     this.clearShown();
     const P = this.player;
     P.maxHp = 6;
@@ -182,7 +194,16 @@ export class Story {
     P.gloves = false;
     P.setPath(null);
     P.carry(null);
-    P.revive(this.world.spawn, this.world.spawnFacing);
+    P.autoWalk = null;
+    P.setSword(SWORD_MAX);
+    this.inventory?.reset();
+    // Startskärmen visar den brinnande byn; ett nytt spel börjar vid Cellos hus
+    const start = silent ? this.areas.get('village') : this.areas.get('home');
+    this.areas.activate(start.id);
+    const sp = silent ? start.entry('south') : start.entry('start');
+    P.revive(sp.pos, sp.facing);
+    this.state.area = start.id;
+    this.state.entry = silent ? 'south' : 'start';
     this.enemies.setActive(false);
     this.enemies.cleared.clear();
     this.bastion.applyState(null);
@@ -191,6 +212,7 @@ export class Story {
     this.titan.reset();
     this.world.villageFires.forEach((f) => { f.level = 1; });
     for (const p of [this.world.paths.north, this.world.paths.east]) p.lower();
+    this.resetAreaThings();
     this.world.lightNorth(false);
     this.world.lightEast(false);
     const n = this.npcs, A = this.world.aetheria.npcs;
@@ -206,10 +228,10 @@ export class Story {
 
   // Cello kommer hem från skogen och ser röken över byn
   startIntro() {
-    this.after(0.7, () => this.hud.caption('Cello had been in the forest since dawn.', 3800));
-    this.after(4.9, () => this.hud.caption('When he turned for home, smoke was rising over the village.', 4200));
+    this.after(0.7, () => this.hud.caption('Cello lived at the edge of the forest, a short walk south of Hollowbrook.', 4200));
+    this.after(5.3, () => this.hud.caption('That morning, smoke was rising over the village.', 4000));
     this.after(10.5, () => {
-      if (this.phase === 'intro' && this.player.feet.z > 66) this.hud.toast('Follow the bridge north, home to the village.', 3600);
+      if (this.phase === 'intro' && this.areas.id === 'home') this.hud.toast('Follow the path north to the bridge.', 3600);
     });
   }
 
@@ -225,14 +247,24 @@ export class Story {
     s.bastion = this.bastion.state;
     this.setupFree();
     this.enemies.resetAll();
+    this.resetAreaThings();
     const P = this.player;
-    if (s.spawnAt === 'bastion') {
-      P.revive(this.world.bastionEntrance, Math.PI);
-      this.hud.toast('Welcome back to The Tempest Bastion.', 3000);
-    } else {
-      P.revive(this.world.aetheria.spawn, this.world.aetheria.spawnFacing);
-      this.hud.toast('Welcome back to Aetheria.', 3000);
+    // Äldre sparningar (0.5) visste bara om Aetheria och fästningen
+    let area = s.area, entry = s.entry;
+    if (!save.state.area) {
+      area = s.spawnAt === 'bastion' ? 'bastion' : 'village';
+      entry = s.spawnAt === 'bastion' ? 'entrance' : 'aetheria';
     }
+    if (!this.areas.get(area)) { area = 'village'; entry = 'aetheria'; }
+    const a = this.areas.activate(area);
+    const e = a.entry(entry);
+    s.area = area;
+    s.entry = entry;
+    for (const id of Object.keys(s.seen || {})) if (this.areas.get(id)) this.areas.get(id).visited = true;
+    P.revive(e.pos, e.facing);
+    P.setSword(s.sword ?? SWORD_MAX);
+    this.inventory?.load(s);
+    this.hud.toast(`Welcome back to ${a.name}.`, 3000);
     this.hud.setHearts(P.hp, P.maxHp);
   }
 
@@ -283,11 +315,16 @@ export class Story {
     this.npcs.maren.place(A.maren.pos, A.maren.face, 'lie');
   }
 
-  save(silent = false) {
+  save(silent = false, entry = null) {
     const s = this.state;
     s.bastion = this.bastion.state;
-    s.spawnAt = this.world.inBastion(this.player.feet.x, this.player.feet.z) ? 'bastion' : 'aetheria';
-    const ok = writeSave({ v: 1, state: s, savedAt: Date.now() });
+    s.spawnAt = this.world.inBastion() ? 'bastion' : 'aetheria';
+    s.area = this.areas.id;
+    if (entry) s.entry = entry;
+    if (s.area === 'bastion') s.entry = 'entrance';
+    s.sword = this.player.sword.dur;
+    this.inventory?.store(s);
+    const ok = writeSave({ v: 2, state: s, savedAt: Date.now() });
     if (!silent) {
       this.hud.toast(ok ? 'Game saved' : 'Could not save in this browser', 2600);
       if (ok) this.sfx.play('save');
@@ -350,7 +387,7 @@ export class Story {
         L('They hunt us because we are the source of their power. The fewer people who live, the stronger they become.'),
         L('What they want is to live in peace. Alone. On an earth without us.'),
         L("But the gods left something behind. Relics holding a part of their power: Thor's hammer, the swift shoes of Hermes, the lightning of Zeus."),
-        L("A shard of Thor's hammer is said to lie in The Tempest Bastion, a burned-out fortress of iron to the north."),
+        L("A shard of Thor's hammer is said to lie in The Tempest Bastion, a burned-out fortress of iron far to the north, beyond the Stormvale."),
         L('The stone gate north of the camp once led there. I think I have finally understood how to wake it. Come.'),
       ], () => { s.talked.lyra = true; this.openNorthPath(); });
       return;
@@ -361,7 +398,8 @@ export class Story {
     }
     if (!s.items.hammer) {
       const pool = [
-        [L('Follow the stones north. The Tempest Bastion waits beyond the storm.'), L("Thor's hammer is said to rest in the fortress forge, among the lightning.")],
+        [L('Follow the stones north to Thistledown Ranch. From there the road runs through Galewind Pass and out onto the Stormvale.'), L('The Tempest Bastion lies at the far northern edge of the Stormvale. It is a long road, Cello.')],
+        [L("Thor's hammer is said to rest in the fortress forge, among the lightning."), L('If you need a lantern or a new blade, the village of Willowmere lies east on the Stormvale. They trade there still.')],
         [L('The Ashlings in your village... I believe they are made from the ashes of those the titans have killed.'), L('The ashes of the dead, turned against the living.')],
         [L('The inscriptions speak of relics that are broken, not destroyed. That means they can be mended.')],
       ];
@@ -379,19 +417,24 @@ export class Story {
     }
     if (!s.eastPath) {
       this.talk(n, [
-        L('The Storm Stone on the island east of the village bears the same runes as this stone gate.'),
+        L('Far out on the eastern edge of the Stormvale stands a Storm Stone. It bears the same runes as this gate.'),
         L('There is a copper plate at its foot. Strike it with the hammer, and perhaps it will wake.'),
       ]);
       return;
     }
     this.talk(n, [
-      L('Beyond the cape to the east lies the Sun-Scorched Pyramid. The shoes of Hermes are said to be there.'),
+      L('Beyond the golden gate lies the road to the Sun-Scorched Pyramid. The shoes of Hermes are said to be there.'),
       L('The golden gate is still sealed. We will find a way. Rest first.'),
     ]);
   }
 
   talkVane() {
     const s = this.state, n = this.npcs.vane, L = (t) => this.line(n, t);
+    // Ett slitet eller avbrutet svärd: Vane smider ett nytt
+    if (this.folk && s.talked.vane && !(s.items.hammer && !s.talked.vaneHammer) && this.player.sword.dur < SWORD_MAX * 0.8) {
+      this.folk.vaneForge(n);
+      return;
+    }
     if (s.items.hammer && !s.talked.vaneHammer) {
       this.talk(n, [
         L("Wait. Is that... Mjölnir's Shard?"),
@@ -545,21 +588,93 @@ export class Story {
     this.hud.toast("You got the Smith's Gloves! Your ground strike is faster, and Cello moves quicker with heavy weight.", 5200);
   }
 
-  askRest() {
+  askRest(entry, prompt = 'The fire crackles warmly. Rest a while?', text = 'Cello rests by the fire...') {
     this.dialog.start([{
-      who: '', prompt: 'The fire crackles warmly. Rest a while?',
+      who: '', prompt,
       choices: [{ text: 'Rest and save', id: 'rest' }, { text: 'Not now', id: 'no' }],
-      onChoose: (id) => { if (id === 'rest') this.rest(); },
+      onChoose: (id) => { if (id === 'rest') this.rest(entry, text); },
     }]);
   }
 
-  rest() {
-    this.startFade(1.6, 'Cello rests by the fire...', () => {
+  rest(entry = null, text = 'Cello rests by the fire...') {
+    this.startFade(1.6, text, () => {
       const P = this.player;
       P.hp = P.maxHp;
       this.hud.setHearts(P.hp, P.maxHp);
-      this.save();
+      this.save(false, entry);
     });
+  }
+
+  // ---------- resor mellan områden ----------
+  // Skärmen tonar till svart, nästa område laddas och Cello går in några steg
+  travel(to, entry, opts = {}) {
+    if (this.fade || this.traveling) return;
+    const P = this.player;
+    this.traveling = true;
+    this.cinematic = true;
+    this.combat.unlock(true);
+    P.shielding = false;
+    if (opts.walk !== false) P.autoWalk = { yaw: P.facing, speed: 0.7 };
+    if (opts.door) this.sfx.play('door', { vol: 0.6 });
+    this.startFade(opts.dur ?? 1.4, opts.text ?? '', () => this.enterArea(to, entry, opts), () => {
+      this.traveling = false;
+      this.cinematic = false;
+      P.autoWalk = null;
+    });
+  }
+
+  enterArea(to, entry, opts = {}) {
+    const P = this.player;
+    const a = this.areas.activate(to);
+    const e = a.entry(entry);
+    P.teleport(e.pos);
+    P.facing = e.facing;
+    P.safe.copy(e.pos);
+    P.safeFacing = e.facing;
+    P.autoWalk = opts.walk === false || opts.door ? null : { yaw: e.facing, speed: 0.6 };
+    this.state.area = to;
+    this.state.entry = entry;
+    this.fx.clearHearts();
+    this.rig.snap(P);
+    if (a.card && !this.state.seen[to]) this.after(1.1, () => this.hud.card(a.name, a.sub, 3800));
+    this.state.seen[to] = true;
+    if (this.phase === 'free') this.save(true);
+  }
+
+  // Var Cello börjar om efter att ha fallit i strid: där han kom in i området
+  respawnPoint() {
+    const a = this.areas.cur;
+    if (a.id === 'bastion') return a.entry('entrance');
+    return a.entry(this.state.entry);
+  }
+
+  // Dörrar, skyltar, kistor, facklor och viloplatser i alla områden
+  addAreaInteractions() {
+    const B = this.world.builder;
+    const free = () => this.phase === 'free' || this.phase === 'intro';
+    for (const a of Object.values(this.areas.list)) {
+      for (const d of a.doors || []) {
+        this.interactions.push({
+          label: d.label, area: a.id, pos: () => d.pos, radius: d.radius ?? 1.7, ok: () => free() && (d.ok ? d.ok() : true),
+          run: () => this.travel(d.to, d.entry, { door: true, dur: 1.1 }),
+        });
+      }
+      for (const r of a.rests || []) {
+        this.interactions.push({
+          label: r.label ?? 'Rest', area: a.id, pos: () => r.pos, radius: r.radius ?? 2.2, ok: () => this.phase === 'free',
+          run: () => this.askRest(r.entry, r.prompt, r.text),
+        });
+      }
+      for (const it of a.interactions || []) this.interactions.push({ area: a.id, ...it });
+    }
+    for (const sg of B.signs) {
+      this.interactions.push({ label: sg.label, area: sg.area, pos: () => sg.pos, radius: 1.6, ok: () => true, run: () => this.read(sg.lines) });
+    }
+  }
+
+  // Saker som hör till områdena och börjar om vid ett nytt spel
+  resetAreaThings() {
+    this.world.onReset?.(this.state);
   }
 
   startFade(dur, text, onMid, onEnd) {
@@ -686,12 +801,13 @@ export class Story {
         this.save(true);
         this.talk(lyra, [
           L('The stones remember the path of the gods.'),
-          L('Follow them north to The Tempest Bastion. The storm there is not like the storm here, so be careful.'),
+          L('Follow them north. The road is long: past Thistledown Ranch, through Galewind Pass and across the Stormvale.'),
+          L('The Tempest Bastion lies at its far end. The storm there is not like the storm here, so be careful.'),
           L('I will stay here by the gate and keep reading the runes.'),
         ], () => {
           this.cinematic = false;
           lyra.pose = 'read';
-          this.hud.toast('A path of stones leads north toward The Tempest Bastion.', 4200);
+          this.hud.toast('A path of stones leads north, out into the wide world.', 4200);
         });
       });
     });
@@ -721,7 +837,8 @@ export class Story {
         P.holdUp(false);
         this.cinematic = false;
         this.save(true);
-        if (kind === 'hammer') this.hud.toast('The copper plate in the floor... Try striking it with F.', 4200);
+        if (kind === 'lantern') this.hud.toast('The lantern lies on a button now. Press it to light the lantern, or near a brazier to light that.', 5200);
+        if (kind === 'hammer') this.hud.toast('The shard lies on F (ground strike) and G (heavy weight). The copper plate in the floor... try striking it!', 5200);
       });
     });
   }
@@ -770,6 +887,7 @@ export class Story {
     if (kind === 'hammer') {
       s.items.hammer = true;
       P.hasHammer = true;
+      this.inventory?.gotHammer();
       this.hud.setItems(P);
     } else if (kind === 'heart') {
       s.hearts = (s.hearts || 0) + 1;
@@ -777,6 +895,8 @@ export class Story {
       P.maxHp = this.maxHpFor(s);
       P.hp = P.maxHp;
       this.hud.setHearts(P.hp, P.maxHp);
+    } else if (kind === 'lantern') {
+      this.inventory?.refresh(true);
     } else this.bastion.grant(kind);
   }
 
@@ -815,6 +935,7 @@ export class Story {
     this.holdMusic('dawn', 30);
     this.startFade(2.6, 'The lightning carries Cello home...', () => {
       s.bastionDone = true;
+      this.enterArea('village', 'aetheria', { walk: false });
       const py = this.groundAt(1.0, ns.y + 3, -98.6) ?? ns.y;
       P.revive(V(1.0, py, -98.6), 0);
       P.hp = P.maxHp;
@@ -831,7 +952,7 @@ export class Story {
         L("Hrungnir... the giant with a heart of stone. He has guarded Thor's fortress since the gods died."),
         s.choice1 === 'saved' ? L("Maren has been asking for you the whole time. Go and show her you're alive.") : L("Vane said he heard the thunder all the way here. He smiled. I've never seen that before."),
         L('The shard is only a piece of Mjölnir. But it remembers the lightning.'),
-        L('The Storm Stone on the island east of the village bears the same runes as this gate. Strike the copper plate at its foot with the hammer.'),
+        L('Far out on the Stormvale, on its eastern edge, stands a Storm Stone with the same runes as this gate. Strike the copper plate at its foot with the hammer.'),
       ], () => {
         this.cinematic = false;
         lyra.pose = 'read';
@@ -857,7 +978,7 @@ export class Story {
     this.lights.flash(top, 0xbfe8ff, 70, 30, 0.5);
     this.sfx.play('thunder', { vol: 0.9, delay: 0.1 });
     this.after(0.4, () => {
-      this.rig.cinematic = { pos: V(66, st.y + 6.5, 9), look: V(86, -1, 0), glide: true, speed: 1.6 };
+      this.rig.cinematic = { pos: V(st.x + 3.5, st.y + 6.5, st.z + 13), look: V(st.x + 24, st.y - 1, st.z + 4), glide: true, speed: 1.6 };
     });
     this.after(1.0, () => { this.world.paths.east.raise(); this.sfx.play('crumble', { vol: 0.7 }); });
     this.after(4.4, () => {
@@ -865,6 +986,7 @@ export class Story {
       this.cinematic = false;
       this.sfx.play('secret');
       this.hud.toast('The Storm Stone awakens! A path of stones rises toward the east.', 4200);
+      this.state.eastPath = true;
       this.save(true);
     });
     return true;
@@ -877,7 +999,8 @@ export class Story {
   // ---------- varje bildruta ----------
   update(dt, inp) {
     const P = this.player;
-    for (const n of Object.values(this.npcs)) if (n !== P.carried) n.update(dt, P, this.groundAt);
+    const here = this.areas.id;
+    for (const n of Object.values(this.npcs)) if (n !== P.carried && (!n.area || n.area === here)) n.update(dt, P, this.groundAt);
 
     if (this.musicHold && !this.dialog.active && !this.cinematic && (this.musicHold.t -= dt) <= 0) this.musicHold = null;
 
@@ -917,7 +1040,7 @@ export class Story {
     }
 
     // Vägen hem: ett vrål från byn, och vid porten syns att allt brinner
-    if (this.phase === 'intro') {
+    if (this.phase === 'intro' && here === 'village') {
       if (!this.introRoar && P.feet.z < 57) {
         this.introRoar = true;
         this.titan.roaring = 1.4;
@@ -938,11 +1061,11 @@ export class Story {
 
     // Bron till Aetheria är stängd tills valet är gjort, och titanen släpper inte Cello
     this.gateT -= dt;
-    if ((this.phase === 'intro' || this.phase === 'prologue') && P.feet.z < -30.5 && Math.abs(P.feet.x) < 4) {
+    if (here === 'village' && (this.phase === 'intro' || this.phase === 'prologue') && P.feet.z < -30.5 && Math.abs(P.feet.x) < 4) {
       P.nudge(0, -30.5 - P.feet.z);
       this.gateNotice("Cello can't leave the village now. Someone is calling for help among the houses.");
     }
-    if (this.phase === 'titan') {
+    if (this.phase === 'titan' && here === 'village') {
       const d = Math.hypot(P.feet.x, P.feet.z);
       if (d > 29) {
         P.nudge((-P.feet.x / d) * (d - 29), (-P.feet.z / d) * (d - 29));
@@ -950,16 +1073,33 @@ export class Story {
       }
     }
 
-    // Udden i öster: en glimt av nästa område
-    if (this.phase === 'free' && !this.capeSeen && this.state.eastPath && P.feet.distanceTo(this.world.east.end) < 7) {
+    // Den gyllene porten i öster: en glimt av nästa område
+    if (this.phase === 'free' && here === 'field' && !this.capeSeen && this.state.eastPath && P.feet.distanceTo(this.world.east.end) < 9) {
       this.capeSeen = true;
-      this.hud.card('The Cape', 'The road to the Sun-Scorched Pyramid');
+      this.hud.card('The Golden Gate', 'The road to the Sun-Scorched Pyramid');
       this.after(3.6, () => this.hud.toast('Far to the east glimmers the Sun-Scorched Pyramid. The way there opens in the next version.', 5200));
+    }
+
+    // Utgångar: Cello går in i dimman vid gränsen och nästa område laddas
+    if (!this.fade && !this.traveling && !this.cinematic && !this.dialog.active && P.state !== 'dead' && !this.shown) {
+      const ex = this.areas.exitAt(P.feet);
+      if (ex) {
+        const block = this.exitBlocked(ex);
+        if (block) {
+          const a = this.areas.cur, b = a.bounds;
+          const cx = (ex.x0 + ex.x1) / 2, cz = (ex.z0 + ex.z1) / 2;
+          const mx = b ? (b.x0 + b.x1) / 2 : P.feet.x, mz = b ? (b.z0 + b.z1) / 2 : P.feet.z;
+          const ox = cx - mx, oz = cz - mz;
+          if (Math.abs(ox) > Math.abs(oz)) P.nudge(-Math.sign(ox) * 0.5, 0); else P.nudge(0, -Math.sign(oz) * 0.5);
+          P.vel.set(0, P.vel.y, 0);
+          this.gateNotice(block);
+        } else this.travel(ex.to, ex.entry);
+      }
     }
 
     // Folk går inte att gå igenom
     for (const n of Object.values(this.npcs)) {
-      if (!n.visible || n === P.carried) continue;
+      if (!n.visible || n === P.carried || (n.area && n.area !== here)) continue;
       const dx = P.feet.x - n.pos.x, dz = P.feet.z - n.pos.z, d = Math.hypot(dx, dz), min = 0.75;
       if (d < min && d > 1e-4 && Math.abs(P.feet.y - n.pos.y) < 1.5) P.nudge((dx / d) * (min - d), (dz / d) * (min - d));
     }
@@ -968,8 +1108,10 @@ export class Story {
     this.prompt = null;
     if (!this.dialog.active && !this.fade && !this.cinematic && P.state === 'move' && P.grounded && !P.carried && !this.combat.lock) {
       let best = null, bd = Infinity;
-      const list = this.world.inBastion(P.feet.x, P.feet.z) ? this.bastion.interactions : this.interactions;
+      const list = this.world.inBastion() ? this.bastion.interactions : this.interactions;
       for (const it of list) {
+        if (it.area && it.area !== here) continue;
+        if (it.npc && it.npc.area && it.npc.area !== here) continue;
         if (!it.ok()) continue;
         if (it.npc && (!it.npc.visible || it.npc.walkTarget)) continue;
         const pos = it.npc ? it.npc.pos : it.pos();
@@ -990,6 +1132,15 @@ export class Story {
       return true;
     }
     return false;
+  }
+
+  // Varför Cello inte får gå vidare just nu (eller null)
+  exitBlocked(ex) {
+    const ph = this.phase;
+    if (ph === 'prologue' || ph === 'titan') return 'Someone is calling for help in the village. Cello can\'t leave now.';
+    if (ph === 'carry') return 'Maren needs help. Aetheria lies to the north, past the gate in the wall.';
+    if (ex.ok && !ex.ok()) return ex.blocked ?? 'The way is closed.';
+    return null;
   }
 
   gateNotice(text) {
@@ -1029,13 +1180,15 @@ export class Story {
       const d = f.pos.distanceTo(P.feet);
       if (f.level > 0.2 && d < 12) fire = Math.max(fire, (1 - d / 12) * Math.min(1, f.level));
     }
-    const inB = this.world.inBastion(P.feet.x, P.feet.z);
+    const inB = this.world.inBastion();
+    const a = this.areas.cur;
     return {
-      inside: inB && P.feet.y < -2.5,
+      inside: (inB && P.feet.y < -2.5) || !!a?.indoor,
       fire,
-      hub: this.world.inAetheria(P.feet.x, P.feet.z) && this.phase !== 'blackout',
+      hub: (this.world.inAetheria(P.feet.x, P.feet.z) || a?.id === 'willowmere') && this.phase !== 'blackout',
       danger: this.phase === 'titan' || (inB && !!this.bastion.trap && this.bastion.trap !== 'R2'),
-      dungeon: inB,
+      dungeon: inB || a?.id === 'cave',
+      wind: a?.windy ? 1 : 0,
     };
   }
 }

@@ -1,293 +1,49 @@
-// Världen: flytande öar i en evig storm.
+// Världen: flytande öar i en evig storm, uppdelad i områden.
 //
-// Karta (x österut, z söderut, y uppåt):
-//   startön (0, 86) → mellanön (0, 49) → Cellos by (0, 0) → Aetheria (0, -78)
-//   → stenväg norrut → The Tempest Bastion (z -143 till -232)
-//   byn → östön med stormstenen (60, 0) → stenväg österut → udden (100, 0) → pyramiden långt bort
+// Resan norrut (x österut, z söderut, y uppåt). Varje område ligger på ett eget ställe i
+// koordinatsystemet; vid gränserna tonar skärmen till svart och nästa område laddas.
 //
-// Allt som Cello kan stå på eller krocka med läggs även i `collision`,
-// som sedan blir ett Octree för kollisioner. Saker som rör sig (stenar som reser sig,
-// dörrar) är lådor i WorldCollider och kopplas in med world.connect().
+//   Cellos hem (0, 100) → byn (0, 0) och Aetheria (0, -78) → Thistledown Ranch (x 1000)
+//   → Galewind Pass och den långa bron (x 2000) → The Stormvale (x 3000)
+//   → Willowmere (x 4000) i öster, Stormreach (x 5000) och Hollow Cave (x 6000) i norr
+//   → The Tempest Bastion (0, -186)
+//   Interiörer: Pells butik (x 7000) och Cellos hus (x 7100)
 import * as THREE from 'three';
-import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
-import { createTextures, mulberry } from './textures.js';
-import { smooth, wrap, hash2, box, cyl, cylUV, breakTop, rockGeo, place, bake } from './geom.js';
+import { createBuilder, StonePath, DECK } from './build.js';
+import { Areas } from './areas.js';
+import { smooth, hash2, box, cyl, cylUV, breakTop, rockGeo, place } from './geom.js';
 import { Bastion } from './bastion.js';
+import { buildRanch } from './regions/ranch.js';
+import { buildPass } from './regions/pass.js';
+import { buildField } from './regions/field.js';
+import { buildWillowmere } from './regions/willowmere.js';
+import { buildStormreach } from './regions/stormreach.js';
+import { buildInteriors } from './regions/interiors.js';
 
 const AZ = -78; // Aetherias mittpunkt i z
-
-// Flytande stenar som reser sig ur stormen och bildar en väg
-class StonePath {
-  constructor(scene, stones, M) {
-    this.stones = stones.map((s, i) => {
-      const g = new THREE.Group();
-      const top = new THREE.Mesh(box(2.8, 0.9, 2.6, 1.6), M.rock);
-      top.position.y = -0.35;
-      const under = new THREE.Mesh(rockGeo(1.25, 500 + i, 1.4), M.rock);
-      under.position.y = -1.3;
-      under.scale.set(1, 1.3, 0.95);
-      const rune = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.02, 0.12), M.runeGlow);
-      rune.position.set(0, 0.11, 0);
-      rune.rotation.y = (i % 2) * 1.2;
-      g.add(top, under, rune);
-      g.position.set(s.x, -30, s.z);
-      g.visible = false;
-      scene.add(g);
-      return { ...s, g, box: null, t: -1, delay: i * 0.22 };
-    });
-    this.raised = false;
-    this.anim = false;
-    this.onStone = null;
-  }
-
-  connect(collider) {
-    for (const s of this.stones) {
-      s.box = collider.addBox(s.x - 1.4, -1.0, s.z - 1.3, s.x + 1.4, 0.1, s.z + 1.3, 'stone');
-      s.box.enabled = false;
-    }
-  }
-
-  raise(instant = false) {
-    this.raised = true;
-    for (const s of this.stones) {
-      s.g.visible = true;
-      if (instant) {
-        s.g.position.y = 0;
-        s.box.enabled = true;
-        s.t = 99;
-      } else s.t = -s.delay;
-    }
-    this.anim = !instant;
-  }
-
-  // Tillbaka ner i stormen (nytt spel)
-  lower() {
-    this.raised = false;
-    this.anim = false;
-    for (const s of this.stones) {
-      s.g.visible = false;
-      s.g.position.y = -30;
-      if (s.box) s.box.enabled = false;
-      s.t = -1;
-    }
-  }
-
-  update(dt) {
-    if (!this.anim) return;
-    let done = true;
-    for (const s of this.stones) {
-      if (s.t >= 1) continue;
-      done = false;
-      const before = s.t;
-      s.t += dt / 0.9;
-      if (before < 0 && s.t >= 0) this.onStone?.(s);
-      const k = Math.max(0, Math.min(1, s.t));
-      const e = 1 - Math.pow(1 - k, 3);
-      s.g.position.y = -30 * (1 - e) + Math.sin(k * Math.PI) * 0.4;
-      s.g.rotation.y = (1 - e) * 1.4;
-      if (s.t >= 1) {
-        s.g.position.y = 0;
-        s.g.rotation.y = 0;
-        s.box.enabled = true;
-      }
-    }
-    if (done) this.anim = false;
-  }
-}
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 
 export function buildWorld(scene, lights) {
-  const noise = new ImprovedNoise();
-  const tex = createTextures();
-  const rand = mulberry(7);
-  const collision = new THREE.Group();
-  const updaters = [];
-  const S = new THREE.Group(); // statiska föremål som slås ihop i slutet
-  scene.add(S);
+  const areas = new Areas(scene, lights);
+  const B = createBuilder(scene, lights);
+  const { M, rand, solid, hidden, deco, island, makeFire, flameMat, flameMat2 } = B;
+  const villageFires = [];
 
-  const lam = (o) => new THREE.MeshLambertMaterial(o);
-  const M = {
-    grass: lam({ map: tex.grass, vertexColors: true }),
-    cliff: lam({ map: tex.cliff, flatShading: true, vertexColors: true }),
-    rockTop: lam({ map: tex.rock, vertexColors: true }),
-    rock: lam({ map: tex.rock, flatShading: true }),
-    marble: lam({ map: tex.marble }),
-    brick: lam({ map: tex.brick }),
-    wood: lam({ map: tex.wood }),
-    rope: lam({ color: 0x5e4f3a }),
-    iron: lam({ color: 0x45434a, flatShading: true }),
-    obsidian: lam({ color: 0x1c1b23, flatShading: true }),
-    tuft: lam({ map: tex.tuft, alphaTest: 0.5 }),
-    mosaic: lam({ map: tex.mosaic }),
-    runes: lam({ map: tex.runes }),
-    char: lam({ map: tex.charred, flatShading: true }),
-    clothOchre: lam({ color: 0x8a6a3a, side: THREE.DoubleSide, flatShading: true }),
-    clothRed: lam({ color: 0x7a3b30, side: THREE.DoubleSide, flatShading: true }),
-    clothBlue: lam({ color: 0x4d5866, side: THREE.DoubleSide, flatShading: true }),
-    linen: lam({ color: 0xb8ad96, flatShading: true }),
-    thatch: lam({ color: 0x4a3c26, flatShading: true }),
-    pine: lam({ color: 0x2f4630, flatShading: true }),
-    pineDark: lam({ color: 0x24382a, flatShading: true }),
-    sack: lam({ color: 0x8e7d5a, flatShading: true }),
-    gold: lam({ color: 0xb08a3c, emissive: 0x2a1c06, flatShading: true }),
-    ironWall: lam({ map: tex.iron }),
-    ironFloor: lam({ map: tex.ironFloor }),
-    cracked: lam({ map: tex.cracked }),
-    copper: lam({ color: 0x8a5634, flatShading: true }),
-    glow: new THREE.MeshBasicMaterial({ color: 0xff8a33 }),
-    lamp: new THREE.MeshBasicMaterial({ color: 0xffd28a }),
-    runeGlow: new THREE.MeshBasicMaterial({ color: 0x3a5a70 }),
-  };
-
-  // Lägger till ett synligt föremål och en kollisionskopia av det.
-  function solid(mesh, parent = S) {
-    parent.add(mesh);
-    mesh.updateWorldMatrix(true, false);
-    const c = new THREE.Mesh(mesh.geometry);
-    c.matrixAutoUpdate = false;
-    c.matrix.copy(mesh.matrixWorld);
-    collision.add(c);
-    return mesh;
-  }
-  // Osynlig kollision (t.ex. en ramp under synliga trappsteg).
-  function hidden(geometry, x, y, z, rx = 0, ry = 0, rz = 0) {
-    const c = new THREE.Mesh(geometry);
-    c.position.set(x, y, z);
-    c.rotation.set(rx, ry, rz);
-    collision.add(c);
-    return c;
-  }
-  const deco = (mesh, x, y, z) => S.add(place(mesh, x, y, z));
-
-  // ---------- Öar ----------
-  const tuftPositions = [];
-
-  function island(o) {
-    const {
-      cx, cz, baseR, rNoise = 3, seed = 0, amp = 0.6, pads = [], keepAngles = [],
-      depth = 18, rings = 36, segs = 96, collide = true, grass = 0, avoid = () => false, baseY = 0,
-      topMat = M.grass,
-    } = o;
-
-    const Rof = (a) => {
-      const n = noise.noise(Math.cos(a) * 1.6 + seed * 3.1, Math.sin(a) * 1.6 + seed * 1.7, seed * 0.37)
-        + 0.5 * noise.noise(Math.cos(a) * 3.4 + seed, Math.sin(a) * 3.4 - seed, seed * 0.11 + 4);
-      let m = 1;
-      for (const k of keepAngles) m = Math.min(m, smooth(0.15, 0.55, Math.abs(wrap(a - k))));
-      return baseR + n * rNoise * m;
-    };
-    const H = (x, z) => {
-      const lx = x - cx, lz = z - cz;
-      const t = Math.hypot(lx, lz) / Rof(Math.atan2(lz, lx));
-      let h = noise.noise(x * 0.07, z * 0.07, seed + 10.5) * amp
-        + noise.noise(x * 0.23, z * 0.23, seed + 3.3) * amp * 0.3;
-      h -= smooth(0.82, 1.0, t) * 0.6;
-      for (const p of pads) {
-        const w = 1 - smooth(p.r * 0.55, p.r, Math.hypot(x - p.x, z - p.z));
-        h += (p.h - h) * w;
-      }
-      return h + baseY;
-    };
-
-    // Ovansidan (gräs)
-    const pos = [], uvs = [], cols = [], idx = [];
-    const ringR = [];
-    for (let j = 0; j < segs; j++) ringR.push(Rof((j / segs) * Math.PI * 2));
-    const pushV = (x, z, i) => {
-      const y = H(x, z);
-      pos.push(x, y, z);
-      uvs.push(x / 4, z / 4);
-      const shade = 1 - smooth(0.72, 1.0, i / rings) * 0.35 + noise.noise(x * 0.15, z * 0.15, seed + 20) * 0.14;
-      cols.push(shade, shade, shade);
-    };
-    pushV(cx, cz, 0);
-    for (let i = 1; i <= rings; i++) {
-      for (let j = 0; j < segs; j++) {
-        const a = (j / segs) * Math.PI * 2, r = ringR[j] * (i / rings);
-        pushV(cx + Math.cos(a) * r, cz + Math.sin(a) * r, i);
-      }
-    }
-    const base = (i) => 1 + (i - 1) * segs;
-    for (let j = 0; j < segs; j++) idx.push(0, 1 + ((j + 1) % segs), 1 + j);
-    for (let i = 1; i < rings; i++) {
-      for (let j = 0; j < segs; j++) {
-        const a = base(i) + j, b = base(i) + ((j + 1) % segs);
-        const c = base(i + 1) + j, d = base(i + 1) + ((j + 1) % segs);
-        idx.push(a, b, c, b, d, c);
-      }
-    }
-    const topGeo = new THREE.BufferGeometry();
-    topGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    topGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-    topGeo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
-    topGeo.setIndex(idx);
-    topGeo.computeVertexNormals();
-    const top = new THREE.Mesh(topGeo, topMat);
-    if (collide) solid(top, scene); else scene.add(top);
-
-    // Undersidan: en ojämn klippkon som hänger ner i stormen
-    const layers = [[1.02, -0.45], [0.96, -1.7], [0.85, -3.7], [0.7, -6.6], [0.52, -10], [0.33, -13.6], [0.15, -16.6]];
-    const upos = [], uuv = [], ucol = [], uidx = [];
-    const rimStart = base(rings);
-    const cols1 = segs + 1;
-    const perim = 2 * Math.PI * baseR;
-    for (let j = 0; j <= segs; j++) {
-      const k = (rimStart + (j % segs)) * 3;
-      upos.push(pos[k], pos[k + 1], pos[k + 2]);
-      uuv.push((j / segs) * perim / 4, pos[k + 1] / 4);
-      ucol.push(0.8, 0.8, 0.82);
-    }
-    const scaleY = depth / 18;
-    layers.forEach(([f, dy], li) => {
-      for (let j = 0; j <= segs; j++) {
-        const a = (j / segs) * Math.PI * 2;
-        const jit = noise.noise(Math.cos(a) * 2.5 + li * 1.7, Math.sin(a) * 2.5, seed + li) * 0.12;
-        const r = ringR[j % segs] * (f + jit);
-        const y = baseY - 0.5 + dy * scaleY + noise.noise(Math.cos(a) * 4, Math.sin(a) * 4, seed + li * 3) * 0.7;
-        upos.push(cx + Math.cos(a) * r, y, cz + Math.sin(a) * r);
-        uuv.push((j / segs) * perim / 4, y / 4);
-        const s = 0.85 - li * 0.08;
-        ucol.push(s, s, s * 1.04);
-      }
-    });
-    const tipIndex = upos.length / 3;
-    upos.push(cx, baseY - depth, cz);
-    uuv.push(0, (baseY - depth) / 4);
-    ucol.push(0.3, 0.3, 0.32);
-    const ringCount = layers.length + 1;
-    for (let k = 0; k < ringCount - 1; k++) {
-      for (let j = 0; j < segs; j++) {
-        const A = k * cols1 + j, B = A + 1, C = (k + 1) * cols1 + j, D = C + 1;
-        uidx.push(A, B, C, B, D, C);
-      }
-    }
-    const lastRing = (ringCount - 1) * cols1;
-    for (let j = 0; j < segs; j++) uidx.push(lastRing + j, lastRing + j + 1, tipIndex);
-    const underGeo = new THREE.BufferGeometry();
-    underGeo.setAttribute('position', new THREE.Float32BufferAttribute(upos, 3));
-    underGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uuv, 2));
-    underGeo.setAttribute('color', new THREE.Float32BufferAttribute(ucol, 3));
-    underGeo.setIndex(uidx);
-    underGeo.computeVertexNormals();
-    scene.add(new THREE.Mesh(underGeo, M.cliff));
-
-    // Grästuvor
-    let placed = 0, tries = 0;
-    while (placed < grass && tries < grass * 20) {
-      tries++;
-      const a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * 0.9 * Rof(a);
-      const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-      if (avoid(x, z)) continue;
-      tuftPositions.push(x, H(x, z), z, rand() * Math.PI, 0.7 + rand() * 0.7);
-      placed++;
-    }
-    return { H, Rof, cx, cz };
-  }
+  // =====================================================================
+  // Byn och Aetheria
+  // =====================================================================
+  const village = areas.create({
+    id: 'village', name: 'Hollowbrook', sub: "Cello's village", card: false,
+    fog: { color: 0x323843, near: 34, far: 260 },
+  });
+  B.begin(village);
+  B.bounds(-45, 75, -136, 66);
 
   // Cellos by – den stora ön i mitten
   const housePads = [[8.5, 15.5], [-8.5, 15], [16, 20], [-17, 19], [21, 7], [-23, -1], [5, 25]];
   const main = island({
     cx: 0, cz: 0, baseR: 33, rNoise: 3.5, seed: 1, amp: 0.7, keepAngles: [0, -Math.PI / 2, Math.PI / 2], depth: 28,
-    rings: 44, segs: 112,
+    rings: 44, segs: 112, label: 'Hollowbrook', mapCol: '#3b302a',
     pads: [
       { x: 0, z: 0, r: 13, h: 0 }, { x: 0, z: 16, r: 5, h: 0 }, { x: 32, z: 0, r: 4.5, h: 0.1 },
       { x: -14, z: -7, r: 8.5, h: 0 }, { x: -14, z: 6, r: 4.5, h: 0 }, { x: 0, z: -16, r: 9, h: 0 },
@@ -301,30 +57,20 @@ export function buildWorld(scene, lights) {
       || housePads.some(([hx, hz]) => Math.hypot(x - hx, z - hz) < 3.2),
   });
 
-  // Mellanön och startön söder om byn
+  // Mellanön söder om byn
   const mid = island({
     cx: 0, cz: 49, baseR: 6.6, rNoise: 1, seed: 13, amp: 0.25, keepAngles: [Math.PI / 2, -Math.PI / 2], depth: 11,
     rings: 14, segs: 48, pads: [{ x: 0, z: 49, r: 6, h: 0.05 }], grass: 50,
     avoid: (x, z) => Math.abs(x) < 1.6,
   });
-  const start = island({
-    cx: 0, cz: 86, baseR: 19, rNoise: 2.2, seed: 17, amp: 0.55, keepAngles: [-Math.PI / 2], depth: 20,
-    rings: 30, segs: 80, pads: [{ x: 0, z: 67.5, r: 4, h: 0.1 }, { x: 0, z: 99, r: 5, h: 0 }, { x: -4, z: 94, r: 4.5, h: 0 }],
-    grass: 320,
-    avoid: (x, z) => Math.abs(x) < 1.4 && z < 98,
-  });
 
-  // Östön med stormstenen, och udden längst österut
+  // Östön: en liten ö med en kista
   const east = island({
-    cx: 60, cz: 0, baseR: 13, rNoise: 1.8, seed: 5, amp: 0.35, keepAngles: [Math.PI, 0], depth: 17,
-    rings: 22, segs: 72,
-    pads: [{ x: 48.5, z: 0, r: 4, h: 0.1 }, { x: 71.5, z: 0, r: 4, h: 0.1 }, { x: 61, z: -2, r: 6, h: 0 }],
-    grass: 120,
-    avoid: (x, z) => Math.hypot(x - 62.5, z + 4.5) < 2 || (Math.abs(z) < 1.6 && (x < 50 || x > 70)),
-  });
-  const cape = island({
-    cx: 100, cz: 0, baseR: 7, rNoise: 1, seed: 29, amp: 0.25, keepAngles: [Math.PI], depth: 12,
-    rings: 14, segs: 48, pads: [{ x: 100, z: 0, r: 6, h: 0.05 }], grass: 40,
+    cx: 60, cz: 0, baseR: 13, rNoise: 1.8, seed: 5, amp: 0.35, keepAngles: [Math.PI], depth: 17,
+    rings: 22, segs: 72, label: 'Eastern Isle',
+    pads: [{ x: 48.5, z: 0, r: 4, h: 0.1 }, { x: 64, z: -3, r: 5, h: 0 }],
+    grass: 140,
+    avoid: (x, z) => Math.hypot(x - 64, z + 3) < 2.5 || (Math.abs(z) < 1.6 && x < 50),
   });
 
   // Avlägsna öar, bara kulisser
@@ -333,7 +79,7 @@ export function buildWorld(scene, lights) {
     [20, 44, -300, 30], [-95, 8, 160, 15], [190, 30, 120, 18], [-175, 22, -55, 18],
   ];
   far.forEach(([x, y, z, r], i) => {
-    const isl = island({ cx: x, cz: z, baseY: y, baseR: r, rNoise: r * 0.18, seed: 20 + i, amp: 0.5, depth: r * 1.5, rings: 6, segs: 28, collide: false });
+    const isl = B.backdrop(x, z, r, y, 20 + i, { amp: 0.5, segs: 28 });
     const n = 1 + Math.floor(rand() * 3);
     for (let k = 0; k < n; k++) {
       const a = rand() * Math.PI * 2, d = rand() * r * 0.6;
@@ -342,12 +88,17 @@ export function buildWorld(scene, lights) {
       deco(new THREE.Mesh(g, M.marble), px, isl.H(px, pz) + ph / 2, pz);
     }
   });
-  // Sun-Scorched Pyramid, långt i öster (nås i en senare version)
+  // Cellos hem i söder syns som en ö bakom dimman
   {
-    const isl = island({ cx: 250, cz: -40, baseY: 34, baseR: 34, rNoise: 4, seed: 41, amp: 0.5, depth: 50, rings: 8, segs: 36, collide: false, topMat: M.rockTop });
-    const pyr = new THREE.Mesh(new THREE.ConeGeometry(28, 40, 4, 1), M.gold);
-    pyr.rotation.y = Math.PI / 4;
-    deco(pyr, 250, isl.H(250, -40) + 20, -40);
+    const hb = B.backdrop(0, 100, 30, 0, 61, { rings: 8, segs: 40 });
+    for (const [x, z, s] of [[-14, 112, 1.3], [12, 118, 1.2], [-20, 98, 1.1], [16, 100, 1.0], [2, 124, 1.3], [-8, 122, 1.1]]) B.pine(x, hb.H(x, z), z, s, false);
+    deco(new THREE.Mesh(box(6, 3.2, 5, 2), M.plaster), -6, hb.H(-6, 106) + 1.4, 106);
+    const r = new THREE.Mesh(box(6.6, 0.2, 3.6, 2), M.thatch);
+    r.rotation.x = 0.62;
+    deco(r, -6, hb.H(-6, 106) + 3.7, 107.2);
+    const r2 = r.clone();
+    r2.rotation.x = -0.62;
+    deco(r2, -6, hb.H(-6, 106) + 3.7, 104.8);
   }
 
   // ---------- Platsen i byns mitt: helgedomen med eldfatet ----------
@@ -357,26 +108,21 @@ export function buildWorld(scene, lights) {
     deco(new THREE.Mesh(cyl(r, r, h, 40, 2.5), M.marble), 0, topY - h / 2, 0);
   }
   const PLAT = 0.88;
-  // Trappstegen känns som steg men kollisionen är en mjuk ramp
   hidden(new THREE.CylinderGeometry(7.2, 9.25, PLAT, 40, 1, true), 0, PLAT / 2, 0);
   hidden(new THREE.CircleGeometry(7.25, 40), 0, PLAT, 0, -Math.PI / 2);
-
   solid(place(new THREE.Mesh(cyl(0.55, 0.7, 0.9, 8, 1.5), M.marble), 0, PLAT + 0.45, 0));
   deco(new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.5, 0.45, 8), M.iron), 0, PLAT + 1.12, 0);
   hidden(new THREE.CylinderGeometry(0.95, 0.95, 1.4, 8), 0, PLAT + 0.7, 0);
-  const flameMat = new THREE.MeshBasicMaterial({ color: 0xff8a33, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
-  const flameMat2 = flameMat.clone();
-  flameMat2.color.set(0xffd27a);
   const flames = [];
   for (let i = 0; i < 4; i++) {
     const f = new THREE.Mesh(new THREE.ConeGeometry(0.32 - i * 0.04, 1.0 - i * 0.12, 5), i % 2 ? flameMat2 : flameMat);
     const a = i * 1.7;
     f.position.set(Math.cos(a) * 0.22 * (i > 0), PLAT + 1.65, Math.sin(a) * 0.22 * (i > 0));
-    scene.add(f);
+    B.add(f);
     flames.push(f);
   }
   lights.add({ x: 0, y: PLAT + 2.2, z: 0, color: 0xff8a3a, power: 34, range: 18 });
-  updaters.push((t) => {
+  village.updaters.push((t) => {
     flames.forEach((f, i) => {
       const s = 1 + Math.sin(t * (9 + i * 3.1) + i) * 0.18;
       f.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
@@ -460,7 +206,7 @@ export function buildWorld(scene, lights) {
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
       const rr = Math.hypot(x, z);
-      if (rr < 0.01 || z > 4.0) continue; // rampsidan hålls rak
+      if (rr < 0.01 || z > 4.0) continue;
       const k = 1 + (hash2(x * 1.3, z * 1.3 + Math.round(y * 10)) - 0.5) * (y > h / 2 - 0.01 ? 0.1 : 0.16);
       p.setX(i, x * k);
       p.setZ(i, z * k);
@@ -473,7 +219,7 @@ export function buildWorld(scene, lights) {
     for (let i = 0; i < cap.geometry.attributes.position.count; i++) cc.push(0.9, 0.9, 0.9);
     cap.geometry.setAttribute('color', new THREE.Float32BufferAttribute(cc, 3));
     cap.rotation.x = -Math.PI / 2;
-    scene.add(place(cap, plat.x, plat.top + 0.01, plat.z));
+    B.add(place(cap, plat.x, plat.top + 0.01, plat.z));
   }
   {
     const rimZ = plat.z + plat.r * 0.92 * Math.cos(Math.PI / 8);
@@ -497,7 +243,7 @@ export function buildWorld(scene, lights) {
     sword.add(blade, guard, grip);
     sword.position.set(plat.x + 1.6, plat.top - 1.0, plat.z - 2.2);
     sword.rotation.set(-0.18, 0.5, 0.22);
-    S.add(sword);
+    village.S.add(sword);
     solid(blade, sword);
     solid(guard, sword);
   }
@@ -507,116 +253,30 @@ export function buildWorld(scene, lights) {
   }
 
   // ---------- Broar ----------
-  const DECK = 0.1;
-  const plankMatrix = new THREE.Matrix4(), plankQ = new THREE.Quaternion(), plankE = new THREE.Euler();
-  const planks = []; // [x, y, z, ry, rx, rz, sx]
-  // En bro längs x (along = 'x') eller längs z, från a0 till a1 vid tvärkoordinaten c
-  function bridge(along, a0, a1, c) {
-    const len = a1 - a0, mid = (a0 + a1) / 2;
-    const P = (a, cc, y) => (along === 'x' ? [a, y, cc] : [cc, y, a]);
-    const B = (w, h, d) => (along === 'x' ? box(w, h, d, 1) : box(d, h, w, 1));
-    const [hx, , hz] = P(mid, c, 0);
-    hidden(along === 'x' ? new THREE.BoxGeometry(len, 0.3, 2.2) : new THREE.BoxGeometry(2.2, 0.3, len), hx, DECK - 0.15, hz);
-    for (let a = a0; a < a1 - 0.2; a += 0.46) planks.push([along, a + 0.2, c + (rand() - 0.5) * 0.08, rand()]);
-    [-0.85, 0.85].forEach((o) => deco(new THREE.Mesh(B(len, 0.2, 0.2), M.wood), ...P(mid, c + o, DECK - 0.22)));
-    for (let a = a0 + 0.3; a <= a1; a += 2.0) {
-      [-1.15, 1.15].forEach((o) => deco(new THREE.Mesh(box(0.14, 1.1, 0.14, 1), M.wood), ...P(a, c + o, DECK + 0.45)));
-    }
-    [-1.15, 1.15].forEach((o) => deco(new THREE.Mesh(along === 'x' ? new THREE.BoxGeometry(len - 0.3, 0.05, 0.05) : new THREE.BoxGeometry(0.05, 0.05, len - 0.3), M.rope), ...P(mid, c + o, DECK + 0.85)));
-  }
-  bridge('x', 32.3, 39.6, 0); // den trasiga bron österut
-  bridge('x', 41.7, 47.6, 0);
-  bridge('z', -48.6, -32.3, 0); // till Aetheria
-  bridge('z', 32.3, 43.3, 0); // söderut mot mellanön
-  bridge('z', 54.7, 66.6, 0); // och vidare till startön
+  B.bridge('x', 32.3, 39.6, 0); // den trasiga bron österut
+  B.bridge('x', 41.7, 47.6, 0);
+  B.bridge('z', -48.6, -32.3, 0); // till Aetheria
+  B.bridge('z', 32.3, 43.3, 0); // söderut mot mellanön
+  B.bridge('z', 54.7, 66.5, 0); // och vidare in i dimman mot Cellos hem
+  B.mist(0, -3, 64.5, 9, 5, 8);
   deco(new THREE.Mesh(breakTop(cyl(1.0, 0.7, 9, 8, 2), 9, 0.4), M.marble), 0, DECK - 4.8, -40.4);
   {
-    const plankMesh = new THREE.InstancedMesh(box(0.4, 0.12, 2.1, 1), M.wood, planks.length + 3);
-    planks.forEach(([along, a, c, r], i) => {
-      plankE.set(along === 'x' ? 0 : (r - 0.5) * 0.04, along === 'x' ? (r - 0.5) * 0.06 : Math.PI / 2 + (r - 0.5) * 0.06, along === 'x' ? (r - 0.5) * 0.04 : 0);
-      plankQ.setFromEuler(plankE);
-      const p = along === 'x' ? new THREE.Vector3(a, DECK - 0.06, c) : new THREE.Vector3(c, DECK - 0.06, a);
-      plankMatrix.compose(p, plankQ, new THREE.Vector3(1, 1, 0.95 + r * 0.1));
-      plankMesh.setMatrixAt(i, plankMatrix);
-    });
     // Plankor som dinglar vid hålet i den östra bron
-    [[39.7, -1.25, 0.3], [41.6, 1.35, -0.4], [39.9, -0.9, -0.6]].forEach(([x, rz, dz], i) => {
-      plankE.set(0.2 * dz, 0.3 * dz, rz);
-      plankQ.setFromEuler(plankE);
-      plankMatrix.compose(new THREE.Vector3(x + (rz < 0 ? 0.15 : -0.15), DECK - 0.75, dz), plankQ, new THREE.Vector3(1, 1, 0.5));
-      plankMesh.setMatrixAt(planks.length + i, plankMatrix);
+    const g = new THREE.Group();
+    [[39.7, -1.25, 0.3], [41.6, 1.35, -0.4], [39.9, -0.9, -0.6]].forEach(([x, rz, dz]) => {
+      const p = new THREE.Mesh(box(0.4, 0.12, 1.05, 1), M.wood);
+      p.position.set(x + (rz < 0 ? 0.15 : -0.15), DECK - 0.75, dz);
+      p.rotation.set(0.2 * dz, 0.3 * dz, rz);
+      g.add(p);
     });
-    scene.add(plankMesh);
+    village.S.add(g);
   }
-
-  // ---------- Eld och rök ----------
-  const smokeTex = (() => {
-    const c = document.createElement('canvas');
-    c.width = c.height = 32;
-    const g = c.getContext('2d');
-    const grd = g.createRadialGradient(16, 16, 2, 16, 16, 15);
-    grd.addColorStop(0, 'rgba(255,255,255,0.9)');
-    grd.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = grd;
-    g.fillRect(0, 0, 32, 32);
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  })();
-  const fires = [];
-  function makeFire(x, y, z, size = 1, lightPower = 0, smokeCount = 6, smokeHeight = 4.5) {
-    // Varje eld har en egen grupp, så att main.js kan dölja eldar långt bort
-    const group = new THREE.Group();
-    scene.add(group);
-    const f = { pos: new THREE.Vector3(x, y, z), level: 1, flames: [], smoke: [], light: null, size, smokeHeight, group };
-    for (let i = 0; i < 4; i++) {
-      const m = new THREE.Mesh(new THREE.ConeGeometry((0.34 - i * 0.05) * size, (1.0 - i * 0.12) * size, 5), i % 2 ? flameMat2 : flameMat);
-      const a = i * 1.9;
-      m.position.set(x + Math.cos(a) * 0.25 * size * (i > 0), y + 0.45 * size, z + Math.sin(a) * 0.25 * size * (i > 0));
-      group.add(m);
-      f.flames.push(m);
-    }
-    for (let i = 0; i < smokeCount; i++) {
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0x2a2826, transparent: true, opacity: 0, depthWrite: false }));
-      sp.userData.t = i / smokeCount;
-      group.add(sp);
-      f.smoke.push(sp);
-    }
-    if (lightPower > 0) f.light = lights.add({ x, y: y + 1.2 * size, z, color: 0xff8a3a, power: lightPower, range: 14 * size });
-    fires.push(f);
-    return f;
-  }
-  updaters.push((t, dt) => {
-    for (const f of fires) {
-      const lv = f.level;
-      f.flames.forEach((m, i) => {
-        const s = (1 + Math.sin(t * (9 + i * 3.1) + i + f.pos.x) * 0.18) * Math.max(0.05, lv);
-        m.scale.set(1 / Math.sqrt(Math.max(0.2, s)), s, 1 / Math.sqrt(Math.max(0.2, s)));
-        m.visible = lv > 0.12 && !f.noFlames;
-        m.rotation.y = t * (1 + i * 0.4);
-      });
-      if (f.light) f.light.level = Math.max(0.12, lv);
-      for (const sp of f.smoke) {
-        sp.userData.t = (sp.userData.t + dt * (0.22 / (f.smokeHeight / 4.5) ** 0.5)) % 1;
-        const k = sp.userData.t;
-        sp.position.set(f.pos.x + Math.sin(k * 5 + f.pos.z) * 0.4 * k * f.size, f.pos.y + 0.8 * f.size + k * f.smokeHeight * f.size, f.pos.z + k * 0.9 * f.size);
-        sp.scale.setScalar((0.6 + k * 2.4) * f.size * (f.smokeHeight > 6 ? 1.8 : 1));
-        sp.material.opacity = Math.sin(k * Math.PI) * 0.5 * Math.min(1, 0.3 + lv);
-      }
-    }
-  });
 
   // ---------- Cellos by: brända och brinnande hus ----------
-  const villageFires = [];
   function houseGroup(x, z, ry) {
-    const g = new THREE.Group();
-    g.position.set(x, main.H(x, z), z);
-    g.rotation.y = ry;
-    S.add(g);
-    g.updateWorldMatrix(true, false);
-    return g;
+    return B.groupAt(x, main.H(x, z), z, ry);
   }
-  const at = (g, lx, ly, lz) => g.localToWorld(new THREE.Vector3(lx, ly, lz));
+  const at = (g, lx, ly, lz) => g.localToWorld(V3(lx, ly, lz));
   function burnedHouse(x, z, ry) {
     const g = houseGroup(x, z, ry);
     const add = (mesh, collide = true) => { if (collide) solid(mesh, g); else g.add(mesh); return mesh; };
@@ -693,10 +353,10 @@ export function buildWorld(scene, lights) {
   {
     const beam = place(new THREE.Mesh(box(5.4, 0.3, 0.3, 1), M.char), 0.3, main.H(0, 30) + 2.9, 30);
     beam.rotation.z = -0.12;
-    S.add(beam);
+    village.S.add(beam);
     const sign = place(new THREE.Mesh(box(1.4, 0.7, 0.08, 1), M.wood), -1.2, 0.25, 31.2);
     sign.rotation.set(-1.3, 0.4, 0.2);
-    S.add(sign);
+    village.S.add(sign);
   }
   // Brunn, staket, tunnor och lådor
   {
@@ -706,26 +366,26 @@ export function buildWorld(scene, lights) {
     [-0.9, 0.9].forEach((o) => deco(new THREE.Mesh(box(0.14, 2.2, 0.14, 1), M.char), -5 + o, wy + 1.1, 22));
     const top = place(new THREE.Mesh(box(2.2, 0.12, 0.9, 1), M.char), -5, wy + 2.2, 22);
     top.rotation.z = 0.25;
-    S.add(top);
+    village.S.add(top);
   }
-  function fence(x0, z0, x1, z1, broken) {
+  function charFence(x0, z0, x1, z1, broken) {
     const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(2, Math.round(len / 1.6));
     for (let i = 0; i <= n; i++) {
       if (broken.includes(i)) continue;
       const x = x0 + ((x1 - x0) * i) / n, z = z0 + ((z1 - z0) * i) / n;
       const post = place(new THREE.Mesh(box(0.14, 1.0, 0.14, 1), M.char), x, main.H(x, z) + 0.5, z);
       post.rotation.z = (hash2(x, z) - 0.5) * 0.4;
-      S.add(post);
+      village.S.add(post);
       if (i < n && !broken.includes(i + 1)) {
         const rail = place(new THREE.Mesh(box(len / n, 0.1, 0.06, 1), M.char), (x + x0 + ((x1 - x0) * (i + 1)) / n) / 2, main.H(x, z) + 0.7, (z + z0 + ((z1 - z0) * (i + 1)) / n) / 2);
         rail.rotation.y = -Math.atan2(z1 - z0, x1 - x0);
-        S.add(rail);
+        village.S.add(rail);
       }
     }
   }
-  fence(11, 24, 19, 26, [2]);
-  fence(-12, 11, -14, 5, [1]);
-  fence(24, 2, 26, 12, [3, 4]);
+  charFence(11, 24, 19, 26, [2]);
+  charFence(-12, 11, -14, 5, [1]);
+  charFence(24, 2, 26, 12, [3, 4]);
   [[12.2, 13.4], [13, 12.6], [-13, 17.4], [7.6, 26.5], [-20.4, 4.6]].forEach(([x, z], i) => {
     const b = place(new THREE.Mesh(cyl(0.36, 0.4, 0.9, 8, 1), i % 2 ? M.wood : M.char), x, main.H(x, z) + 0.45, z);
     if (i === 2) { b.rotation.z = Math.PI / 2; b.position.y -= 0.1; }
@@ -743,6 +403,8 @@ export function buildWorld(scene, lights) {
     f.noFlames = true;
     villageFires.push(f);
   }
+  // Krukor vid tunnor och lådor
+  for (const [x, z] of [[11.2, 13.9], [-12.2, 16.4], [8.6, 27.4], [-19.4, 5.6], [14.6, 15.4]]) B.pot(x, main.H(x, z), z, 0.9);
 
   // ---------- Mellanön: en välta kärra och ett brinnande träd ----------
   {
@@ -750,14 +412,14 @@ export function buildWorld(scene, lights) {
     const cart = new THREE.Group();
     cart.position.set(2.3, y, 48.5);
     cart.rotation.set(0, 0.6, 1.25);
-    S.add(cart);
+    village.S.add(cart);
     solid(place(new THREE.Mesh(box(2.2, 0.15, 1.3, 1), M.wood), 0, 0.5, 0), cart);
     [-0.6, 0.6].forEach((z) => cart.add(place(new THREE.Mesh(box(2.2, 0.5, 0.1, 1), M.wood), 0, 0.8, z)));
     const wheel = place(new THREE.Mesh(cyl(0.55, 0.55, 0.12, 10, 1), M.wood), -0.7, 0.55, 0.75);
     wheel.rotation.x = Math.PI / 2;
     cart.add(wheel);
     const loose = place(new THREE.Mesh(cyl(0.55, 0.55, 0.12, 10, 1), M.wood), -1.3, y + 0.07, 51.5);
-    S.add(loose);
+    village.S.add(loose);
     for (let i = 0; i < 4; i++) deco(new THREE.Mesh(rockGeo(0.28, 700 + i, 0.6), M.sack), 0.6 + i * 0.5, y + 0.15, 47 + (i % 2) * 0.6);
     const ty = mid.H(-3.4, 50.6);
     const trunk = place(new THREE.Mesh(cyl(0.22, 0.32, 3.4, 7, 1), M.char), -3.4, ty + 1.7, 50.6);
@@ -766,85 +428,32 @@ export function buildWorld(scene, lights) {
     [[0.5, 0.6], [-0.4, 1.9]].forEach(([r, h], i) => {
       const br = place(new THREE.Mesh(cyl(0.08, 0.12, 1.6, 5, 1), M.char), -3.4 + (i ? -0.5 : 0.5), ty + 2.4 + h * 0.3, 50.6);
       br.rotation.z = r * 2;
-      S.add(br);
+      village.S.add(br);
     });
     villageFires.push(makeFire(-3.3, ty + 3.1, 50.6, 0.9, 18, 5));
   }
 
-  // ---------- Startön: Cellos lägerplats i skogen ----------
-  function pine(x, z, s = 1) {
-    const y = start.H(x, z);
-    solid(place(new THREE.Mesh(cyl(0.18 * s, 0.26 * s, 1.6 * s, 6, 1), M.wood), x, y + 0.8 * s, z));
-    [[1.4, 1.7, 1.7], [1.1, 1.5, 2.7], [0.75, 1.3, 3.6]].forEach(([r, h, yy], i) => {
-      deco(new THREE.Mesh(new THREE.ConeGeometry(r * s, h * s, 7), i % 2 ? M.pine : M.pineDark), x, y + yy * s, z);
-    });
-  }
-  [[-9, 82, 1.2], [-12, 90, 1.0], [9, 80, 1.1], [12, 92, 1.3], [7, 100, 0.9], [-10, 101, 1.1], [-14, 78, 0.9], [14, 85, 0.8], [3, 106, 1.0], [-5, 107, 1.2]].forEach(([x, z, s]) => pine(x, z, s));
+  // ---------- Östön: en gammal kista och några krukor ----------
   {
-    const y = start.H(-5, 95);
-    [[-6.4, 93.6], [-3.6, 93.6], [-6.4, 96.4], [-3.6, 96.4]].forEach(([x, z], i) => solid(place(new THREE.Mesh(box(0.16, i < 2 ? 2.2 : 1.1, 0.16, 1), M.wood), x, y + (i < 2 ? 1.1 : 0.55), z)));
-    const roof = place(new THREE.Mesh(box(3.4, 0.12, 3.3, 1.2), M.thatch), -5, y + 1.7, 95);
-    roof.rotation.x = -0.32;
-    S.add(roof);
-    for (let i = 0; i < 7; i++) {
-      const a = (i / 7) * Math.PI * 2;
-      deco(new THREE.Mesh(rockGeo(0.2, 720 + i, 0.7), M.rock), -1.8 + Math.cos(a) * 0.7, start.H(-1.8, 92) + 0.06, 92 + Math.sin(a) * 0.7);
-    }
-    deco(new THREE.Mesh(box(0.6, 0.04, 0.4, 1), M.glow), -1.8, start.H(-1.8, 92) + 0.05, 92);
-    for (let i = 0; i < 5; i++) {
-      const log = place(new THREE.Mesh(cyl(0.09, 0.09, 1.1, 6, 1), M.wood), 1.0 + (i % 3) * 0.2, start.H(1, 97) + 0.1 + Math.floor(i / 3) * 0.17, 97.2 + (i % 2) * 0.2);
-      log.rotation.set(0, 0.3, Math.PI / 2, 'YXZ');
-      S.add(log);
-    }
-    solid(place(new THREE.Mesh(rockGeo(1.3, 740, 0.9), M.rock), 6, start.H(6, 88) + 0.5, 88));
-  }
-
-  // ---------- Östön: stormstenen ----------
-  const eastStone = new THREE.Group();
-  eastStone.position.set(62.5, east.H(62.5, -4.5), -4.5);
-  eastStone.rotation.set(0.04, 0.4, 0.05);
-  S.add(eastStone);
-  solid(place(new THREE.Mesh(box(1.3, 7, 1.3, 2), M.obsidian), 0, 3.1, 0), eastStone);
-  const eastRunes = new THREE.MeshBasicMaterial({ color: 0x2a3440 });
-  for (let i = 0; i < 4; i++) {
-    const r = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.02), eastRunes);
-    r.position.set(0, 1.4 + i * 1.2, 0.66);
-    r.userData.keep = true;
-    eastStone.add(r);
-  }
-  const eastPlate = new THREE.Vector3(61, east.H(61, -1.6), -1.6);
-  const eastPlateMat = new THREE.MeshLambertMaterial({ color: 0x7a4c2e, emissive: 0x000000, flatShading: true });
-  {
-    const p = new THREE.Mesh(cyl(0.95, 1.0, 0.14, 10, 1), eastPlateMat);
-    p.userData.keep = true;
-    scene.add(place(p, eastPlate.x, eastPlate.y + 0.04, eastPlate.z));
-    const groove = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 2.6), eastRunes);
-    groove.position.set(61.7, eastPlate.y + 0.02, -3.0);
-    groove.rotation.y = 0.48;
-    scene.add(groove);
-  }
-  // Udden: en förseglad gyllene port mot pyramiden
-  {
-    const y = cape.H(103, 0);
-    [-1.8, 1.8].forEach((z) => solid(place(new THREE.Mesh(box(0.9, 4.6, 0.9, 1.5), M.marble), 103.5, y + 2.3, z)));
-    deco(new THREE.Mesh(box(1.2, 0.7, 4.8, 1.5), M.marble), 103.5, y + 4.9, 0);
-    const disc = new THREE.Mesh(cyl(0.9, 0.9, 0.16, 16, 1), M.gold);
-    disc.rotation.z = Math.PI / 2;
-    deco(disc, 103.0, y + 4.9, 0);
-    solid(place(new THREE.Mesh(box(0.3, 3.6, 2.8, 1.2), M.gold), 103.5, y + 1.8, 0));
+    const y = east.H(64, -3);
+    B.chest('eastIsle', 64, y, -3, -Math.PI / 2, { shards: 20 });
+    for (const [x, z] of [[58, 4], [59.5, 5.2], [67, 3]]) B.pot(x, east.H(x, z), z);
+    B.rock(68, east.H(68, -7), -7, 1.4, 77);
+    B.rock(55, east.H(55, -6), -6, 1.1, 78);
+    const h = 3.0;
+    solid(place(new THREE.Mesh(breakTop(cyl(0.6, 0.7, h, 10), h, 0.8), M.marble), 66.5, y + h / 2, 1.5));
   }
 
   // ---------- Aetheria ----------
   const aeth = island({
     cx: 0, cz: AZ, baseR: 30, rNoise: 2.8, seed: 9, amp: 0.45, keepAngles: [Math.PI / 2, -Math.PI / 2], depth: 32,
-    rings: 40, segs: 104,
+    rings: 40, segs: 104, label: 'Aetheria',
     pads: [{ x: 0, z: -80, r: 22, h: 0 }, { x: 0, z: -49.5, r: 4.5, h: 0.1 }, { x: 0, z: -106.5, r: 4.5, h: 0.1 }],
     grass: 340,
     avoid: (x, z) => Math.hypot(x, z + 80) < 16.5 || (Math.abs(x) < 1.8 && (z > -56 || z < -100))
       || Math.hypot(x + 16, z + 71) < 4 || Math.hypot(x - 15, z + 72) < 3.5 || Math.hypot(x, z + 103.5) < 2.5,
   });
-  const T = new THREE.Vector3(0, 0, -80); // orkesterns mitt
-  // Sittplatserna: sex halvcirkelformade trappsteg mot norr
+  const T = V3(0, 0, -80); // orkesterns mitt
   function annulus(r0, r1, h) {
     const sh = new THREE.Shape();
     sh.absarc(0, 0, r1, 0, Math.PI, false);
@@ -858,10 +467,9 @@ export function buildWorld(scene, lights) {
   for (let i = 0; i < 6; i++) {
     const h = 0.45 * (i + 1);
     const m = place(new THREE.Mesh(annulus(9 + 0.75 * i, 15.3, h + 0.5), M.marble), T.x, -0.5, T.z);
-    if (i === 5) solid(m); else S.add(m);
+    if (i === 5) solid(m); else village.S.add(m);
   }
   {
-    // Kollisionen för trappstegen är en mjuk ramp, vänd inåt mot orkestern
     const g = new THREE.CylinderGeometry(12.75, 9, 2.7, 40, 1, true, Math.PI / 2, Math.PI);
     const idx = g.index.array;
     for (let i = 0; i < idx.length; i += 3) { const a = idx[i]; idx[i] = idx[i + 2]; idx[i + 2] = a; }
@@ -880,7 +488,7 @@ export function buildWorld(scene, lights) {
   }
 
   // Lägerelden, där man vilar och sparar
-  const campPos = new THREE.Vector3(0, 0, -79);
+  const campPos = V3(0, 0, -79);
   for (let i = 0; i < 9; i++) {
     const a = (i / 9) * Math.PI * 2;
     deco(new THREE.Mesh(rockGeo(0.22, 300 + i, 0.7), M.rock), campPos.x + Math.cos(a) * 0.85, 0.08, campPos.z + Math.sin(a) * 0.85);
@@ -895,62 +503,45 @@ export function buildWorld(scene, lights) {
   {
     const bedroll = place(new THREE.Mesh(box(0.85, 0.14, 1.9, 1), M.clothRed), 2.5, 0.07, -80.4);
     bedroll.rotation.y = 0.5;
-    S.add(bedroll);
+    village.S.add(bedroll);
   }
-
-  function tent(x, z, ry, mat, w = 2.4, len = 2.8, h = 1.8) {
-    const g = new THREE.Group();
-    g.position.set(x, aeth.H(x, z), z);
-    g.rotation.y = ry;
-    S.add(g);
-    const slope = Math.hypot(w / 2, h), ang = Math.atan2(h, w / 2);
-    [-1, 1].forEach((s) => {
-      const p = new THREE.Mesh(box(slope, 0.05, len, 2), mat);
-      p.position.set((s * w) / 4, h / 2, 0);
-      p.rotation.z = -s * ang;
-      g.add(p);
-    });
-    const back = new THREE.Shape();
-    back.moveTo(-w / 2, 0);
-    back.lineTo(w / 2, 0);
-    back.lineTo(0, h);
-    back.lineTo(-w / 2, 0);
-    const bm = new THREE.Mesh(new THREE.ShapeGeometry(back), mat);
-    bm.position.z = -len / 2;
-    g.add(bm);
-    g.add(place(new THREE.Mesh(box(0.08, h + 0.3, 0.08, 1), M.wood), 0, (h + 0.3) / 2, len / 2 + 0.05));
-    g.updateWorldMatrix(true, false);
-    const c = new THREE.Mesh(new THREE.BoxGeometry(w * 0.85, h * 0.8, len));
-    c.position.set(0, h * 0.4, 0);
-    g.add(c);
-    c.visible = false;
-    solid(c, g);
-  }
-  tent(-9.5, -70, 0.9, M.clothOchre);
-  tent(9, -69.5, -0.8, M.clothBlue);
-  tent(-12.5, -76, 1.4, M.clothRed);
-  tent(11.5, -78.5, -1.5, M.clothOchre);
+  const tentAt = (x, z, ry, mat) => B.tent(x, aeth.H(x, z), z, ry, mat);
+  tentAt(-9.5, -70, 0.9, M.clothOchre);
+  tentAt(9, -69.5, -0.8, M.clothBlue);
+  tentAt(-12.5, -76, 1.4, M.clothRed);
+  tentAt(11.5, -78.5, -1.5, M.clothOchre);
 
   // Vanes smedja
-  const forge = new THREE.Vector3(-17, aeth.H(-17, -71), -71);
+  const forge = V3(-17, aeth.H(-17, -71), -71);
   solid(place(new THREE.Mesh(box(2.2, 1.6, 1.9), M.brick), forge.x, forge.y + 0.8, forge.z));
   solid(place(new THREE.Mesh(box(0.8, 2.6, 0.8), M.brick), forge.x - 0.5, forge.y + 2.6, forge.z - 0.4));
   {
     const mouth = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.55), M.glow);
     mouth.rotation.y = Math.PI / 2;
-    scene.add(place(mouth, forge.x + 1.11, forge.y + 0.75, forge.z));
+    B.add(place(mouth, forge.x + 1.11, forge.y + 0.75, forge.z));
   }
   const forgeFire = makeFire(forge.x - 0.5, forge.y + 3.6, forge.z - 0.4, 0.5, 0, 6);
   forgeFire.noFlames = true;
   forgeFire.level = 0.35;
   lights.add({ x: forge.x + 1.6, y: forge.y + 0.9, z: forge.z, color: 0xff7a2a, power: 20, range: 9, flicker: 0.6 });
-  const anvil = new THREE.Vector3(-14.6, aeth.H(-14.6, -70.3), -70.3);
+  const anvil = V3(-14.6, aeth.H(-14.6, -70.3), -70.3);
   solid(place(new THREE.Mesh(box(0.45, 0.5, 0.35, 1), M.iron), anvil.x, anvil.y + 0.25, anvil.z));
   solid(place(new THREE.Mesh(box(0.9, 0.22, 0.34, 1), M.iron), anvil.x, anvil.y + 0.6, anvil.z));
   deco(new THREE.Mesh(cyl(0.38, 0.4, 0.8, 8, 1), M.wood), forge.x + 0.6, forge.y + 0.4, forge.z + 1.6);
+  // Vanes svärdsställ (han smider nya svärd)
+  {
+    const g = B.groupAt(-18.4, aeth.H(-18.4, -68.4), -68.4, 0.9);
+    B.put(g, new THREE.Mesh(box(1.4, 0.12, 0.3, 1), M.wood), 0, 0.5, 0, true);
+    B.put(g, new THREE.Mesh(box(1.4, 0.12, 0.3, 1), M.wood), 0, 1.2, -0.05);
+    for (let i = 0; i < 3; i++) {
+      const s = new THREE.Mesh(box(0.06, 1.1, 0.12, 1), B.M.marble);
+      s.rotation.z = 0.08;
+      B.put(g, s, -0.45 + i * 0.45, 1.0, 0.1);
+    }
+  }
 
-  // Lyras arkiv: en mur med inristade tavlor, ett läspulpet och ljus
-  const archive = new THREE.Vector3(16.5, aeth.H(16.5, -73), -73);
+  // Lyras arkiv
+  const archive = V3(16.5, aeth.H(16.5, -73), -73);
   {
     const wall = place(new THREE.Mesh(box(5, 3.2, 0.8), M.brick), archive.x, archive.y + 1.4, archive.z);
     wall.rotation.y = -0.5;
@@ -979,8 +570,8 @@ export function buildWorld(scene, lights) {
     lights.add({ x: archive.x + 0.6, y: archive.y + 0.9, z: archive.z + 1.2, color: 0xffc47a, power: 6, range: 7, flicker: 0.5 });
   }
 
-  // Britsen där Maren vilar (om hon räddas) och graven (om hon inte gör det)
-  const cotPos = new THREE.Vector3(10.6, aeth.H(10.6, -75.2), -75.2);
+  // Britsen och graven
+  const cotPos = V3(10.6, aeth.H(10.6, -75.2), -75.2);
   {
     const cot = place(new THREE.Mesh(box(0.95, 0.45, 2.0, 1), M.wood), cotPos.x, cotPos.y + 0.22, cotPos.z);
     cot.rotation.y = 0.3;
@@ -999,7 +590,7 @@ export function buildWorld(scene, lights) {
     }
     grave.add(place(new THREE.Mesh(box(0.1, 1.0, 0.1, 1), M.wood), 0, 0.5, -0.55));
     grave.add(place(new THREE.Mesh(box(0.5, 0.1, 0.08, 1), M.wood), 0, 0.78, -0.55));
-    scene.add(grave);
+    B.add(grave);
     grave.visible = false;
   }
 
@@ -1012,32 +603,29 @@ export function buildWorld(scene, lights) {
     deco(new THREE.Mesh(box(0.3, 0.32, 0.3, 1), M.lamp), x, y + 2.3, z);
   });
 
-  // Stormporten norr om Aetheria: en obelisk som Lyra kan väcka
-  const northStone = new THREE.Vector3(0, aeth.H(0, -103.5), -103.5);
+  // Stormporten norr om Aetheria
+  const northStone = V3(0, aeth.H(0, -103.5), -103.5);
   const northRunes = new THREE.MeshBasicMaterial({ color: 0x2a3440 });
   {
     solid(place(new THREE.Mesh(box(1.4, 6.4, 1.4, 2), M.obsidian), northStone.x - 2.4, northStone.y + 3.2, northStone.z));
     for (let i = 0; i < 4; i++) {
       const r = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.08, 0.6), northRunes);
       r.position.set(northStone.x - 1.68, northStone.y + 1.4 + i * 1.2, northStone.z);
-      scene.add(r);
+      B.add(r);
     }
     solid(place(new THREE.Mesh(box(1.2, 4.2, 1.2, 2), M.obsidian), northStone.x + 2.4, northStone.y + 2.1, northStone.z));
   }
 
-  // ---------- Stenvägar som reser sig ----------
+  // Stenvägen norrut (reser sig när Lyra väcker porten) och dimman där den försvinner
   const northStones = [];
-  for (let i = 0; i < 12; i++) northStones.push({ x: (hash2(i, 3) - 0.5) * 0.5, z: -109.5 - i * 2.9 });
-  const eastStones = [];
-  for (let i = 0; i < 8; i++) eastStones.push({ x: 74.5 + i * 2.9, z: (hash2(i, 7) - 0.5) * 0.5 });
-  const paths = { north: new StonePath(scene, northStones, M), east: new StonePath(scene, eastStones, M) };
-  updaters.push((t, dt) => { paths.north.update(dt); paths.east.update(dt); });
-
-  // ---------- The Tempest Bastion ----------
-  const bastion = new Bastion({ scene, S, M, tex, solid, hidden, collision, lights, makeFire, rand, island, flameMat, flameMat2 });
+  for (let i = 0; i < 9; i++) northStones.push({ x: (hash2(i, 3) - 0.5) * 0.5, z: -109.5 - i * 2.9 });
+  const paths = { north: new StonePath(village.root, northStones, M) };
+  village.updaters.push((t, dt) => paths.north.update(dt));
+  village.connectFns.push((c) => paths.north.connect(c));
+  B.mist(0, -2, -136.5, 10, 5, 8);
+  village.map.lines.push({ pts: [[0, -108], [0, -133]], kind: 'stones', when: 'northPath' });
 
   // ---------- Svävande bråte ----------
-  // Några få former delas av alla bitar och ritas instansierat (en ritning per form)
   const chunkGeos = [0, 1, 2, 3].map((k) => ({ geo: rockGeo(1, 200 + k, 0.8), mat: M.rock, list: [] }))
     .concat([0, 1].map((k) => ({ geo: breakTop(cyl(0.6, 0.6, 1.4, 8), 1.4, 0.35 + k * 0.1), mat: M.marble, list: [] })));
   for (let i = 0; i < 60; i++) {
@@ -1050,7 +638,7 @@ export function buildWorld(scene, lights) {
     const s = 1.2 + rand() * 3.4;
     const kind = chunkGeos[isDrum ? 4 + (i % 2) : i % 4];
     kind.list.push({
-      pos: new THREE.Vector3(x, -14 + rand() * 34, z), rot: new THREE.Euler(rand() * 3, rand() * 3, rand() * 3), s,
+      pos: V3(x, -14 + rand() * 34, z), rot: new THREE.Euler(rand() * 3, rand() * 3, rand() * 3), s,
       sp: 0.3 + rand() * 0.5, p: rand() * 6, amp: 0.3 + rand() * 1.0, rs: (rand() - 0.5) * 0.15,
     });
   }
@@ -1058,12 +646,12 @@ export function buildWorld(scene, lights) {
     const im = new THREE.InstancedMesh(k.geo, k.mat, k.list.length);
     im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     im.frustumCulled = false;
-    scene.add(im);
+    B.add(im);
     return { im, list: k.list };
   });
   {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
-    updaters.push((t) => {
+    village.updaters.push((t) => {
       for (const { im, list } of chunkMeshes) {
         list.forEach((c, i) => {
           p.copy(c.pos).y += Math.sin(t * c.sp + c.p) * c.amp;
@@ -1076,108 +664,259 @@ export function buildWorld(scene, lights) {
     });
   }
 
-  // ---------- Grästuvor (en enda instansierad mesh) ----------
-  {
-    const w = 0.38, hgt = 0.55;
-    const pos = [-w, 0, 0, w, 0, 0, w, hgt, 0, -w, hgt, 0, 0, 0, -w, 0, 0, w, 0, hgt, w, 0, hgt, -w];
-    const uv = [0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1];
-    const nrm = new Array(24).fill(0).map((_, i) => (i % 3 === 1 ? 1 : 0));
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-    // Båda sidor ritas som framsidor med normal uppåt, så tuvorna ljussätts som marken
-    g.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 0, 2, 1, 0, 3, 2, 4, 6, 5, 4, 7, 6]);
-    const count = tuftPositions.length / 5;
-    const tufts = new THREE.InstancedMesh(g, M.tuft, count);
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-    for (let i = 0; i < count; i++) {
-      const [x, y, z, ry, s] = tuftPositions.slice(i * 5, i * 5 + 5);
-      q.setFromAxisAngle(up, ry);
-      m4.compose(new THREE.Vector3(x, y - 0.05, z), q, new THREE.Vector3(s, s, s));
-      tufts.setMatrixAt(i, m4);
-    }
-    scene.add(tufts);
-  }
-
-  const baked = bake(S);
-
-  // ---------- Platser som berättelsen behöver ----------
-  const V = (x, z, isl = main) => new THREE.Vector3(x, isl.H(x, z), z);
-  const enemySpots = [
+  // Fiender i byn
+  const V = (x, z, isl = main) => V3(x, isl.H(x, z), z);
+  [
     { home: V(-3, -11), path: [V(-6, -11.5), V(4, -11.5), V(3, -10)] },
     { home: V(13, 3), path: [V(12, 0), V(16.5, 3.5), V(13, -3.5)] },
     { home: V(-18, 5), path: [V(-19, 2.5), V(-16.5, 9.5), V(-17, 5)] },
     { home: V(55, 3, east), path: [V(54, -2, east), V(57, 5, east)] },
     { home: V(14, -22), path: [V(10, -24), V(18, -20)] },
-  ];
+  ].forEach((s) => B.enemy(s.home, s.path));
 
-  const aetheria = {
-    center: new THREE.Vector3(0, 0, AZ),
-    radius: 30,
-    camp: campPos,
-    spawn: new THREE.Vector3(0, aeth.H(0, -75.4), -75.4),
-    spawnFacing: Math.PI,
-    gate: new THREE.Vector3(0, 0.1, -50),
-    northStone,
-    lyraRead: new THREE.Vector3(0.6, aeth.H(0.6, -101.2), -101.2),
-    npcs: {
-      lyra: { pos: new THREE.Vector3(14.2, aeth.H(14.2, -70.4), -70.4), face: -2.6 },
-      vane: { pos: new THREE.Vector3(-13.9, aeth.H(-13.9, -69.4), -69.4), face: -2.2 },
-      edda: { pos: new THREE.Vector3(-2.9, 0, -80.6), face: 1.15 },
-      ilo: { pos: new THREE.Vector3(3, 0, -75), face: 0 },
-      bram: { pos: new THREE.Vector3(2.2, aeth.H(2.2, -55), -55), face: 0.2 },
-      kaelCot: { pos: new THREE.Vector3(9.4, aeth.H(9.4, -74.4), -74.4), face: 2.2 },
-      kaelGrave: { pos: new THREE.Vector3(-6.2, aeth.H(-6.2, -66.6), -66.6), face: -2.5 },
-      maren: { pos: cotPos.clone().setY(cotPos.y + 0.5), face: 0.3 },
-    },
-    grave,
+  village.entries = {
+    south: { pos: V3(0, DECK, 61.2), facing: Math.PI },
+    north: { pos: V3(0, 0, -129.5), facing: 0 },
+    aetheria: { pos: V3(0, aeth.H(0, -75.4), -75.4), facing: Math.PI },
   };
+  village.exits = [
+    { x0: -3, x1: 3, z0: 62.8, z1: 70, to: 'home', entry: 'north', label: "Cello's Home" },
+    { x0: -3, x1: 3, z0: -150, z1: -131.6, to: 'ranch', entry: 'south', label: 'Thistledown Ranch' },
+  ];
+  village.map.pois.push({ x: 0, z: -79, label: 'Rest', icon: 'fire' });
+  village.map.exits = [{ x: 0, z: 66, label: "Cello's Home", to: 'home' }, { x: 0, z: -134, label: 'Thistledown Ranch', to: 'ranch', when: 'northPath' }];
+  B.end();
+
+  // =====================================================================
+  // Cellos hem: huset vid skogsbrynet, trädgården och lägerplatsen
+  // =====================================================================
+  const home = areas.create({
+    id: 'home', name: "Cello's Home", sub: 'At the edge of the forest', card: false,
+    fog: { color: 0x323843, near: 34, far: 240 },
+  });
+  B.begin(home);
+  B.bounds(-36, 36, 52, 134);
+  const pathPts = [[0, 71], [-1, 78], [-3.5, 86], [-5, 94], [-6, 100.5]];
+  const homeIsl = island({
+    cx: 0, cz: 100, baseR: 30, rNoise: 3, seed: 17, amp: 0.55, keepAngles: [-Math.PI / 2], depth: 26,
+    rings: 36, segs: 96, label: "Cello's Home",
+    pads: [{ x: 0, z: 71, r: 4, h: 0.1 }, { x: -6, z: 106, r: 7, h: 0.15 }, { x: 7, z: 108, r: 6, h: 0.05 }, { x: -15, z: 90, r: 5, h: 0 }],
+    roads: [{ pts: pathPts, w: 2.2 }],
+    dips: [{ x: 13, z: 121, r: 6, depth: 0.7 }],
+    grass: 420,
+    avoid: (x, z) => Math.hypot(x + 6, z - 106) < 5 || (x > 2.5 && x < 11.5 && z > 104.5 && z < 111.5) || Math.hypot(x - 13, z - 121) < 5,
+  });
+  const HH = homeIsl.H;
+  B.road(pathPts, 2.2, HH);
+  B.bridge('z', 56.5, 71, 0);
+  B.mist(0, -3, 57.5, 9, 5, 8);
+  // Byn i norr syns som en ö där röken stiger
+  {
+    const vb = B.backdrop(0, 0, 33, 0, 1, { rings: 10, segs: 48 });
+    B.backdrop(0, 49, 6.6, 0, 13, { rings: 4, segs: 20 });
+    for (const [x, z, ry] of [[8.5, 15.5, -0.4], [-8.5, 15, 0.5], [21, 7, 1.2], [-17, 19, -0.6], [5, 25, 0.1], [16, 20, 0.3]]) {
+      const m = new THREE.Mesh(box(4.2, 2.2, 3.4, 2), M.char);
+      m.rotation.y = ry;
+      deco(m, x, vb.H(x, z) + 1.0, z);
+    }
+    for (const [x, z] of [[-17, 19], [5, 25], [16, 20]]) {
+      const f = makeFire(x, vb.H(x, z) + 3.5, z, 2.6, 0, 9, 14);
+      f.noFlames = true;
+      villageFires.push(f);
+    }
+  }
+  // Huset
+  const cottage = B.house(-6, HH(-6, 106), 106, Math.PI, {
+    w: 6.2, d: 5.2, h: 2.7, wall: M.plaster, roof: M.thatch, shutter: M.clothRed, chimneyX: -0.3, label: 'Home',
+  });
+  // Trädgården: staket, pumpor, kål och en fågelskrämma
+  B.fence([[2.5, 104.5], [11.5, 104.5], [11.5, 111.5], [2.5, 111.5], [2.5, 104.5]], HH, { gap: 1.5, skip: [1] });
+  for (let row = 0; row < 3; row++) {
+    for (let i = 0; i < 5; i++) {
+      const x = 4 + i * 1.5, z = 106 + row * 2;
+      const y = HH(x, z);
+      if (row === 1) {
+        const p = new THREE.Mesh(new THREE.SphereGeometry(0.32, 7, 5), M.pumpkin);
+        p.scale.y = 0.7;
+        deco(p, x, y + 0.18, z);
+        deco(new THREE.Mesh(box(0.05, 0.14, 0.05, 1), M.leaf), x, y + 0.42, z);
+      } else deco(new THREE.Mesh(new THREE.IcosahedronGeometry(0.28, 0), M.cabbage), x, y + 0.2, z);
+    }
+  }
+  {
+    const y = HH(10, 110.5);
+    deco(new THREE.Mesh(box(0.1, 1.9, 0.1, 1), M.woodDark), 10, y + 0.95, 110.5);
+    deco(new THREE.Mesh(box(1.3, 0.1, 0.1, 1), M.woodDark), 10, y + 1.5, 110.5);
+    deco(new THREE.Mesh(box(0.55, 0.7, 0.3, 1), M.clothBlue), 10, y + 1.3, 110.5);
+    deco(new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 4), M.sack), 10, y + 1.85, 110.5);
+    deco(new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.3, 6), M.hay), 10, y + 2.05, 110.5);
+  }
+  // Vedtrave, huggkubbe och en tvättlina
+  {
+    const x = -12, z = 103.5, y = HH(x, z);
+    for (let r = 0; r < 3; r++) for (let i = 0; i < 4 - r; i++) {
+      const log = new THREE.Mesh(cyl(0.16, 0.16, 1.6, 7, 1), M.bark);
+      log.rotation.x = Math.PI / 2;
+      deco(log, x + (i - 1.5 + r * 0.5) * 0.34, y + 0.17 + r * 0.3, z);
+    }
+    hidden(new THREE.BoxGeometry(1.5, 1.0, 1.7), x, y + 0.5, z);
+    solid(place(new THREE.Mesh(cyl(0.34, 0.38, 0.5, 8, 1), M.bark), -11, y + 0.25, 100.2));
+    const axe = new THREE.Mesh(box(0.06, 0.8, 0.06, 1), M.wood);
+    axe.rotation.z = 0.5;
+    deco(axe, -10.8, y + 0.75, 100.2);
+    for (const px of [-1, 5]) deco(new THREE.Mesh(box(0.1, 2.0, 0.1, 1), M.woodDark), px, HH(px, 114) + 1.0, 114);
+    deco(new THREE.Mesh(box(6, 0.02, 0.02, 1), M.rope), 2, HH(2, 114) + 1.85, 114);
+    [[0.5, M.linen], [2.2, M.clothRed], [3.6, M.linen]].forEach(([dx, m]) => deco(new THREE.Mesh(box(0.8, 0.9, 0.03, 1), m), dx, HH(dx, 114) + 1.4, 114));
+  }
+  // Övningsdocka av halm (Cellos svärdsträning)
+  const dummyPos = V3(6, HH(6, 95), 95); // dockan byggs i folk.js (den gungar när den blir slagen)
+  // Lägerplatsen i skogsbrynet (där Cello sov i natt)
+  {
+    const y = HH(-15, 90);
+    [[-16.4, 88.6], [-13.6, 88.6], [-16.4, 91.4], [-13.6, 91.4]].forEach(([x, z], i) => solid(place(new THREE.Mesh(box(0.16, i < 2 ? 2.2 : 1.1, 0.16, 1), M.wood), x, y + (i < 2 ? 1.1 : 0.55), z)));
+    const roof = place(new THREE.Mesh(box(3.4, 0.12, 3.3, 1.2), M.thatch), -15, y + 1.7, 90);
+    roof.rotation.x = -0.32;
+    home.S.add(roof);
+    B.campfire(-11.5, HH(-11.5, 92), 92, 18);
+  }
+  // Damm med vass
+  B.water(13, HH(13, 121) + 0.35, 121, 4.6, 3.6);
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2, x = 13 + Math.cos(a) * 4.4, z = 121 + Math.sin(a) * 3.5;
+    deco(new THREE.Mesh(box(0.05, 0.9, 0.05, 1), M.crop), x, HH(x, z) + 0.45, z);
+  }
+  // Skogen runt om
+  for (const [x, z, s] of [[-9, 80, 1.2], [-12, 86, 1.0], [9, 80, 1.1], [14, 88, 1.3], [17, 98, 0.9], [-20, 97, 1.1], [-22, 110, 0.9], [19, 112, 1.0],
+    [3, 125, 1.0], [-5, 125, 1.2], [-14, 120, 1.2], [21, 104, 1.1], [-24, 103, 1.3], [8, 86, 0.8], [-18, 82, 1.0]]) B.pine(x, HH(x, z), z, s);
+  for (const [x, z, s] of [[3, 100, 1.1], [-14, 112, 1.2], [16, 94, 1.0]]) B.oak(x, HH(x, z), z, s);
+  for (const [x, z] of [[-2, 112], [-10, 96], [5, 92], [12, 116], [-17, 116]]) B.bush(x, HH(x, z), z, 0.9);
+  B.flowers(-3, HH(-3, 102), 102, 8, 1.3);
+  B.flowers(1, HH(1, 108), 108, 6);
+  B.rock(6, HH(6, 88), 88, 1.3, 740);
+  B.rock(-20, HH(-20, 90), 90, 1.0, 741);
+  for (const [x, z] of [[-3, 104.5], [-9.5, 104.8]]) B.pot(x, HH(x, z), z, 0.85);
+  B.sign(2.2, HH(2.2, 74), 74, -0.3, ['"Hollowbrook — follow the bridge north."', 'Someone has added in small letters: "Cello, feed the goats! —M"'], { arrow: -1 });
+  home.entries = {
+    north: { pos: V3(0, DECK, 61.8), facing: 0 },
+    start: { pos: V3(-5, HH(-5, 98.5), 98.5), facing: Math.PI },
+    door: { pos: V3(cottage.door.x, cottage.door.y, cottage.door.z), facing: Math.PI },
+  };
+  home.exits = [{ x0: -3, x1: 3, z0: 40, z1: 59.6, to: 'village', entry: 'south', label: 'Hollowbrook' }];
+  home.doors = [{ pos: cottage.door, to: 'house', entry: 'door', label: 'Enter the house' }];
+  home.map.exits = [{ x: 0, z: 58, label: 'Hollowbrook', to: 'village' }];
+  B.end();
+
+  // =====================================================================
+  // The Tempest Bastion
+  // =====================================================================
+  const bastionArea = areas.create({
+    id: 'bastion', name: 'The Tempest Bastion', sub: "Thor's burned fortress", card: false,
+    fog: { color: 0x2c313b, near: 30, far: 220 },
+  });
+  B.begin(bastionArea);
+  B.bounds(-44, 44, -240, -120);
+  const bastion = new Bastion({
+    scene: bastionArea.root, S: bastionArea.S, M, tex: B.tex, solid, hidden, collision: bastionArea.collision,
+    lights, makeFire, rand, island, flameMat, flameMat2,
+  });
+  // Åskstegen: stenar från grottans mynning fram till förgården
+  for (let i = 0; i < 4; i++) {
+    const z = -128.5 - i * 2.6, x = (hash2(i, 9) - 0.5) * 0.4;
+    solid(place(new THREE.Mesh(box(2.8, 0.9, 2.4, 1.6), M.rock), x, -0.45, z));
+    deco(new THREE.Mesh(rockGeo(1.25, 520 + i, 1.4), M.rock), x, -1.6, z);
+    deco(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.02, 0.12), M.runeGlow), x, 0.01, z);
+  }
+  B.mist(0, -3, -124.5, 10, 5, 8);
+  // Fiender, kistor och krukor i fästningen
+  bastionArea.entries = {
+    south: { pos: V3(0, 0, -130.5), facing: Math.PI },
+    entrance: { pos: V3(0, 0, -146), facing: Math.PI },
+  };
+  bastionArea.exits = [{ x0: -3, x1: 3, z0: -127, z1: -110, to: 'cave', entry: 'north', label: 'The Hollow Cave' }];
+  bastionArea.connectFns.push((c) => bastion.connect(c));
+  bastionArea.updaters.push(() => {});
+  {
+    const P = (x, z, y = 0) => B.pot(x, y, z);
+    [[7.6, -151.6], [-8.0, -157], [8.0, -166.6], [-27.6, -151.5], [-27.6, -166.6], [-12.4, -166.6],
+      [-11.8, -176.5], [11.8, -176.5], [-11.8, -189], [11.8, -189], [-33.6, -184], [-16.4, -188.5],
+      [34, -151.4], [34, -166.5], [16.4, -178], [33.6, -190.6], [13.6, -214], [-13.6, -214], [0, -227.6],
+      [-10.5, -144.5], [10.5, -144.5]].forEach(([x, z]) => P(x, z));
+    P(16.4, -177.5, -6);
+    P(33.8, -177.6, -6);
+  }
+  B.end();
+
+  // =====================================================================
+  // Resten av världen
+  // =====================================================================
+  const ranch = buildRanch(B, areas);
+  const pass = buildPass(B, areas);
+  const field = buildField(B, areas);
+  const willow = buildWillowmere(B, areas);
+  const reach = buildStormreach(B, areas);
+  const interiors = buildInteriors(B, areas);
 
   const world = {
-    collision,
-    enemySpots,
-    // Spelet börjar på startön söder om byn
-    spawn: V(0, 99.5, start),
-    spawnFacing: Math.PI,
-    village: { center: new THREE.Vector3(0, 0, 0), gateZ: 33.5, midZ: 55.5, revive: V(0, 22) },
-    intro: { vantage: new THREE.Vector3(7, 9.5, 37), look: new THREE.Vector3(-6, 1.5, 9) },
-    aetheria,
-    // Där Cello börjar om i fästningen (efter att ha dött, eller när spelet laddas där)
-    bastionEntrance: new THREE.Vector3(0, 0, -146),
-    prologue: {
-      refugee: V(4.6, 12.4),
-      titanHome: V(-16.5, 9),
+    areas,
+    builder: B,
+    village: { center: V3(0, 0, 0), gateZ: 33.5, midZ: 55.5, revive: V(0, 22) },
+    intro: { vantage: V3(7, 9.5, 37), look: V3(-6, 1.5, 9) },
+    aetheria: {
+      center: V3(0, 0, AZ),
+      radius: 30,
+      camp: campPos,
+      spawn: V3(0, aeth.H(0, -75.4), -75.4),
+      spawnFacing: Math.PI,
+      gate: V3(0, 0.1, -50),
+      northStone,
+      lyraRead: V3(0.6, aeth.H(0.6, -101.2), -101.2),
+      forge,
+      npcs: {
+        lyra: { pos: V3(14.2, aeth.H(14.2, -70.4), -70.4), face: -2.6 },
+        vane: { pos: V3(-13.9, aeth.H(-13.9, -69.4), -69.4), face: -2.2 },
+        edda: { pos: V3(-2.9, 0, -80.6), face: 1.15 },
+        ilo: { pos: V3(3, 0, -75), face: 0 },
+        bram: { pos: V3(2.2, aeth.H(2.2, -55), -55), face: 0.2 },
+        kaelCot: { pos: V3(9.4, aeth.H(9.4, -74.4), -74.4), face: 2.2 },
+        kaelGrave: { pos: V3(-6.2, aeth.H(-6.2, -66.6), -66.6), face: -2.5 },
+        maren: { pos: cotPos.clone().setY(cotPos.y + 0.5), face: 0.3 },
+      },
+      grave,
     },
-    east: { plate: eastPlate, stone: eastStone.position.clone(), end: new THREE.Vector3(100, cape.H(100, 0), 0) },
-    paths,
+    home: { dummy: dummyPos, door: cottage.door, H: HH },
+    bastionEntrance: V3(0, 0, -146),
+    prologue: { refugee: V(4.6, 12.4), titanHome: V(-16.5, 9) },
+    east: field.east,
+    paths: { north: paths.north, east: field.eastPath },
+    ranch, pass, field, willow, reach, interiors,
     bastion,
-    fires,
+    fires: B.fires,
     villageFires,
-    baked,
-    // Sant om punkten ligger i Aetheria eller på broarna dit (byns asklingar går aldrig dit)
-    isSafe: (x, z) => Math.hypot(x, z - AZ) < 33 || (Math.abs(x) < 3 && (z < -27 || z > 29)),
-    inAetheria: (x, z) => Math.hypot(x, z - AZ) < 32,
-    inBastion: (x, z) => x > -44 && x < 44 && z < -142 && z > -240,
-    inVillage: (x, z) => Math.hypot(x, z) < 36,
+    // Sant om punkten ligger där fiender inte får gå (Aetheria och broarna dit, eller ett fridfullt område)
+    isSafe: (x, z) => {
+      const a = areas.cur;
+      if (a?.safe) return true;
+      if (a?.id === 'village') return Math.hypot(x, z - AZ) < 33 || (Math.abs(x) < 3 && (z < -27 || z > 29));
+      return a?.isSafe?.(x, z) ?? false;
+    },
+    inAetheria: (x, z) => areas.id === 'village' && Math.hypot(x, z - AZ) < 32,
+    inBastion: () => areas.id === 'bastion',
+    inVillage: (x, z) => areas.id === 'village' && Math.hypot(x, z) < 36,
     connect(collider) {
-      paths.north.connect(collider);
-      paths.east.connect(collider);
-      bastion.connect(collider);
+      areas.collider = collider;
+      for (const a of Object.values(areas.list)) {
+        collider.building = a.id;
+        for (const fn of a.connectFns) fn(collider);
+      }
+      collider.building = null;
     },
-    // Hammarslag på östöns kopparplatta väcker stormstenen
-    slamEast(point) {
-      return Math.hypot(point.x - eastPlate.x, point.z - eastPlate.z) < 1.9;
-    },
-    lightEast(on) {
-      eastRunes.color.set(on ? 0x7fdcff : 0x2a3440);
-      eastPlateMat.emissive.set(on ? 0x2a6a88 : 0x000000);
-    },
+    slamEast: field.slamEast,
+    lightEast: field.lightEast,
     lightNorth(on) {
       northRunes.color.set(on ? 0x7fdcff : 0x2a3440);
     },
     update(t, dt) {
-      for (const u of updaters) u(t, dt);
+      areas.update(t, dt);
     },
   };
   return world;

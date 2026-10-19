@@ -9,6 +9,21 @@ export const VOICES = {
   ilo: { f: 480, wave: 'square', form: [[950, 4], [1850, 5]] },
   bram: { f: 148, wave: 'sawtooth', form: [[600, 4], [1150, 5]] },
   kael: { f: 172, wave: 'sawtooth', form: [[620, 4], [1250, 5]] },
+  // 0.6: folket ute i världen
+  hollis: { f: 118, wave: 'sawtooth', form: [[520, 4], [980, 5]], wobble: 0.4 },
+  tilly: { f: 430, wave: 'triangle', form: [[900, 4], [1800, 5]] },
+  garrick: { f: 132, wave: 'sawtooth', form: [[560, 4], [1120, 5]] },
+  mags: { f: 250, wave: 'sawtooth', form: [[760, 3], [1300, 4]], wobble: 0.6 },
+  pell: { f: 165, wave: 'square', form: [[640, 4], [1350, 5]] },
+  rosa: { f: 270, wave: 'triangle', form: [[720, 4], [1400, 5]] },
+  ysolde: { f: 205, wave: 'triangle', form: [[580, 3], [1050, 4]], wobble: 1.2, breath: 0.4 },
+  doran: { f: 112, wave: 'sawtooth', form: [[500, 4], [1000, 5]] },
+  fenwick: { f: 140, wave: 'sawtooth', form: [[600, 3], [1150, 4]], wobble: 0.5 },
+  mira: { f: 500, wave: 'square', form: [[1000, 4], [1950, 5]] },
+  tob: { f: 455, wave: 'square', form: [[920, 4], [1800, 5]] },
+  fenn: { f: 190, wave: 'sawtooth', form: [[680, 4], [1300, 5]] },
+  odo: { f: 128, wave: 'triangle', form: [[540, 3], [1000, 4]], breath: 0.3 },
+  nell: { f: 300, wave: 'triangle', form: [[780, 4], [1500, 5]] },
 };
 const STEPS = [1, 9 / 8, 5 / 4, 4 / 3, 3 / 2];
 const FANFARE = [[523.25, 0], [659.25, 0.13], [783.99, 0.26], [1046.5, 0.39], [987.77, 0.62], [1046.5, 0.78]];
@@ -163,7 +178,7 @@ export class Sfx {
     if (!this.ctx || this.ctx.state !== 'running') return;
     const c = this.ctx, t = c.currentTime;
     const gust = 0.5 + Math.sin(t * 0.23) * 0.3 + Math.sin(t * 0.61 + 1) * 0.2;
-    this.windGain.gain.setTargetAtTime((s.inside ? 0.05 : 0.11) * gust, t, 0.5);
+    this.windGain.gain.setTargetAtTime((s.inside ? 0.05 : 0.11 + (s.wind || 0) * 0.08) * gust, t, 0.5);
     this.windFilter.frequency.setTargetAtTime(260 + gust * 320, t, 0.5);
     if (s.fire > 0 && Math.random() < dt * 9 * s.fire) this.play('crackle', { vol: s.fire });
   }
@@ -418,6 +433,78 @@ export class Sfx {
           this.osc('triangle', f, f * 0.9, ti, 0.08, this.gain(ti, 0.001, 0.12 * v, 0.08));
         }
         this.osc('sine', 180, 90, t, 0.1, this.gain(t, 0.002, 0.3 * v, 0.1));
+        break;
+      case 'shard': { // en skärva: ett klingande ljud, högre för större värden
+        const notes = v >= 20 ? [1319, 1568, 1976, 2637] : v >= 5 ? [1175, 1568, 2093] : [1568, 2093];
+        notes.forEach((f, i) => {
+          const ti = t + i * 0.055;
+          this.osc('triangle', f, f, ti, 0.1, this.gain(ti, 0.003, 0.12, 0.1));
+          this.osc('sine', f * 2, f * 2, ti, 0.08, this.gain(ti, 0.003, 0.04, 0.08));
+        });
+        break;
+      }
+      case 'grass': // gräset skärs av
+        this.noiseThrough('highpass', 3000, 1800, 0.8, t, 0.09, this.gain(t, 0.003, 0.18 * v, 0.09));
+        break;
+      case 'buy': // köpet gick igenom
+        [784, 988, 1175, 1568].forEach((f, i) => {
+          const ti = t + i * 0.07;
+          this.osc('square', f, f, ti, 0.09, this.lowpass(this.gain(ti, 0.003, 0.08, 0.09), 2400));
+        });
+        break;
+      case 'denied': // inte tillräckligt med skärvor
+        this.osc('square', 196, 185, t, 0.12, this.lowpass(this.gain(t, 0.003, 0.12, 0.12), 900));
+        this.osc('square', 147, 139, t + 0.13, 0.18, this.lowpass(this.gain(t + 0.13, 0.003, 0.12, 0.18), 900));
+        break;
+      case 'snap': // svärdet går av
+        for (const [f, p] of [[1700, 0.25], [2650, 0.18], [3900, 0.1]]) this.osc('sine', f * r, f * r * 0.9, t, 0.35, this.gain(t, 0.001, p, 0.35));
+        this.noiseThrough('highpass', 4200, 2600, 0.9, t, 0.12, this.gain(t, 0.001, 0.4, 0.12));
+        this.osc('sine', 330, 120, t + 0.05, 0.3, this.gain(t + 0.05, 0.005, 0.25, 0.3));
+        break;
+      case 'lantern': // lyktan tänds
+        this.noiseThrough('bandpass', 500, 1800, 0.9, t, 0.35, this.gain(t, 0.05, 0.22 * v, 0.3));
+        this.osc('sine', 220, 330, t, 0.3, this.gain(t, 0.05, 0.08 * v, 0.3));
+        break;
+      case 'lanternoff':
+        this.noiseThrough('lowpass', 900, 300, 0.7, t, 0.2, this.gain(t, 0.01, 0.15 * v, 0.2));
+        break;
+      case 'drink': // tre klunkar
+        for (let i = 0; i < 3; i++) {
+          const ti = t + i * 0.22;
+          this.osc('sine', 300, 180, ti, 0.12, this.gain(ti, 0.01, 0.3, 0.12));
+          this.noiseThrough('lowpass', 700, 300, 1, ti, 0.1, this.gain(ti, 0.01, 0.12, 0.1));
+        }
+        break;
+      case 'menu': // menyn öppnas eller stängs
+        this.osc('triangle', v > 0.5 ? 660 : 880, v > 0.5 ? 990 : 660, t, 0.12, this.gain(t, 0.004, 0.14, 0.12));
+        break;
+      case 'select': // markören flyttas
+        this.osc('square', 1320, 1320, t, 0.035, this.lowpass(this.gain(t, 0.002, 0.07, 0.035), 3000));
+        break;
+      case 'equip': // ett föremål läggs på en knapp
+        this.osc('triangle', 990, 1320, t, 0.1, this.gain(t, 0.003, 0.16, 0.1));
+        this.osc('triangle', 1320, 1760, t + 0.08, 0.12, this.gain(t + 0.08, 0.003, 0.14, 0.12));
+        break;
+      case 'goat': { // bräkande get
+        const g = this.lowpass(this.gain(t, 0.02, 0.18 * v, 0.5), 2200);
+        const o = this.ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(420 * r, t);
+        for (let k = 0; k < 10; k++) o.frequency.setValueAtTime((k % 2 ? 380 : 440) * r, t + k * 0.045);
+        o.connect(g);
+        o.start(t);
+        o.stop(t + 0.5);
+        break;
+      }
+      case 'moo':
+        this.voice(120 * r, 95 * r, 0.9, 0.35 * v, [[380, 4], [800, 5]], t);
+        break;
+      case 'cluck':
+        for (let i = 0; i < 3; i++) this.voice(620 * r, 480 * r, 0.06, 0.15 * v, [[1100, 4], [2200, 5]], t + i * 0.11);
+        break;
+      case 'torch': // ett eldfat tänds
+        this.noiseThrough('bandpass', 300, 1400, 0.8, t, 0.6, this.gain(t, 0.04, 0.35 * v, 0.55));
+        this.osc('sine', 110, 70, t, 0.4, this.gain(t, 0.02, 0.2 * v, 0.4));
         break;
       case 'portal':
         for (let i = 0; i < 6; i++) {

@@ -160,6 +160,13 @@ export class Effects {
     this.trail = new SwordTrail(scene);
     this.heartGeo = heartGeometry();
     this.heartMat = new THREE.MeshLambertMaterial({ color: 0xd8352f, emissive: 0x6a0d0b });
+    // Skärvor (pengarna): gröna är värda 1, blå 5 och röda 20, som rupier
+    this.shardGeo = new THREE.OctahedronGeometry(0.2, 0).scale(0.75, 1.5, 0.45);
+    this.shardMats = {
+      1: new THREE.MeshLambertMaterial({ color: 0x4ad06a, emissive: 0x0e4a1a, flatShading: true }),
+      5: new THREE.MeshLambertMaterial({ color: 0x4a8ae0, emissive: 0x0e2a5a, flatShading: true }),
+      20: new THREE.MeshLambertMaterial({ color: 0xe04a4a, emissive: 0x5a0e0e, flatShading: true }),
+    };
     this.hearts = [];
     this.onPickup = null;
     this.rings = [];
@@ -237,7 +244,25 @@ export class Effects {
     const m = new THREE.Mesh(this.heartGeo, this.heartMat);
     m.position.copy(pos).add(new THREE.Vector3(0, 1.2, 0));
     this.scene.add(m);
-    this.hearts.push({ m, ground: pos.y + 0.5, t: 0, life: 14, vy: 3 });
+    this.hearts.push({ m, ground: pos.y + 0.5, t: 0, life: 14, vy: 3, kind: 'heart', value: 2 });
+  }
+
+  // En skärva som studsar ut åt sidan (value 1, 5 eller 20)
+  spawnShard(pos, value = 1, spread = 0.6) {
+    const v = value >= 20 ? 20 : value >= 5 ? 5 : 1;
+    const m = new THREE.Mesh(this.shardGeo, this.shardMats[v]);
+    const a = Math.random() * Math.PI * 2, r = Math.random() * spread;
+    m.position.copy(pos).add(new THREE.Vector3(Math.cos(a) * r, 1.0, Math.sin(a) * r));
+    this.scene.add(m);
+    this.hearts.push({ m, ground: pos.y + 0.35, t: Math.random(), life: 16, vy: 3.4, kind: 'shard', value: v });
+  }
+
+  // Delar upp ett belopp i så få skärvor som möjligt
+  spawnShards(pos, amount) {
+    let left = amount;
+    for (const v of [20, 5, 1]) {
+      while (left >= v) { this.spawnShard(pos, v, 0.9); left -= v; }
+    }
   }
 
   clearHearts() {
@@ -279,7 +304,7 @@ export class Effects {
       const dx = player.feet.x - h.m.position.x, dz = player.feet.z - h.m.position.z;
       const dy = player.feet.y + 0.8 - h.m.position.y;
       if (h.life <= 0) { this.scene.remove(h.m); continue; }
-      if (Math.hypot(dx, dz) < 1.1 && Math.abs(dy) < 1.4 && this.onPickup?.()) {
+      if (Math.hypot(dx, dz) < 1.1 && Math.abs(dy) < 1.4 && h.t > 0.25 && this.onPickup?.(h.kind, h.value)) {
         this.scene.remove(h.m);
         continue;
       }

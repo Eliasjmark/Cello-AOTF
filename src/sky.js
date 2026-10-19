@@ -125,15 +125,23 @@ export function createSky(scene) {
     return dist;
   }
 
-  let next = 2.5, ft = -1, flash = 0;
+  let next = 2.5, ft = -1, flash = 0, indoor = false;
   const api = {
     onBolt: null,
+    // Inomhus och i grottor syns varken himlen, molnhavet eller blixtarna
+    setIndoor(on) {
+      indoor = on;
+      dome.visible = !on;
+      sea.visible = !on;
+      if (on) { ft = -1; flash = 0; bolt.visible = false; }
+    },
     update(dt, t, camera) {
       dome.position.copy(camera.position);
       sea.position.x = camera.position.x;
       sea.position.z = camera.position.z;
       u.uTime.value = t;
       next -= dt;
+      if (indoor) { u.uFlash.value = 0; return 0; }
       if (next <= 0 && ft < 0) {
         ft = 0;
         api.onBolt?.(makeBolt(camera));

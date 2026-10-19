@@ -179,6 +179,8 @@ export class Npc {
     this.model = buildPerson(def.look ?? {});
     mergeRigid(this.model.root);
     scene.add(this.model.root);
+    this.parentGroup = scene;
+    this.area = def.area ?? null;
     this.pos = def.pos.clone();
     this.home = def.pos.clone();
     this.facing = def.face ?? 0;

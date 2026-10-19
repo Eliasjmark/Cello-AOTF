@@ -232,5 +232,99 @@ export function createTextures() {
     for (let i = 0; i < 5; i++) walk(g, s, r, 22, 'rgba(30,26,24,0.9)', [r() > 0.5 ? 0.9 : -0.9, 0.6]);
   });
 
-  return { grass, rock, cliff, marble, brick, wood, tuft, mosaic, runes, charred, iron, ironFloor, cracked };
+  // ---- 0.6: hela byar, vägar och fältet ----
+  // Jordväg med hjulspår och småsten
+  const dirt = canvasTexture(32, 163, (g, s, r) => {
+    noisyFill(g, s, r, [104, 86, 62], 10);
+    for (let i = 0; i < 26; i++) {
+      g.fillStyle = r() > 0.5 ? 'rgba(70,56,40,0.7)' : 'rgba(140,122,94,0.6)';
+      g.fillRect(Math.floor(r() * s), Math.floor(r() * s), 1 + Math.floor(r() * 2), 1);
+    }
+    g.fillStyle = 'rgba(66,52,38,0.35)';
+    g.fillRect(8, 0, 2, s);
+    g.fillRect(22, 0, 2, s);
+  });
+
+  // Putsade väggar (vitkalkade hus i Willowmere och på ranchen)
+  const plaster = canvasTexture(32, 171, (g, s, r) => {
+    noisyFill(g, s, r, [196, 186, 164], 7);
+    for (let i = 0; i < 6; i++) {
+      g.fillStyle = 'rgba(150,140,120,0.35)';
+      g.fillRect(Math.floor(r() * s), Math.floor(r() * s), 3 + Math.floor(r() * 4), 2);
+    }
+  });
+
+  // Takspån i rader (färgas av materialet)
+  const shingle = canvasTexture(32, 181, (g, s, r) => {
+    noisyFill(g, s, r, [196, 196, 196], 10);
+    g.fillStyle = 'rgba(40,40,40,0.55)';
+    for (let y = 0; y < s; y += 6) {
+      g.fillRect(0, y, s, 1);
+      const off = (y / 6) % 2 ? 4 : 0;
+      for (let x = off; x < s; x += 8) g.fillRect(x, y, 1, 6);
+    }
+  });
+
+  // Kullersten för torg och gångar
+  const cobble = canvasTexture(32, 191, (g, s, r) => {
+    noisyFill(g, s, r, [70, 68, 64], 6);
+    for (let y = 0; y < s; y += 8) {
+      for (let x = (y / 8) % 2 ? 4 : 0; x < s + 8; x += 8) {
+        const c = 104 + Math.floor(r() * 30);
+        g.fillStyle = `rgb(${c},${c - 4},${c - 10})`;
+        g.fillRect((x + 1) % s, y + 1, 6, 6);
+      }
+    }
+  });
+
+  // Hö och halm
+  const hay = canvasTexture(32, 197, (g, s, r) => {
+    noisyFill(g, s, r, [176, 148, 82], 12);
+    for (let i = 0; i < 40; i++) {
+      g.fillStyle = r() > 0.5 ? 'rgba(214,186,110,0.8)' : 'rgba(120,96,48,0.7)';
+      g.fillRect(Math.floor(r() * s), Math.floor(r() * s), 4 + Math.floor(r() * 5), 1);
+    }
+  });
+
+  // Lövverk (färgas av materialet)
+  const leaf = canvasTexture(32, 211, (g, s, r) => {
+    noisyFill(g, s, r, [170, 176, 160], 18);
+    for (let i = 0; i < 30; i++) {
+      g.fillStyle = r() > 0.5 ? 'rgba(230,236,210,0.6)' : 'rgba(80,90,70,0.6)';
+      g.fillRect(Math.floor(r() * s), Math.floor(r() * s), 2, 2);
+    }
+  });
+
+  // Bark
+  const bark = canvasTexture(32, 223, (g, s, r) => {
+    noisyFill(g, s, r, [84, 66, 52], 10);
+    for (let x = 0; x < s; x += 3 + Math.floor(r() * 3)) {
+      g.fillStyle = 'rgba(44,34,26,0.7)';
+      g.fillRect(x, 0, 1, s);
+    }
+  });
+
+  // Plankgolv inomhus
+  const floor = canvasTexture(32, 229, (g, s, r) => {
+    noisyFill(g, s, r, [112, 82, 56], 8);
+    g.fillStyle = 'rgba(54,38,26,0.85)';
+    for (let y = 0; y < s; y += 8) {
+      g.fillRect(0, y, s, 1);
+      g.fillRect((y * 3) % s, y, 1, 8);
+    }
+  });
+
+  // Vatten: ljusa stråk på mörkt
+  const water = canvasTexture(32, 239, (g, s, r) => {
+    noisyFill(g, s, r, [58, 72, 84], 5);
+    for (let i = 0; i < 12; i++) {
+      g.fillStyle = 'rgba(150,176,190,0.5)';
+      g.fillRect(Math.floor(r() * s), Math.floor(r() * s), 3 + Math.floor(r() * 5), 1);
+    }
+  });
+
+  return {
+    grass, rock, cliff, marble, brick, wood, tuft, mosaic, runes, charred, iron, ironFloor, cracked,
+    dirt, plaster, shingle, cobble, hay, leaf, bark, floor, water,
+  };
 }

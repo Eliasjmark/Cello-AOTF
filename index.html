@@ -116,6 +116,84 @@
   .slot.on { border-color: var(--storm); box-shadow: 0 0 14px rgba(158, 200, 238, 0.55); }
   .slot.gloves { border-color: var(--gold); }
   .touch-device .slot kbd { display: none; }
+  button.slot { padding: 0; font: inherit; color: inherit; cursor: default; }
+  .slot .ico { display: grid; place-items: center; }
+  .slot.empty .ico { opacity: 0; }
+  .slot.empty { opacity: 0.55; }
+  .slot .count { position: absolute; left: -4px; bottom: -4px; min-width: 1.2em; padding: 0 3px; font: 600 0.72rem/1.4 var(--font-ui); text-align: center; background: var(--night); border: 1px solid var(--rule); }
+  .slot .count:empty { display: none; }
+  .slot .bar { position: absolute; left: 9px; right: 9px; bottom: 6px; height: 3px; background: #222831; }
+  .slot .bar i { display: block; height: 100%; width: 100%; background: #c9ced6; }
+  .slot .bar.oil i { background: #ffc46a; }
+  .slot-sword { border-radius: 8px; width: 44px; height: 44px; align-self: center; }
+  .slot-sword.worn .bar i { background: #e0a040; }
+  .slot-sword.broken { border-color: #8a3a32; }
+  .slot-sword.broken .bar i { width: 0 !important; }
+
+  /* Skärvorna (pengarna) under hjärtana */
+  .wallet {
+    position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(max(14px, env(safe-area-inset-top, 0px)) + 32px);
+    display: flex; align-items: center; gap: 5px; font: 600 1rem var(--font-ui); font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 0 #000, 0 0 8px rgba(0,0,0,.7);
+  }
+  .wallet svg { width: 16px; height: 16px; filter: drop-shadow(0 1px 0 #000); }
+  .wallet + .dungeon, .dungeon { top: calc(max(14px, env(safe-area-inset-top, 0px)) + 60px); }
+
+  /* Föremålsmenyn */
+  .bag {
+    position: absolute; inset: 0; display: grid; place-items: center; overflow: auto; pointer-events: auto;
+    background: rgba(6, 8, 12, 0.78); padding: inherit;
+  }
+  .bag-panel {
+    width: min(34rem, 100%); box-sizing: border-box; padding: 18px 22px 16px; display: flex; flex-direction: column; gap: 12px;
+    background: var(--panel); border: 1px solid var(--rule); position: relative;
+  }
+  .bag-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .bag-title { margin: 0; font: 700 1.25rem var(--font-display); letter-spacing: .14em; text-transform: uppercase; }
+  .bag-wallet { display: flex; align-items: center; gap: 6px; font: 600 1.05rem var(--font-ui); font-variant-numeric: tabular-nums; }
+  .bag-wallet svg { width: 16px; height: 16px; }
+  .bag-sub { margin: 4px 0 0; font: 600 0.78rem var(--font-ui); letter-spacing: .2em; text-transform: uppercase; color: var(--dim); }
+  .bag-grid { display: flex; flex-wrap: wrap; gap: 10px; min-height: 64px; }
+  .bag-item {
+    position: relative; width: 64px; height: 64px; display: grid; place-items: center; cursor: pointer;
+    background: rgba(255,255,255,0.03); border: 1px solid var(--rule); color: var(--ink);
+  }
+  .bag-item svg { width: 34px; height: 34px; display: block; }
+  .bag-item.sel { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 14px rgba(201,162,79,.35); }
+  .bag-item kbd { position: absolute; right: -6px; bottom: -6px; font-size: 0.72rem; background: var(--night); }
+  .bag-item .count { position: absolute; left: 4px; bottom: 2px; font: 600 0.8rem var(--font-ui); }
+  .bag-empty { margin: 0; color: var(--dim); align-self: center; }
+  .bag-info { min-height: 3.6em; }
+  .bag-name { margin: 0 0 4px; font: 700 1rem var(--font-display); letter-spacing: .06em; color: var(--gold); }
+  .bag-desc { margin: 0; font-size: 0.98rem; line-height: 1.45; color: var(--ink); text-wrap: pretty; }
+  .bag-assign { display: flex; gap: 10px; }
+  .assign-slot {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px; cursor: pointer; min-width: 74px;
+    background: transparent; border: 1px solid var(--rule); color: var(--ink); font: inherit;
+  }
+  .assign-slot .ico svg { width: 22px; height: 22px; display: block; }
+  .assign-slot.on { border-color: var(--gold); }
+  .bag-gear { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 8px 14px; }
+  .gear { display: flex; align-items: center; gap: 8px; }
+  .gear .ico svg { width: 24px; height: 24px; display: block; }
+  .gear-text { display: flex; flex-direction: column; gap: 2px; font-size: 0.9rem; }
+  .gear-text b { font-weight: 600; }
+  .gear-text small { color: var(--dim); font-size: 0.8rem; }
+  .gear .bar { width: 7rem; height: 3px; background: #222831; }
+  .gear .bar i { display: block; height: 100%; background: #c9ced6; }
+  .bag-goal { margin: 0; padding: 8px 10px; font-size: 0.95rem; line-height: 1.45; color: var(--ink); border-left: 2px solid #9a6ab0; background: rgba(154,106,176,0.08); }
+  .bag-hint { margin: 0; font-size: 0.85rem; color: var(--dim); }
+  .bag-hint .touchonly { display: none; }
+  .touch-device .bag-hint .touchonly { display: inline; }
+  .touch-device .bag-hint .desk { display: none; }
+  .bag-close {
+    align-self: flex-end; cursor: pointer; padding: 6px 16px; font: 600 0.85rem var(--font-ui); letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink); background: transparent; border: 1px solid var(--rule);
+  }
+  @media (max-width: 480px) {
+    .bag-panel { padding: 16px 14px 14px; }
+    .bag-item { width: 56px; height: 56px; }
+  }
 
   /* Fästningens nycklar, karta och Stormnyckel */
   .dungeon {
@@ -254,7 +332,8 @@
     position: absolute; pointer-events: auto;
     right: max(18px, env(safe-area-inset-right, 0px)); bottom: max(22px, env(safe-area-inset-bottom, 0px));
     display: grid; grid-template-columns: repeat(3, 62px); grid-template-rows: repeat(3, 62px); gap: 10px;
-    grid-template-areas: "slam heavy map" "lock shield jump" "dodge . attack";
+    grid-template-areas: "item1 item2 item3" "bag lock map" "shield dodge jump" ". . attack";
+    grid-template-rows: repeat(4, 62px);
   }
   .pad-buttons button {
     width: 62px; height: 62px; border-radius: 50%; touch-action: none;
@@ -266,9 +345,13 @@
   .pad-buttons [data-press="dodge"] { grid-area: dodge; }
   .pad-buttons [data-press="lock"] { grid-area: lock; }
   .pad-buttons [data-press="shield"] { grid-area: shield; }
-  .pad-buttons [data-press="slam"] { grid-area: slam; border-color: var(--storm); }
-  .pad-buttons [data-press="heavy"] { grid-area: heavy; }
+  .pad-buttons [data-press="item1"] { grid-area: item1; }
+  .pad-buttons [data-press="item2"] { grid-area: item2; }
+  .pad-buttons [data-press="item3"] { grid-area: item3; }
+  .pad-buttons [data-press="bag"] { grid-area: bag; }
   .pad-buttons [data-press="map"] { grid-area: map; }
+  .pad-buttons .pad-item { border-color: var(--storm); display: grid; place-items: center; }
+  .pad-buttons .pad-item svg { width: 28px; height: 28px; }
   .talk-btn {
     position: absolute; pointer-events: auto; left: 50%; bottom: calc(22% + 44px); transform: translateX(-50%);
     padding: 10px 22px; font: 600 0.95rem var(--font-ui); color: #17130a; background: var(--gold); border: 0;
@@ -305,21 +388,13 @@
 <div class="bars" id="bars" aria-hidden="true"></div>
 <div class="hud">
   <div class="hearts" id="hearts" role="img" hidden></div>
+  <div class="wallet" id="wallet" hidden title="Shards"><svg viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="3" y="0" width="2" height="1" fill="#7af09a"/><rect x="2" y="1" width="4" height="6" fill="#4ad06a"/><rect x="3" y="7" width="2" height="1" fill="#2a9a4a"/><rect x="3" y="2" width="1" height="4" fill="#b8ffd0"/></svg><span id="wallet-n">0</span></div>
   <div class="topright">
     <div class="badge">
       <span class="badge-name">Cello: Ashes of the Fallen</span>
-      <span class="badge-sub">Prototype 0.5 · The Tempest Bastion</span>
+      <span class="badge-sub">Prototype 0.6 · A Larger World</span>
     </div>
-    <div class="items" id="items" hidden>
-      <div class="slot" id="slot-hammer" title="Mjölnir's Shard: ground strike">
-        <svg viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="1" width="6" height="3" fill="#7d808a"/><rect x="5" y="1" width="2" height="1" fill="#2a2a30"/><rect x="2" y="2" width="1" height="1" fill="#8fe4ff"/><rect x="4" y="3" width="1" height="1" fill="#8fe4ff"/><rect x="3.5" y="4" width="1" height="4" fill="#7a4e30"/></svg>
-        <kbd>F</kbd>
-      </div>
-      <div class="slot" id="slot-heavy" title="Heavy weight">
-        <svg viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="3" y="1" width="2" height="1" fill="#9a9ca6"/><rect x="2" y="2" width="4" height="1" fill="#9a9ca6"/><rect x="1" y="3" width="6" height="4" fill="#5a5c66"/><rect x="2" y="4" width="4" height="1" fill="#8fe4ff"/></svg>
-        <kbd>G</kbd>
-      </div>
-    </div>
+    <div class="items" id="items" hidden></div>
     <pre class="info" id="info" hidden></pre>
   </div>
   <div class="dungeon" id="dungeon" hidden aria-label="Fortress items">
@@ -339,8 +414,8 @@
     <span><kbd>Q</kbd> lock on</span>
     <span><kbd>Shift</kbd> roll</span>
     <span><kbd>E</kbd> talk</span>
-    <span class="needs-hammer" hidden><kbd>F</kbd> ground strike</span>
-    <span class="needs-hammer" hidden><kbd>G</kbd> heavy weight</span>
+    <span><kbd>F</kbd><kbd>G</kbd><kbd>V</kbd> items</span>
+    <span><kbd>Tab</kbd> item menu</span>
     <span><kbd>K</kbd> map</span>
     <span><kbd>H</kbd> hide</span>
   </div>
@@ -360,17 +435,19 @@
       <button type="button" data-press="dodge">Roll</button>
       <button type="button" data-press="lock">Lock</button>
       <button type="button" data-press="shield">Shield</button>
-      <button type="button" data-press="slam" class="needs-hammer" hidden>Strike</button>
-      <button type="button" data-press="heavy" class="needs-hammer" hidden>Heavy</button>
+      <button type="button" data-press="item1" class="pad-item" hidden aria-label="Item 1"></button>
+      <button type="button" data-press="item2" class="pad-item" hidden aria-label="Item 2"></button>
+      <button type="button" data-press="item3" class="pad-item" hidden aria-label="Item 3"></button>
+      <button type="button" data-press="bag">Items</button>
       <button type="button" data-press="map">Map</button>
     </div>
   </div>
   <section class="start" id="start" aria-labelledby="start-title">
     <div class="tablet">
-      <p class="eyebrow">Prototype 0.5 · The Tempest Bastion</p>
+      <p class="eyebrow">Prototype 0.6 · A Larger World</p>
       <h1 id="start-title"><span class="kicker">Cello<span class="sr">:</span></span> Ashes of the Fallen</h1>
       <div class="rule" aria-hidden="true"><span></span></div>
-      <p class="lede">Cello has been in the forest since dawn. As he turns for home, smoke rises over the village. What he chooses tonight, the people of Aetheria will remember, and far to the north a piece of Thor's hammer is waiting.</p>
+      <p class="lede">Cello lives at the edge of the forest, south of the village of Hollowbrook. This morning, smoke is rising over the village. What he chooses tonight, the people of Aetheria will remember, and far beyond the Stormvale a piece of Thor's hammer is waiting.</p>
       <dl class="controls">
         <div><dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Run</dd></div>
         <div><dt><kbd>Mouse</kbd></dt><dd>Camera</dd></div>
@@ -380,11 +457,12 @@
         <div><dt><kbd>Right-click</kbd></dt><dd>Shield</dd></div>
         <div><dt><kbd>Q</kbd></dt><dd>Lock on</dd></div>
         <div><dt><kbd>E</kbd></dt><dd>Talk, open</dd></div>
-        <div><dt><kbd>F</kbd> <kbd>G</kbd></dt><dd>Hammer</dd></div>
+        <div><dt><kbd>F</kbd> <kbd>G</kbd> <kbd>V</kbd></dt><dd>Items</dd></div>
+        <div><dt><kbd>Tab</kbd></dt><dd>Item menu</dd></div>
         <div><dt><kbd>K</kbd></dt><dd>Map</dd></div>
       </dl>
-      <p class="note note-touch">The left side of the screen moves Cello, the right side moves the camera. The buttons in the lower right are sword, jump, roll, lock on, shield and map. Two more buttons appear once Cello has the hammer.</p>
-      <p class="note note-desktop">The first click captures the mouse, <kbd>Esc</kbd> releases it. <kbd>C</kbd> walk, <kbd>M</kbd> sound, <kbd>N</kbd> music, <kbd>P</kbd> Retro mode. Gamepad: A jump, X sword, B roll, RT shield, LT lock on, Y talk, RB ground strike, LB heavy weight, Back map.</p>
+      <p class="note note-touch">The left side of the screen moves Cello, the right side moves the camera. The buttons in the lower right are sword, jump, roll, lock on, shield, items and map. Items you put on a button get their own button at the top.</p>
+      <p class="note note-desktop">The first click captures the mouse, <kbd>Esc</kbd> releases it. <kbd>C</kbd> walk, <kbd>M</kbd> sound, <kbd>N</kbd> music, <kbd>P</kbd> Retro mode. Gamepad: A jump, X sword, B roll, RT shield, LT lock on, Y talk, RB, LB and D-pad right items, Start item menu, Back map.</p>
       <p class="note credits">Music: <em>Hearth of the Hollow</em> by Treblo.</p>
       <div class="start-buttons">
         <button class="play" id="continue" type="button" hidden>Continue</button>

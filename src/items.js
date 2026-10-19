@@ -79,6 +79,15 @@ export function buildItem(kind) {
   } else if (kind === 'letter') {
     g.add(B(0.36, 0.24, 0.02, M.paper, 0, 0, 0));
     g.add(B(0.08, 0.08, 0.03, M.ribbon, 0, 0, 0.01));
+  } else if (kind === 'lantern') {
+    // Mässingslykta med glas och ett varmt sken
+    g.add(B(0.3, 0.05, 0.3, M.brass, 0, 0.2, 0));
+    g.add(B(0.32, 0.05, 0.32, M.brass, 0, -0.2, 0));
+    for (const [x, z] of [[-0.13, -0.13], [0.13, -0.13], [-0.13, 0.13], [0.13, 0.13]]) g.add(B(0.04, 0.4, 0.04, M.brass, x, 0, z));
+    g.add(B(0.2, 0.32, 0.2, new THREE.MeshBasicMaterial({ color: 0xffd27a }), 0, 0, 0));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.02, 4, 10), M.brass);
+    ring.position.y = 0.32;
+    g.add(ring);
   }
   return g;
 }
@@ -90,8 +99,14 @@ export const ITEM_TEXT = {
   hammer: [
     "You got Mjölnir's Shard!",
     "A piece of Thor's own hammer. Broken, but the lightning still lives in it.",
-    'Press F to strike the ground. The blow sends lightning through old copper channels and shatters shields.',
-    'Press G to carry the hammer with heavy weight. You will stand firm against storm winds, and weak floors will give way beneath you.',
+    'It lies on F: strike the ground. The blow sends lightning through old copper channels and shatters shields.',
+    'And on G: carry the hammer with heavy weight. You will stand firm against storm winds, and weak floors will give way beneath you.',
+    'Press Tab to open the item menu and choose which button each item lies on.',
   ],
   heart: ['You got a Heart Ember!', 'A new heart, filled to the brim.'],
+  lantern: [
+    'You got the Lantern!',
+    'A brass oil lantern. Put it on F, G or V in the item menu (Tab), then press that button to light it.',
+    'It burns oil while it is lit, so put it out when you do not need it. Hold it up to an old brazier to light the brazier.',
+  ],
 };

@@ -1,8 +1,8 @@
 // Tangentbord, mus, handkontroll och pekskärm samlas till ett gemensamt indata-objekt.
 //
 // Tangentbord och mus:  WASD spring · Space hopp · vänsterklick svärd · högerklick/R sköld
-//                       Shift undanmanöver · Q lock-on · E prata/öppna · F markslag · G tung vikt
-//                       K karta · C gå långsamt · M ljud · P retroläge
+//                       Shift undanmanöver · Q lock-on · E prata/öppna · F, G, V föremålsknappar
+//                       Tab/B föremålsmenyn · K karta · C gå långsamt · M ljud · P retroläge
 const DEAD = 0.18;
 const MOUSE_X = 0.0026, MOUSE_Y = 0.0022;
 
@@ -25,7 +25,7 @@ export class Input {
     this.skipMoves = 0;
     this.mouseShield = false;
     this.clicks = { attack: false, lock: false };
-    this.virtual = { jump: false, attack: false, dodge: false, lock: false, shield: false, jumpHeld: false, interact: false, slam: false, heavy: false, map: false };
+    this.virtual = { jump: false, attack: false, dodge: false, lock: false, shield: false, jumpHeld: false, interact: false, item1: false, item2: false, item3: false, bag: false, map: false };
     this.walkMode = false;
     this.lastTouch = -1e9;
     this.isTouch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
@@ -37,6 +37,7 @@ export class Input {
     this.empty = { moveX: 0, moveY: 0, lookX: 0, lookY: 0, walk: false };
 
     const block = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab']);
+    this.inGame = false; // på startskärmen är Start "börja spela", i spelet öppnar den föremålsmenyn
     addEventListener('keydown', (e) => {
       if (block.has(e.code)) e.preventDefault();
       if (!this.keys.has(e.code)) this.pressed.add(e.code);
@@ -153,7 +154,7 @@ export class Input {
     lookX += t.ldx * 0.0065; lookY += t.ldy * 0.005;
     t.ldx = 0; t.ldy = 0;
 
-    const pad = { jump: false, jumpHeld: false, attack: false, dodge: false, lock: false, shield: false, start: false, interact: false, up: false, down: false, slam: false, heavy: false, map: false };
+    const pad = { jump: false, jumpHeld: false, attack: false, dodge: false, lock: false, shield: false, start: false, interact: false, up: false, down: false, left: false, right: false, item1: false, item2: false, item3: false, map: false, cancel: false };
     if (this.padOk) {
       try {
         const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -172,13 +173,17 @@ export class Input {
           pad.attack = edge('x', b(2));
           pad.lock = edge('lt', b(6));
           pad.shield = b(7);
-          pad.heavy = edge('lb', b(4));
-          pad.slam = edge('rb', b(5));
+          pad.item2 = edge('lb', b(4));
+          pad.item1 = edge('rb', b(5));
+          pad.item3 = edge('dright', b(15));
           pad.map = edge('back', b(8));
           pad.start = edge('start', b(9));
           pad.interact = edge('y', b(3));
+          pad.cancel = pad.dodge;
           pad.up = edge('up', b(12) || ly < -0.6);
           pad.down = edge('down', b(13) || ly > 0.6);
+          pad.left = edge('left', b(14) || lx < -0.6);
+          pad.right = edge('right', lx > 0.6);
         }
       } catch {
         this.padOk = false; // handkontroll blockeras i den här miljön
@@ -197,9 +202,14 @@ export class Input {
       jump: p.has('Space') || pad.jump || v.jump,
       jumpHeld: k.has('Space') || pad.jumpHeld || v.jumpHeld,
       attack: this.clicks.attack || pad.attack || v.attack,
-      slam: p.has('KeyF') || pad.slam || v.slam,
-      heavy: p.has('KeyG') || pad.heavy || v.heavy,
-      map: p.has('KeyK') || p.has('Tab') || pad.map || v.map,
+      slam: false,
+      heavy: false,
+      item1: p.has('KeyF') || p.has('Digit1') || pad.item1 || v.item1,
+      item2: p.has('KeyG') || p.has('Digit2') || pad.item2 || v.item2,
+      item3: p.has('KeyV') || p.has('Digit3') || pad.item3 || v.item3,
+      bag: p.has('Tab') || p.has('KeyB') || (this.inGame && pad.start) || v.bag,
+      cancel: p.has('Escape') || pad.cancel,
+      map: p.has('KeyK') || pad.map || v.map,
       shield: this.mouseShield || k.has('KeyR') || pad.shield || v.shield,
       dodge: p.has('ShiftLeft') || p.has('ShiftRight') || pad.dodge || v.dodge,
       lock: this.clicks.lock || p.has('KeyQ') || pad.lock || v.lock,
@@ -216,6 +226,8 @@ export class Input {
         || pad.jump || pad.attack || pad.interact || v.jump || v.attack || v.interact,
       up: p.has('KeyW') || p.has('ArrowUp') || pad.up,
       down: p.has('KeyS') || p.has('ArrowDown') || pad.down,
+      left: p.has('KeyA') || p.has('ArrowLeft') || pad.left,
+      right: p.has('KeyD') || p.has('ArrowRight') || pad.right,
       pick: p.has('Digit1') ? 1 : p.has('Digit2') ? 2 : p.has('Digit3') ? 3 : 0,
     };
     p.clear();
@@ -223,7 +235,7 @@ export class Input {
     this.mdy = 0;
     this.clicks.attack = false;
     this.clicks.lock = false;
-    v.jump = v.attack = v.dodge = v.lock = v.interact = v.slam = v.heavy = v.map = false;
+    v.jump = v.attack = v.dodge = v.lock = v.interact = v.item1 = v.item2 = v.item3 = v.bag = v.map = false;
     return out;
   }
 }

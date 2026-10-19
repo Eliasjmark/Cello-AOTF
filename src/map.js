@@ -181,64 +181,143 @@ export class MapView {
     g.fill();
   }
 
-  drawWorld(world, story, player) {
+  // Kartan över området Cello är i, och en liten översikt över hela riket i hörnet
+  drawArea(areas, story, player) {
     const { w, h, dpr } = this.size();
     const g = this.ctx;
     g.clearRect(0, 0, w, h);
-    const T = this.fit(-45, 112, -240, 112, w, h, 22 * dpr);
-    const isl = (x, z, r, label, col = COL.grass, known = true) => {
-      g.beginPath();
-      g.arc(T.X(x), T.Z(z), r * T.s, 0, Math.PI * 2);
-      g.fillStyle = known ? col : COL.faint;
-      g.fill();
-      g.strokeStyle = COL.dim;
-      g.lineWidth = 1 * dpr;
-      g.stroke();
-      if (label) {
-        g.fillStyle = COL.ink;
-        g.font = `${12 * dpr}px "Barlow Semi Condensed", sans-serif`;
-        g.textAlign = 'center';
-        // Små öar får namnet under sig, stora mitt i
-        const below = r * T.s < 26 * dpr;
-        g.fillText(label, T.X(x), below ? T.Z(z) + r * T.s + 14 * dpr : T.Z(z) + 4 * dpr);
+    const a = areas.cur, st = story.state;
+    const font = (px, weight = '') => `${weight} ${px * dpr}px "Barlow Semi Condensed", sans-serif`;
+    const interior = a.indoor && a.id !== 'cave';
+    if (!interior && a.bounds) {
+      const b = a.bounds;
+      const T = this.fit(b.x0, b.x1, b.z0, b.z1, w * 0.74, h, 26 * dpr);
+      const poly = (pts) => {
+        g.beginPath();
+        pts.forEach(([x, z], i) => (i ? g.lineTo(T.X(x), T.Z(z)) : g.moveTo(T.X(x), T.Z(z))));
+        g.closePath();
+      };
+      for (const isl of a.map.islands) {
+        poly(isl.outline);
+        g.fillStyle = isl.col ?? (a.dark ? '#26242a' : COL.grass);
+        g.fill();
+        g.strokeStyle = COL.dim;
+        g.lineWidth = 1 * dpr;
+        g.stroke();
       }
-    };
-    const line = (x0, z0, x1, z1, col, dash) => {
-      g.strokeStyle = col;
-      g.lineWidth = 2 * dpr;
-      g.setLineDash(dash ? [3 * dpr, 4 * dpr] : []);
-      g.beginPath();
-      g.moveTo(T.X(x0), T.Z(z0));
-      g.lineTo(T.X(x1), T.Z(z1));
-      g.stroke();
-      g.setLineDash([]);
-    };
-    const st = story.state;
-    // Broar och stenvägar
-    line(0, 99, 0, -48, '#7a6040');
-    line(33, 0, 47, 0, '#7a6040');
-    if (st.northPath) line(0, -108, 0, -143, COL.storm, true);
-    if (st.eastPath) line(73, 0, 95, 0, COL.storm, true);
-    isl(0, 86, 19, 'Camp');
-    isl(0, 49, 6.6, '');
-    isl(0, 0, 33, 'Village', '#3b302a');
-    isl(60, 0, 13, 'Storm Stone');
-    isl(100, 0, 7, 'The Cape', COL.rock, st.eastPath);
-    isl(0, -78, 30, 'Aetheria');
-    // Fästningen
-    g.fillStyle = st.northPath ? '#2a2f38' : COL.faint;
-    g.fillRect(T.X(-36), T.Z(-197), 72 * T.s, 54 * T.s);
-    g.beginPath();
-    g.arc(T.X(0), T.Z(-214), 16 * T.s, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = COL.ink;
-    g.textAlign = 'center';
-    g.font = `${12 * dpr}px "Barlow Semi Condensed", sans-serif`;
-    g.fillText(st.northPath ? 'The Tempest Bastion' : '?', T.X(0), T.Z(-172));
-    this.arrow(g, T.X(player.feet.x), T.Z(player.feet.z), player.facing, 7 * dpr, COL.ink);
+      for (const r of a.map.rects) {
+        if (r.kind === 'water') {
+          g.beginPath();
+          g.ellipse(T.X(r.x), T.Z(r.z), r.rx * T.s, r.rz * T.s, 0, 0, Math.PI * 2);
+          g.fillStyle = '#34485a';
+          g.fill();
+        }
+      }
+      for (const l of a.map.lines) {
+        if (l.when && !st[l.when]) continue;
+        g.strokeStyle = l.kind === 'road' ? '#6a5640' : l.kind === 'bridge' ? '#8a6a44' : COL.storm;
+        g.lineWidth = (l.kind === 'road' ? 2.6 : 2.2) * dpr;
+        g.setLineDash(l.kind === 'stones' ? [3 * dpr, 4 * dpr] : []);
+        g.beginPath();
+        l.pts.forEach(([x, z], i) => (i ? g.lineTo(T.X(x), T.Z(z)) : g.moveTo(T.X(x), T.Z(z))));
+        g.stroke();
+        g.setLineDash([]);
+      }
+      for (const r of a.map.rects) {
+        if (r.kind !== 'house') continue;
+        g.save();
+        g.translate(T.X(r.x), T.Z(r.z));
+        g.rotate(-r.ry);
+        g.fillStyle = '#5a4a3e';
+        g.fillRect(-r.w / 2 * T.s, -r.d / 2 * T.s, r.w * T.s, r.d * T.s);
+        g.restore();
+      }
+      g.textAlign = 'center';
+      for (const isl of a.map.islands) {
+        if (!isl.label || isl.r * T.s < 30 * dpr) continue;
+        g.fillStyle = 'rgba(235,230,216,0.55)';
+        g.font = font(12, 600);
+        g.fillText(isl.label.toUpperCase(), T.X(isl.cx), T.Z(isl.cz) - isl.r * T.s * 0.55);
+      }
+      for (const p of a.map.pois) {
+        if (p.when && !st[p.when]) continue;
+        const x = T.X(p.x), y = T.Z(p.z);
+        g.fillStyle = p.icon === 'fire' ? '#ff9a4a' : p.icon === 'shop' ? COL.gold : p.icon === 'seer' ? '#b08ad0' : p.icon === 'stone' ? COL.storm : COL.ink;
+        g.beginPath();
+        g.arc(x, y, 3.5 * dpr, 0, Math.PI * 2);
+        g.fill();
+        g.font = font(11);
+        g.fillStyle = COL.ink;
+        g.fillText(p.label, x, y - 7 * dpr);
+      }
+      for (const ex of a.map.exits || []) {
+        if (ex.when && !st[ex.when]) continue;
+        const x = T.X(ex.x), y = T.Z(ex.z);
+        g.fillStyle = COL.gold;
+        g.beginPath();
+        g.arc(x, y, 4 * dpr, 0, Math.PI * 2);
+        g.fill();
+        g.font = font(11, 600);
+        g.fillStyle = COL.gold;
+        const known = areas.list[ex.to]?.visited;
+        g.fillText(`→ ${known || !ex.to ? ex.label : '?'}`, x, y + 15 * dpr);
+      }
+      this.arrow(g, T.X(player.feet.x), T.Z(player.feet.z), player.facing, 7 * dpr, COL.ink);
+    }
+    // Rubrik
     g.textAlign = 'left';
     g.fillStyle = COL.ink;
-    g.font = `700 ${15 * dpr}px Cinzel, serif`;
-    g.fillText('The Shattered Realm', 14 * dpr, 24 * dpr);
+    g.font = `700 ${16 * dpr}px Cinzel, serif`;
+    g.fillText(a.name, 14 * dpr, 26 * dpr);
+    g.font = font(12);
+    g.fillStyle = COL.dim;
+    g.fillText('The Shattered Realm', 14 * dpr, 44 * dpr);
+    this.drawRealm(areas, story, interior ? { x: w * 0.25, y: h * 0.12, w: w * 0.5, h: h * 0.8 } : { x: w * 0.76, y: h * 0.1, w: w * 0.22, h: h * 0.84 });
+  }
+
+  // Översikten: områdena som en kedja, från Cellos hem i söder till fästningen i norr
+  drawRealm(areas, story, box) {
+    const g = this.ctx, dpr = Math.min(2, window.devicePixelRatio || 1);
+    const N = {
+      bastion: [0.3, 0.03, 'Tempest Bastion'], cave: [0.3, 0.15, 'Hollow Cave'], stormreach: [0.3, 0.27, 'Stormreach'],
+      field: [0.3, 0.42, 'The Stormvale'], willowmere: [0.78, 0.42, 'Willowmere'], pass: [0.3, 0.57, 'Galewind Pass'],
+      ranch: [0.3, 0.7, 'Thistledown'], village: [0.3, 0.84, 'Hollowbrook'], home: [0.3, 0.97, "Cello's Home"],
+    };
+    const parent = { shop: 'willowmere', house: 'home' };
+    const here = parent[areas.id] ?? areas.id;
+    const E = [['home', 'village'], ['village', 'ranch'], ['ranch', 'pass'], ['pass', 'field'], ['field', 'willowmere'], ['field', 'stormreach'], ['stormreach', 'cave'], ['cave', 'bastion']];
+    const P = (id) => [box.x + N[id][0] * box.w, box.y + N[id][1] * box.h];
+    g.fillStyle = 'rgba(12,15,21,0.75)';
+    g.fillRect(box.x - 6 * dpr, box.y - 20 * dpr, box.w + 12 * dpr, box.h + 30 * dpr);
+    g.strokeStyle = COL.faint;
+    g.lineWidth = 1 * dpr;
+    g.strokeRect(box.x - 6 * dpr, box.y - 20 * dpr, box.w + 12 * dpr, box.h + 30 * dpr);
+    g.font = `600 ${10 * dpr}px "Barlow Semi Condensed", sans-serif`;
+    g.fillStyle = COL.dim;
+    g.textAlign = 'left';
+    g.fillText('THE REALM', box.x, box.y - 7 * dpr);
+    const vis = (id) => areas.list[id]?.visited;
+    for (const [a, b] of E) {
+      if (!vis(a) && !vis(b)) continue;
+      const [x0, y0] = P(a), [x1, y1] = P(b);
+      g.strokeStyle = vis(a) && vis(b) ? '#6a5640' : COL.faint;
+      g.lineWidth = 2 * dpr;
+      g.beginPath();
+      g.moveTo(x0, y0);
+      g.lineTo(x1, y1);
+      g.stroke();
+    }
+    for (const [id, [, , label]] of Object.entries(N)) {
+      const [x, y] = P(id);
+      const v = vis(id);
+      g.beginPath();
+      g.arc(x, y, (id === here ? 5.5 : 4) * dpr, 0, Math.PI * 2);
+      g.fillStyle = id === here ? COL.gold : v ? COL.ink : COL.faint;
+      g.fill();
+      g.font = `${(id === here ? 12 : 11) * dpr}px "Barlow Semi Condensed", sans-serif`;
+      g.fillStyle = id === here ? COL.gold : v ? COL.ink : COL.dim;
+      g.textAlign = 'left';
+      g.fillText(v ? label : '?', x + 9 * dpr, y + 4 * dpr);
+    }
   }
 }

@@ -64,6 +64,8 @@ export class WorldCollider {
   constructor(octree) {
     this.octree = octree;
     this.boxes = [];
+    this.area = null; // aktivt område: lådor i andra områden räknas inte
+    this.building = null; // området som lådor läggs till i just nu
   }
 
   addBox(x0, y0, z0, x1, y1, z1, tag = '') {
@@ -72,6 +74,7 @@ export class WorldCollider {
       max: new THREE.Vector3(Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1)),
       enabled: true,
       tag,
+      area: this.building,
     };
     this.boxes.push(b);
     return b;
@@ -92,7 +95,7 @@ export class WorldCollider {
       hit = true;
     }
     for (const b of this.boxes) {
-      if (!b.enabled) continue;
+      if (!b.enabled || (b.area && b.area !== this.area)) continue;
       const h = capsuleBox(_cap, b);
       if (h && h.depth > 1e-7) {
         _cap.translate(_n.set(h.nx * h.depth, h.ny * h.depth, h.nz * h.depth));
@@ -124,7 +127,7 @@ export class WorldCollider {
       if (t < bestT) { bestT = t; best = { distance: t, position: _hit.clone(), triangle: tri }; }
     }
     for (const b of this.boxes) {
-      if (!b.enabled) continue;
+      if (!b.enabled || (b.area && b.area !== this.area)) continue;
       const h = rayBox(ray, b, bestT);
       if (h && h.t < bestT) {
         bestT = h.t;

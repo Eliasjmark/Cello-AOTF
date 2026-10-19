@@ -13,6 +13,7 @@ const JUMP_V = 7.6, AUTO_JUMP_V = 7.4, JUMP_MIN_SPEED = 4.2;
 const COYOTE = 0.1, JUMP_BUFFER = 0.12;
 const FLOOR_NY = 0.55, SNAP = 0.45, STEP = 1 / 150;
 export const MAX_HP = 6; // tre hjärtan, varje träff tar ett halvt
+export const SWORD_MAX = 150; // svärdets hållbarhet: ett hugg som träffar sliter 1, en sköld 2
 // Mjölnirs skärva: tung vikt och markslaget
 const HEAVY_SPEED = 2.3, HEAVY_SPEED_GLOVES = 3.3;
 const SLAM_WIND = 0.42, SLAM_WIND_GLOVES = 0.3, SLAM_RECOVER = 0.38, SLAM_REACH = 1.25;
@@ -194,12 +195,22 @@ function buildModel() {
   sword.add(B(0.09, 0.06, 0.32, M.iron, 0, -0.11, 0));
   const blade = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.82, 0.1), M.steel);
   blade.position.y = -0.55;
+  blade.userData.solo = true;
   sword.add(blade);
   const tip = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.13, 4), M.steel);
   tip.rotation.set(Math.PI, Math.PI / 4, 0);
   tip.scale.set(0.5, 1, 1.2);
   tip.position.y = -1.02;
+  tip.userData.solo = true;
   sword.add(tip);
+  // Den avbrutna eggen (syns när svärdet har gått sönder)
+  const jag = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.12, 3), M.steel);
+  jag.rotation.set(Math.PI, 0, 0.5);
+  jag.scale.set(0.6, 1, 1.4);
+  jag.position.set(0.01, -0.5, 0);
+  jag.visible = false;
+  jag.userData.solo = true;
+  sword.add(jag);
   elbowR.add(sword);
   // Skölden bärs på sidan och lyfts framför bröstet vid block: rund, med järnkant och ett rött märke
   const shield = new THREE.Group();
@@ -228,10 +239,24 @@ function buildModel() {
   hammerBack.visible = false;
   torso.add(hammerBack);
 
+  // Lyktan hänger i bältet vid vänster höft
+  const lantern = new THREE.Group();
+  lantern.position.set(-0.27, 0.02, 0.06);
+  lantern.add(B(0.14, 0.03, 0.14, M.iron, 0, 0.09, 0));
+  lantern.add(B(0.14, 0.03, 0.14, M.iron, 0, -0.09, 0));
+  for (const [x, z] of [[-0.06, -0.06], [0.06, -0.06], [-0.06, 0.06], [0.06, 0.06]]) lantern.add(B(0.02, 0.18, 0.02, M.iron, x, 0, z));
+  lantern.add(B(0.02, 0.08, 0.02, M.iron, 0, 0.14, 0));
+  const lanternGlass = new THREE.MeshBasicMaterial({ color: 0x5a4a30 });
+  const glass = B(0.1, 0.14, 0.1, lanternGlass, 0, 0, 0);
+  glass.userData.solo = true;
+  lantern.add(glass);
+  lantern.visible = false;
+  hips.add(lantern);
+
   const lL = leg(-1), lR = leg(1);
   const parts = {
     body, hips, torso, head, tail, scarf, armL, armR, elbowL, elbowR, legL: lL.g, legR: lR.g, kneeL: lL.knee, kneeR: lR.knee,
-    skirt, sword, shield, eyes, lids, M, hammerHand, hammerBack, hammerGlow: glow,
+    skirt, sword, shield, eyes, lids, M, hammerHand, hammerBack, hammerGlow: glow, blade, tip, jag, lantern, lanternGlass,
   };
   root.scale.setScalar(0.9);
   return { root, ...parts };
@@ -298,6 +323,9 @@ export class Player {
     this.gloves = false;
     this.slamBuf = 0;
     this.slamDone = false;
+    this.sword = { dur: SWORD_MAX, broken: false };
+    this.autoWalk = null; // { yaw, speed } – Cello går själv (in i ett nytt område)
+    this.onSwordWear = null; // ('dull' | 'broken')
     this.wind = new THREE.Vector3(); // stormvind som knuffar Cello (sätts av fästningen)
     this.anim = { phase: 0, run: 0, air: 0, land: 0, t: 0, shield: 0, lastStep: 0, blink: 2.5, scarf: [0.3, 0.3, 0.3], scarfV: [0, 0, 0] };
     this.model = buildModel();
@@ -369,7 +397,7 @@ export class Player {
       this.shielding = false;
     } else if (this.carried) {
       const r = this.carried.model.root;
-      this.scene.add(r);
+      (this.carried.parentGroup ?? this.scene).add(r);
       r.rotation.set(0, 0, 0);
       r.scale.setScalar(0.86);
       this.carried = null;
@@ -447,8 +475,42 @@ export class Player {
     return 'hit';
   }
 
+  // ---------- svärdet ----------
+  // Svärdet slits när det träffar. Vid 0 går det av: kortare räckvidd och halv skada.
+  wearSword(n) {
+    const s = this.sword;
+    if (s.broken || n <= 0) return;
+    const before = s.dur;
+    s.dur = Math.max(0, s.dur - n);
+    if (s.dur <= 0) {
+      this.setSword(0);
+      this.onSwordWear?.('broken');
+    } else if (before > SWORD_MAX * 0.25 && s.dur <= SWORD_MAX * 0.25) this.onSwordWear?.('dull');
+  }
+
+  // Sätter hållbarheten (ett nytt svärd = SWORD_MAX)
+  setSword(dur) {
+    this.sword.dur = Math.max(0, Math.min(SWORD_MAX, dur));
+    this.sword.broken = this.sword.dur <= 0;
+    const m = this.model, b = this.sword.broken;
+    m.blade.scale.y = b ? 0.36 : 1;
+    m.blade.position.y = b ? -0.29 : -0.55;
+    m.tip.visible = !b;
+    m.jag.visible = b;
+  }
+
+  // Lyktan: syns vid höften när Cello har en, och lyser när den är tänd
+  setLantern(have, lit) {
+    this.model.lantern.visible = have;
+    this.model.lanternGlass.color.set(lit ? 0xffd27a : 0x5a4a30);
+  }
+
   // ---------- uppdatering ----------
   update(dt, input, camYaw) {
+    if (this.autoWalk) {
+      input = { ...input, moveX: 0, moveY: this.autoWalk.speed ?? 0.72, walk: false, attack: false, jump: false, dodge: false, slam: false, heavy: false, shield: false };
+      camYaw = this.autoWalk.yaw + Math.PI;
+    }
     this.invuln = Math.max(0, this.invuln - dt);
     this.blockT = Math.max(0, this.blockT - dt);
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
@@ -620,8 +682,9 @@ export class Player {
     this.combo = i;
     this.queued = false;
     this.attackBuf = 0;
-    const dmg = A.dmg + (i === 2 ? this.finisherBonus : 0);
-    this.swing = { id: ++this.swingId, active: false, dmg, reach: A.reach, arc: A.arc, hit: new Set(), kind: A.kind };
+    const broken = this.sword.broken;
+    const dmg = (A.dmg + (i === 2 ? this.finisherBonus : 0)) * (broken ? 0.5 : 1);
+    this.swing = { id: ++this.swingId, active: false, dmg, reach: A.reach * (broken ? 0.75 : 1), arc: A.arc, hit: new Set(), kind: A.kind };
     this.onAttack?.(i);
   }
 
@@ -769,7 +832,7 @@ export class Player {
     const s = this.model.sword;
     this.model.root.updateMatrixWorld(true);
     s.localToWorld(this.swordBase.set(0, -0.14, 0));
-    s.localToWorld(this.swordTip.set(0, -1.0, 0));
+    s.localToWorld(this.swordTip.set(0, this.sword.broken ? -0.48 : -1.0, 0));
   }
 
   // ---------- animation ----------

@@ -394,7 +394,7 @@ class Askling {
       this.setState('dead');
       w.sfx.play('edie');
       w.fx.burst('ash', this.chest, 26);
-      if (Math.random() < (w.player.hp < w.player.maxHp ? 0.7 : 0.35)) w.fx.spawnHeart(this.pos.clone());
+      w.fx.drop?.(this.pos.clone(), this.kind === 'shield' ? 'shield' : 'askling', w.player);
       this.exclT = 0;
       if (!this.respawn) this.permaDead = true;
       return 'killed';
@@ -780,7 +780,7 @@ class Bat {
     w.sfx.play('bat', { vol: 0.7 });
     w.fx.burst('spark', this.pos, 12, 0x8fdcff);
     if (!this.respawn) this.permaDead = true;
-    if (Math.random() < 0.3) w.fx.spawnHeart(this.pos.clone().setY(this.home.y));
+    w.fx.drop?.(this.pos.clone().setY(this.home.y), 'bat', w.player);
   }
 
   hurt(dmg, from, w) {
@@ -885,6 +885,7 @@ export class Enemies {
     this.attacker = null;
     this.active = true;
     this.cleared = new Set();
+    this.area = null;
   }
 
   // opts: { kind: 'askling' | 'shield' | 'bat', room, dormant, respawn, bounds, group: 'world' | 'bastion' }
@@ -896,8 +897,21 @@ export class Enemies {
     e.bounds = opts.bounds || null;
     e.trapGroup = opts.dormant ? opts.room : null;
     e.group = opts.group || 'world';
+    e.area = opts.area || null;
     this.list.push(e);
     return e;
+  }
+
+  // Cello kommer till ett område: fienderna där står på sina platser igen
+  enterArea(id) {
+    this.area = id;
+    this.attacker = null;
+    for (const e of this.list) {
+      if (e.area !== id || e.group !== 'world' || !this.active) continue;
+      if (e.permaDead && !e.respawn) continue;
+      e.permaDead = false;
+      e.reset();
+    }
   }
 
   // Under prologen finns inga asklingar i byn; efteråt reser de sig ur askan
@@ -971,20 +985,23 @@ export class Enemies {
     if (this.attacker && !this.attacker.targetable) this.attacker = null;
     const ctx = { ...w, director: this };
     const p = w.player;
+    const near = [];
     for (const e of this.list) {
       if (e.group === 'world' && !this.active) continue;
+      if (this.area && e.area && e.area !== this.area) continue;
       if (Math.abs(e.home.x - p.feet.x) > 60 || Math.abs(e.home.z - p.feet.z) > 60) continue;
       e.update(dt, ctx);
+      near.push(e);
     }
     // Knuffa isär Cello och fiender, och fiender sinsemellan
-    for (const e of this.list) {
+    for (const e of near) {
       if (!e.targetable || e.flying) continue;
       const dx = p.feet.x - e.pos.x, dz = p.feet.z - e.pos.z, d = Math.hypot(dx, dz);
       const min = RADIUS + 0.38;
       if (d < min && d > 1e-4 && Math.abs(p.feet.y - e.pos.y) < 1.8) {
         p.nudge((dx / d) * (min - d), (dz / d) * (min - d));
       }
-      for (const o of this.list) {
+      for (const o of near) {
         if (o === e || !o.targetable || o.flying) continue;
         const ex = e.pos.x - o.pos.x, ez = e.pos.z - o.pos.z, ed = Math.hypot(ex, ez);
         if (ed < RADIUS * 2 && ed > 1e-4) {

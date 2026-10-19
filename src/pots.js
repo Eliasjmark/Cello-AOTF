@@ -26,10 +26,11 @@ export class Pots {
     this.mesh = null;
     this.collider = null;
     this.onBreak = null; // (kruka) – ljud och effekter kopplas i main.js
+    this.area = null;
   }
 
-  add(x, y, z, s = 1) {
-    this.list.push({ pos: new THREE.Vector3(x, y, z), s, broken: false, t: 0, box: null, rot: Math.random() * Math.PI });
+  add(x, y, z, s = 1, area = null) {
+    this.list.push({ pos: new THREE.Vector3(x, y, z), s, broken: false, t: 0, box: null, rot: Math.random() * Math.PI, area });
   }
 
   // Alla krukor ritas i en enda instansierad mesh
@@ -45,8 +46,10 @@ export class Pots {
     this.scene.add(this.mesh);
     for (const p of this.list) {
       const r = 0.32 * p.s;
+      collider.building = p.area;
       p.box = collider.addBox(p.pos.x - r, p.pos.y, p.pos.z - r, p.pos.x + r, p.pos.y + 0.75 * p.s, p.pos.z + r, 'pot');
     }
+    collider.building = null;
     this.sync();
   }
 
@@ -54,7 +57,8 @@ export class Pots {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), sc = new THREE.Vector3();
     this.list.forEach((p, i) => {
       q.setFromAxisAngle(up, p.rot);
-      m4.compose(p.pos, q, sc.setScalar(p.broken ? 0.0001 : p.s));
+      const hide = p.broken || (this.area && p.area && p.area !== this.area);
+      m4.compose(p.pos, q, sc.setScalar(hide ? 0.0001 : p.s));
       this.mesh.setMatrixAt(i, m4);
       p.box.enabled = !p.broken;
     });
@@ -74,11 +78,19 @@ export class Pots {
     if (this.mesh) this.sync();
   }
 
+  // Bara krukorna i det aktiva området syns; de som slogs sönder står hela igen
+  setArea(id) {
+    this.area = id;
+    for (const p of this.list) if (p.area === id) p.broken = false;
+    if (this.mesh) this.sync();
+  }
+
   // Svärdshugg och hammarslag
   update(dt, player) {
     let changed = false;
     const sw = player.swing;
     for (const p of this.list) {
+      if (this.area && p.area && p.area !== this.area) continue;
       if (p.broken) {
         p.t += dt;
         if (p.t > RESPAWN && p.pos.distanceTo(player.feet) > 25) { p.broken = false; changed = true; }

@@ -27,9 +27,9 @@ export class Hud {
       touch: $('touch-ui'), stick: $('stick'), knob: $('knob'), hearts: $('hearts'), bars: $('bars'),
       prompt: $('prompt'), promptText: $('prompt-text'), cont: $('continue'), talkBtn: $('talk-btn'),
       card: $('card'), cardTitle: $('card-title'), cardSub: $('card-sub'), caption: $('caption'),
-      items: $('items'), slotHammer: $('slot-hammer'), slotHeavy: $('slot-heavy'),
+      items: $('items'),
       dungeon: $('dungeon'), keys: $('dg-keys'), dgMap: $('dg-map'), dgBoss: $('dg-boss'),
-      map: $('map'), mapCanvas: $('map-canvas'), hammerBtns: document.querySelectorAll('.needs-hammer'),
+      map: $('map'), mapCanvas: $('map-canvas'),
     };
     this.mapView = new MapView(this.el.mapCanvas);
     this.mapOpen = false;
@@ -77,6 +77,7 @@ export class Hud {
     this.el.help.hidden = this.input.isTouch;
     this.el.touch.hidden = !this.input.isTouch;
     this.el.hearts.hidden = false;
+    this.input.inGame = true;
     if (!fromSave) this.input.requestLock();
     this.onBegin?.(mode);
   }
@@ -133,15 +134,9 @@ export class Hud {
     this.captionTimer = setTimeout(() => c.classList.remove('show'), ms);
   }
 
-  // Föremålsrutorna: Mjölnirs skärva (F) och tung vikt (G)
-  setItems(player) {
-    const key = `${player.hasHammer}|${player.heavy}|${player.gloves}`;
-    if (key === this.itemKey) return;
-    this.itemKey = key;
-    this.el.items.hidden = !player.hasHammer || !this.started;
-    this.el.slotHeavy.classList.toggle('on', player.heavy);
-    this.el.slotHammer.classList.toggle('gloves', player.gloves);
-    this.el.hammerBtns.forEach((b) => { b.hidden = !player.hasHammer; });
+  // Föremålsrutorna sköts av inventory.js (refresh); den här finns kvar för äldre anrop
+  setItems() {
+    this.onItems?.();
   }
 
   // Nycklar, karta och Stormnyckel visas bara inne i fästningen

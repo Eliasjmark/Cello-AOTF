@@ -15,11 +15,14 @@ export class LightPool {
     }
     this.pickT = 0;
     this.picked = [];
+    this.area = null; // bara ljus i det aktiva området tänds
+    this.building = null; // området som nya ljus hör till
+    this.extra = null; // ett ljus som alltid går först (lyktan)
   }
 
   // power: ljusstyrka, range: räckvidd i meter, flicker: 0 = stilla, 1 = eld
   add({ x, y, z, color = 0xff8a3a, power = 20, range = 12, flicker = 1 }) {
-    const s = { pos: new THREE.Vector3(x, y, z), color: new THREE.Color(color), power, range, flicker, level: 1, on: true, phase: Math.random() * 10 };
+    const s = { pos: new THREE.Vector3(x, y, z), color: new THREE.Color(color), power, range, flicker, level: 1, on: true, phase: Math.random() * 10, area: this.building };
     this.sources.push(s);
     return s;
   }
@@ -41,8 +44,8 @@ export class LightPool {
     this.pickT -= dt;
     if (this.pickT <= 0) {
       this.pickT = 0.2;
-      const all = this.sources.concat(this.flashes).filter((s) => s.on && s.level > 0.01);
-      for (const s of all) s.score = s.pos.distanceTo(focus) - s.range * 0.6 - (s.dur ? 100 : 0);
+      const all = this.sources.concat(this.flashes).filter((s) => s.on && s.level > 0.01 && (!s.area || s.area === this.area));
+      for (const s of all) s.score = s.pos.distanceTo(focus) - s.range * 0.6 - (s.dur ? 100 : 0) - (s.prio || 0);
       all.sort((a, b) => a.score - b.score);
       this.picked = all.slice(0, this.lights.length);
     }

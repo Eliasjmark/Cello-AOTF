@@ -117,6 +117,10 @@ export class Combat {
         sw.hit.add(e);
         const res = e.hurt(sw.dmg, p.feet, { player: p, director: this.enemies, fx: this.fx, sfx: this.sfx });
         const at = e.chest.clone().lerp(p.swordTip, e.canSwordHit ? 0.75 : 0.4);
+        if (!e.noWear) {
+          if (res === 'blocked' || res === 'immune') p.wearSword(2);
+          else if (res) p.wearSword(1);
+        }
         if (res === 'blocked' || res === 'immune') {
           // Svärdet studsar mot en sköld eller sten: gnistor, klang och Cello knuffas bakåt
           this.fx.burst('spark', at, 14, 0xbfe4ff);
