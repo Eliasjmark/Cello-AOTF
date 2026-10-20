@@ -395,7 +395,7 @@ export class Apophis {
       return { m, pos: new THREE.Vector3(), vel: new THREE.Vector3(), t: 0, on: false };
     });
     this.onEvent = null;
-    this.immuneHint = 'Its scales are woven of shadow. Stand in the sunlight, raise the prism and lock on to Apophis!';
+    this.immuneHint = 'Steel cannot cut the shadow-scales. Stand in the light at the centre, raise the prism and aim it at the serpent until it crashes down. Then strike the gem on its brow!';
     this.reset();
   }
 
@@ -430,6 +430,13 @@ export class Apophis {
 
   get chest() {
     return this.headPos;
+  }
+
+  // Ljuset bränner ormen var det än träffar: huvudet eller kroppen som reser sig ur hålet
+  beamPoints() {
+    const out = [this.headPos];
+    for (const s of this.model.segs) if (s.visible) out.push(s.position);
+    return out;
   }
 
   get phase2() {

@@ -279,8 +279,12 @@ export class Beams {
       }
       for (const tg of this.targets()) {
         if (!tg.beamable) continue;
-        const t = raySphere(o, d, tg.beamPoint ?? tg.chest, tg.beamRadius ?? 0.8, best);
-        if (t !== null && t < best) { best = t; kind = 'target'; obj = tg; }
+        // Stora mål (ormen) kan träffas var som helst längs kroppen
+        const pts = tg.beamPoints ? tg.beamPoints() : [tg.beamPoint ?? tg.chest];
+        for (const pt of pts) {
+          const t = raySphere(o, d, pt, tg.beamRadius ?? 0.8, best);
+          if (t !== null && t < best) { best = t; kind = 'target'; obj = tg; }
+        }
       }
       if (from !== player) {
         const pc = _v.set(player.feet.x, player.feet.y + 1.15, player.feet.z);
