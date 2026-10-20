@@ -3,7 +3,7 @@
 import { MapView } from './map.js';
 const HEART_ROWS = ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'];
 
-function heartSvg(id) {
+export function heartSvg(id) {
   let rects = '';
   HEART_ROWS.forEach((row, y) => {
     [...row].forEach((c, x) => { if (c === '#') rects += `<rect x="${x}" y="${y}" width="1.02" height="1.02"/>`; });
@@ -22,10 +22,10 @@ export class Hud {
     this.started = false;
     this.onBegin = null;
     this.el = {
-      start: $('start'), play: $('play'), help: $('help'), info: $('info'), toast: $('toast'),
+      start: $('start'), help: $('help'), info: $('info'), toast: $('toast'),
       fade: $('fade'), fadeText: $('fade-text'), lockHint: $('lock-hint'),
       touch: $('touch-ui'), stick: $('stick'), knob: $('knob'), hearts: $('hearts'), bars: $('bars'),
-      prompt: $('prompt'), promptText: $('prompt-text'), cont: $('continue'), talkBtn: $('talk-btn'),
+      prompt: $('prompt'), promptText: $('prompt-text'), talkBtn: $('talk-btn'),
       card: $('card'), cardTitle: $('card-title'), cardSub: $('card-sub'), caption: $('caption'),
       items: $('items'),
       dungeon: $('dungeon'), keys: $('dg-keys'), dgMap: $('dg-map'), dgBoss: $('dg-boss'),
@@ -37,8 +37,6 @@ export class Hud {
     this.captionTimer = 0;
     this.itemKey = '';
     this.dungeonKey = '';
-    this.el.play.addEventListener('click', () => this.begin(false, 'new'));
-    this.el.cont.addEventListener('click', () => this.begin(false, 'continue'));
     this.promptKey = null;
     document.querySelectorAll('[data-press]').forEach((b) => {
       const name = b.dataset.press;
@@ -62,15 +60,8 @@ export class Hud {
     this.heartKey = '';
   }
 
-  // Startskärmen visar Fortsätt om det finns ett sparat spel
-  showContinue(on) {
-    this.el.cont.hidden = !on;
-    this.el.play.textContent = on ? 'New game' : 'Play';
-    this.el.play.classList.toggle('secondary', on);
-    (on ? this.el.cont : this.el.play).focus?.({ preventScroll: true });
-  }
-
-  begin(fromSave = false, mode = 'new') {
+  // Spelet börjar (från startmenyn): mode 'new' | 'continue' | 'resume', slot = sparfil 1 eller 2
+  begin(fromSave = false, mode = 'new', slot = undefined) {
     if (this.started) return;
     this.started = true;
     this.el.start.hidden = true;
@@ -79,7 +70,7 @@ export class Hud {
     this.el.hearts.hidden = false;
     this.input.inGame = true;
     if (!fromSave) this.input.requestLock();
-    this.onBegin?.(mode);
+    this.onBegin?.(mode, slot);
   }
 
   setPrompt(text) {

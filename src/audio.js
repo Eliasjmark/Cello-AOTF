@@ -56,6 +56,10 @@ export class Sfx {
       this.master = c.createGain();
       this.master.gain.value = this.muted ? 0 : this.volume;
       this.master.connect(c.destination);
+      // Ljudeffekterna har en egen volym (inställningar), musiken går direkt till master
+      this.fx = c.createGain();
+      this.fx.gain.value = this.fxLevel ?? 1;
+      this.fx.connect(this.master);
       const white = c.createBuffer(1, c.sampleRate * 1.5, c.sampleRate);
       const w = white.getChannelData(0);
       for (let i = 0; i < w.length; i++) w[i] = Math.random() * 2 - 1;
@@ -80,11 +84,17 @@ export class Sfx {
       this.windGain.gain.value = 0;
       wind.connect(this.windFilter);
       this.windFilter.connect(this.windGain);
-      this.windGain.connect(this.master);
+      this.windGain.connect(this.fx);
       wind.start();
     } catch {
       this.ctx = null;
     }
+  }
+
+  // Ljudeffekternas volym, 0–1 (startmenyns inställningar)
+  setFxLevel(v) {
+    this.fxLevel = v;
+    if (this.fx) this.fx.gain.value = v;
   }
 
   setMuted(m) {
@@ -96,7 +106,7 @@ export class Sfx {
     return !!this.ctx && !this.muted && this.ctx.state === 'running';
   }
 
-  gain(t0, attack, peak, decay, dest = this.master) {
+  gain(t0, attack, peak, decay, dest = this.fx) {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.linearRampToValueAtTime(peak, t0 + attack);
@@ -314,6 +324,45 @@ export class Sfx {
       case 'stomp':
         this.osc('sine', 62, 24, t, 0.6, this.gain(t, 0.004, 0.9 * v, 0.6));
         this.noiseThrough('lowpass', 500, 90, 0.8, t, 0.7, this.gain(t, 0.01, 0.5 * v, 0.7), this.brown);
+        break;
+      // ---------- 0.9: startmenyn ----------
+      case 'menuMove': // markören flyttas: en liten kristallklang
+        this.osc('sine', 1318.5, 1318.5, t, 0.09, this.gain(t, 0.002, 0.07 * v, 0.09));
+        this.osc('triangle', 659.25, 659.25, t, 0.07, this.gain(t, 0.002, 0.05 * v, 0.07));
+        break;
+      case 'menuSelect': // välj: två toner uppåt och lite gnistor
+        [[783.99, 0], [1174.66, 0.07]].forEach(([f, d]) => this.osc('triangle', f, f, t + d, 0.3, this.gain(t + d, 0.003, 0.16 * v, 0.3)));
+        this.osc('sine', 2349.3, 2349.3, t + 0.07, 0.4, this.gain(t + 0.07, 0.003, 0.04 * v, 0.4));
+        this.noiseThrough('highpass', 7000, 9000, 0.7, t + 0.05, 0.25, this.gain(t + 0.05, 0.01, 0.05 * v, 0.25));
+        break;
+      case 'menuBack': // tillbaka: två toner nedåt
+        [[659.25, 0], [440, 0.07]].forEach(([f, d]) => this.osc('triangle', f, f, t + d, 0.22, this.gain(t + d, 0.003, 0.13 * v, 0.22)));
+        break;
+      case 'menuDeny': // går inte
+        this.osc('square', 150, 130, t, 0.14, this.lowpass(this.gain(t, 0.003, 0.09 * v, 0.14), 900));
+        this.osc('square', 150, 130, t + 0.16, 0.14, this.lowpass(this.gain(t + 0.16, 0.003, 0.08 * v, 0.14), 900));
+        break;
+      case 'menuOpen': { // första knapptrycket: ett andetag av vind och ett ackord som sväller
+        this.noiseThrough('bandpass', 260, 1400, 0.8, t, 1.4, this.gain(t, 0.5, 0.22 * v, 0.9), this.brown);
+        const g = this.gain(t, 0.35, 0.12 * v, 1.6);
+        const lp = this.lowpass(g, 1500);
+        for (const f of [196, 293.66, 392, 587.33]) this.osc('sawtooth', f, f, t, 2.0, lp);
+        [1174.66, 1567.98].forEach((f, i) => this.osc('sine', f, f, t + 0.3 + i * 0.12, 1.0, this.gain(t + 0.3 + i * 0.12, 0.01, 0.05 * v, 1.0)));
+        break;
+      }
+      case 'menuStart': { // resan börjar: dovt slag, åska och en stigande klang
+        this.osc('sine', 82, 30, t, 1.4, this.gain(t, 0.004, 0.9 * v, 1.4));
+        this.noiseThrough('lowpass', 420, 60, 0.6, t + 0.05, 2.8, this.gain(t + 0.05, 0.06, 0.65 * v, 2.6), this.brown);
+        [523.25, 783.99, 1046.5, 1567.98, 2093].forEach((f, i) => {
+          const ti = t + 0.15 + i * 0.09;
+          this.osc('triangle', f, f, ti, 0.9, this.gain(ti, 0.004, 0.11 * v, 0.9));
+        });
+        this.noiseThrough('bandpass', 400, 3600, 0.9, t, 1.1, this.gain(t, 0.3, 0.16 * v, 0.7));
+        break;
+      }
+      case 'menuErase': // en fil raderas: något som smulas sönder
+        this.noiseThrough('lowpass', 1600, 120, 0.7, t, 0.9, this.gain(t, 0.005, 0.4 * v, 0.9), this.brown);
+        this.osc('triangle', 440, 110, t, 0.7, this.gain(t, 0.004, 0.12 * v, 0.7));
         break;
       case 'choice':
         this.osc('triangle', 660, 660, t, 0.05, this.gain(t, 0.002, 0.12, 0.05));

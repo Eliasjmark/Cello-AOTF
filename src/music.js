@@ -82,6 +82,12 @@ export class Music {
     }
   }
 
+  // Musikens volym, 0–1 (startmenyns inställningar)
+  setVolume(v) {
+    this.volume = v;
+    if (this.bus) this.bus.gain.value = v;
+  }
+
   setEnabled(on) {
     this.enabled = on;
   }

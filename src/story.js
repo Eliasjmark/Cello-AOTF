@@ -11,29 +11,88 @@ import { buildItem, ITEM_TEXT } from './items.js';
 import { SWORD_MAX } from './player.js';
 
 const SAVE_KEY = 'cello-ashes-of-the-fallen:save';
+const META_KEY = 'cello-ashes-of-the-fallen:meta';
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
-export function loadSave() {
+// ---------- två sparfiler (0.9) ----------
+// Fil 1 och Fil 2 sparas var för sig. En sparning från 0.8 eller tidigare flyttas till Fil 1 första gången.
+export const SLOTS = [1, 2];
+const slotKey = (n) => `${SAVE_KEY}:${n}`;
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch { /* ingen lagring */ } },
+};
+const valid = (d) => d && (d.v === 1 || d.v === 2) && d.state ? d : null;
+
+function migrate() {
+  const old = store.get(SAVE_KEY);
+  if (!old) return;
+  if (!store.get(slotKey(1))) store.set(slotKey(1), old);
+  store.del(SAVE_KEY);
+}
+
+export function loadSave(slot) {
+  migrate();
+  if (slot === undefined) slot = continueSlot();
+  if (!slot) return null;
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const d = JSON.parse(raw);
-    return d && (d.v === 1 || d.v === 2) && d.state ? d : null;
+    const raw = store.get(slotKey(slot));
+    return raw ? valid(JSON.parse(raw)) : null;
   } catch {
     return null;
   }
 }
 
-function writeSave(data) {
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    return true;
-  } catch {
-    return false;
+export function listSaves() {
+  migrate();
+  return SLOTS.map((n) => ({ slot: n, save: loadSave(n) }));
+}
+
+export function eraseSave(slot) {
+  store.del(slotKey(slot));
+  const m = meta();
+  if (m.last === slot) { m.last = null; store.set(META_KEY, JSON.stringify(m)); }
+}
+
+export function copySave(from, to) {
+  const raw = store.get(slotKey(from));
+  return raw ? store.set(slotKey(to), raw) : false;
+}
+
+function meta() {
+  try { return JSON.parse(store.get(META_KEY) || '{}') || {}; } catch { return {}; }
+}
+
+export function setLastSlot(slot) {
+  store.set(META_KEY, JSON.stringify({ ...meta(), last: slot }));
+}
+
+// Filen som Continue fortsätter: den som spelades senast, annars den som sparades senast
+export function continueSlot() {
+  migrate();
+  const m = meta();
+  const has = (n) => !!store.get(slotKey(n));
+  if (m.last && has(m.last)) return m.last;
+  let best = null, bt = -1;
+  for (const n of SLOTS) {
+    const raw = store.get(slotKey(n));
+    if (!raw) continue;
+    let at = 0;
+    try { at = JSON.parse(raw).savedAt || 0; } catch { /* trasig fil */ }
+    if (at > bt) { bt = at; best = n; }
   }
+  return best;
+}
+
+function writeSave(slot, data) {
+  const ok = store.set(slotKey(slot), JSON.stringify(data));
+  if (ok) setLastSlot(slot);
+  return ok;
 }
 
 const freshState = () => ({
+  playTime: 0,
   choice1: null, karma: 0, amulet: false, kaelQuest: null, talked: {},
   // 0.4: stenvägarna, föremålen och fästningen
   northPath: false, eastPath: false, items: { hammer: false, prism: false }, hearts: 0, bastion: null,
@@ -366,6 +425,8 @@ export class Story {
   }
 
   save(silent = false, entry = null) {
+    // På startmenyn finns inget spel att spara (byn i bakgrunden är bara en kuliss)
+    if (!this.hud.started) return false;
     const s = this.state;
     s.bastion = this.bastion.state;
     s.pyramid = this.pyramid.state;
@@ -376,7 +437,7 @@ export class Story {
     s.sword = this.player.sword.dur;
     this.goat?.store(s);
     this.inventory?.store(s);
-    const ok = writeSave({ v: 2, state: s, savedAt: Date.now() });
+    const ok = writeSave(this.slot ?? 1, { v: 2, state: s, savedAt: Date.now() });
     if (!silent) {
       this.hud.toast(ok ? 'Game saved' : 'Could not save in this browser', 2600);
       if (ok) this.sfx.play('save');

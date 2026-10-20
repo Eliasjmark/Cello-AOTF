@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.8 · The Deepening Bastion (fas 0–7 klara; i 0.8 blev fästningen fem gånger så stor, pyramiden står näst på tur)
+**Version:** prototyp 0.9 · A Hero Awakens (en ny startmeny med Cellos hjältemodell och två sparfiler; pyramiden står näst på tur)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -22,6 +22,23 @@ En fristående version (en enda HTML-fil med all kod) byggs med:
 npm install          # en gång, hämtar esbuild
 npm run build:artifact   # → build/play.html
 ```
+
+## Vad är nytt i 0.9: startmenyn
+
+När spelet startar möter Cello spelaren i stormen: modellen som Elias skickade av hur Cello ska se ut när spelet är klart, målad och upplyst av eld bakifrån, med blixtar, glöd som stiger och aska som faller. Bredvid står logotypen i guld.
+
+- **Tryck på valfri tangent** (eller tryck på skärmen) så öppnas menyn: *Continue*, *New Game*, *Load Game*, *Options*, *How to Play* och *Credits*.
+- **Två sparfiler.** Fil 1 och fil 2 visar plats, hjärtan, skärvor, speltid, reliker och när filen sparades senast.
+  - *Continue* fortsätter filen som spelades senast.
+  - *New Game* frågar vilken fil resan ska sparas i, och varnar innan en gammal resa skrivs över.
+  - En fil kan startas, kopieras till den andra platsen eller raderas, alltid med en fråga först.
+  - En sparning från 0.8 eller tidigare flyttas automatiskt till fil 1.
+- **Options:** musikens och ljudeffekternas volym (0–10) och retroläget. Inställningarna sparas.
+- **Ljud:** menyn har egna ljud (markören, välj, tillbaka, nej, radera) och en stor åskknall när resan börjar. Musiken är *Hymn of the Wandering Hero*.
+- Menyn går att styra med tangentbord (piltangenter eller WASD, Enter, Esc), mus, pekskärm och handkontroll.
+- På mobil står logotypen överst, Cello i mitten och menyn längst ner.
+
+Hjältemodellen ligger i `models/cello-hero.bin` (89 000 trianglar, 0,9 MB). Den görs av `tools/hero/paint.py` från STL-filen `tools/hero/cello-hero.stl`: modellen förenklas, och varje del får en färg (hud, hår, pannband, tunika, läder, svärd och sköld) plus mörkare skrymslen och ljusare kanter.
 
 ## Vad är nytt i 0.8: fästningen blev djupare
 
@@ -225,6 +242,8 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/folk.js` | Folket ute i världen, butikerna, kistorna, eldfaten, djuren och övningsdockan |
 | `src/inventory.js` | Föremålsmenyn, snabbknapparna, skärvorna, lyktan och dryckerna |
 | `src/bastion.js` | The Tempest Bastion: rum, dörrar, kistor, kretsar, pussel, fällor och bossarna |
+| `src/title.js` | Startmenyn: scenen med hjälten, menyerna, de två sparfilerna och inställningarna |
+| `src/heroModel.js` | Läser hjältemodellen (`models/cello-hero.bin`) |
 | `src/bastionwings.js` | Fästningens fyra nya delar (0.8): cisternerna, smedjan, tornet och kronan |
 | `src/dkit.js` | Verktygslådan för fängelsehålor: salar, dörrar, blixtnätet, kondensatorer, järnblock, spruckna golv, stormvind, fällrum och hissar |
 | `src/bosses.js` | Järnväktaren och Hrungnir |

@@ -12,7 +12,8 @@ import { Effects } from './effects.js';
 import { Enemies } from './enemies.js';
 import { Combat } from './combat.js';
 import { Dialog } from './dialog.js';
-import { Story, loadSave } from './story.js';
+import { Story, loadSave, setLastSlot, continueSlot } from './story.js';
+import { TitleScreen, loadSettings, storeSettings } from './title.js';
 import { LightPool } from './lights.js';
 import { Music } from './music.js';
 import { Pots } from './pots.js';
@@ -205,21 +206,43 @@ function start(saved = {}) {
     cull(0, true);
   };
 
-  // Startskärmen visar den brinnande byn; Fortsätt finns om det finns ett sparat spel
+  // Bakom startmenyn väntar den brinnande byn (spelets första bild)
   story.newGame(true);
-  let save = loadSave();
-  hud.showContinue(!!save);
+  const settings = loadSettings();
+  let pixel = saved.pixel ?? settings.pixel;
   const unlockAudio = () => {
     sfx.init();
     music.unlock();
+    applySettings(settings);
   };
+  function applySettings(s) {
+    Object.assign(settings, s);
+    music.setVolume(0.75 * settings.music / 8);
+    sfx.setFxLevel(settings.sound / 8);
+    if (settings.pixel !== pixel) {
+      pixel = settings.pixel;
+      resize();
+    }
+  }
   addEventListener('pointerdown', unlockAudio);
   addEventListener('keydown', unlockAudio);
-  hud.onBegin = (mode) => {
+  // Startmenyn (0.9): Cello i stormen, två sparfiler, inställningar
+  const title = new TitleScreen({
+    renderer, sfx, music, input, settings, unlockAudio,
+    areaName: (id) => areas.get(id)?.name,
+    onSettings: (s) => applySettings(s),
+    onStart: (mode, slot) => hud.begin(false, mode, slot),
+  });
+  hud.onBegin = (mode, slot) => {
     unlockAudio();
+    title.close();
+    resize();
     if (mode === 'resume') return;
-    if (mode === 'continue' && save) story.loadGame(save);
+    const sv = mode === 'continue' ? loadSave(slot) : null;
+    story.slot = slot ?? (sv ? continueSlot() : null) ?? 1;
+    if (sv) story.loadGame(sv);
     else story.newGame();
+    setLastSlot(story.slot);
     rig.snap(player);
     inventory.refresh();
   };
@@ -315,12 +338,14 @@ function start(saved = {}) {
     }
   };
 
-  let pixel = saved.pixel ?? true;
   function resize() {
     const w = innerWidth, h = innerHeight;
-    const s = pixel ? Math.min(1, PIXEL_LINES / h) : Math.min(devicePixelRatio || 1, 2);
+    // Startmenyn ritas alltid i full upplösning, så att Cello syns ordentligt
+    const px = pixel && !title.active;
+    const s = px ? Math.min(1, PIXEL_LINES / h) : Math.min(devicePixelRatio || 1, title.active ? 1.5 : 2);
     renderer.setSize(Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), false);
-    canvas.classList.toggle('smooth', !pixel);
+    canvas.classList.toggle('smooth', !px);
+    title.resize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
@@ -355,12 +380,13 @@ function start(saved = {}) {
   // Återställ läget efter en uppdatering av sidan (bara efter prologen)
   if (saved.started && saved.phase === 'free' && saved.state) {
     hud.begin(true, 'resume');
+    story.slot = saved.slot ?? 1;
     story.loadGame({ state: saved.state });
     if (saved.pos) player.teleport(new THREE.Vector3().fromArray(saved.pos));
     rig.snap(player);
   }
   window.claude?.hot?.snapshot?.(() => ({
-    started: hud.started, phase: story.phase, state: { ...story.state, area: areas.id }, pos: player.feet.toArray(), pixel,
+    started: hud.started, phase: story.phase, state: { ...story.state, area: areas.id }, pos: player.feet.toArray(), pixel, slot: story.slot,
   }));
 
   // ---------- Musiken: vilket spår som hörs var ----------
@@ -434,6 +460,16 @@ function start(saved = {}) {
     requestAnimationFrame(frame);
     timer.update(ts);
     const dt = Math.max(0, Math.min(timer.getDelta(), 0.05));
+    if (title.active) {
+      // Startmenyn: egen scen, men samma musik och samma storm i bakgrunden
+      title.update(dt);
+      if (!window.__realm?.hold) {
+        updateMusic(dt);
+        sfx.ambience(dt, story.ambienceState());
+      }
+      title.render();
+      return;
+    }
     if (!window.__realm?.hold) update(dt, input.poll(dt));
     renderer.render(scene, camera);
   }
@@ -442,6 +478,8 @@ function start(saved = {}) {
   function update(dt, inp) {
     if (inp.togglePixel) {
       pixel = !pixel;
+      settings.pixel = pixel;
+      storeSettings(settings);
       resize();
       hud.toast(pixel ? 'Retro mode on' : 'Retro mode off');
     }
@@ -456,7 +494,7 @@ function start(saved = {}) {
       music.setEnabled(!music.enabled);
       hud.toast(music.enabled ? 'Music on' : 'Music off');
     }
-    if (!hud.started && inp.start) hud.begin(false, save ? 'continue' : 'new');
+    if (hud.started && story.state) story.state.playTime = (story.state.playTime || 0) + dt;
 
     const calm = !dialog.active && !story.cinematic && !story.fade && !respawn;
     if (hud.started && inp.map && !inventory.open && (hud.mapOpen || calm)) toggleMap(!hud.mapOpen);
@@ -569,7 +607,7 @@ function start(saved = {}) {
   // Handtag för felsökning i webbläsarens konsol
   window.__realm = {
     player, rig, world, areas, input, hud, scene, camera, enemies, combat, fx, sfx, story, dialog, bastion, pyramid, lights, collider, renderer,
-    culled, cullS, music, pots, inventory, folk, goat, THREE,
+    culled, cullS, music, pots, inventory, folk, goat, title, THREE,
     tick: (dt, inp) => update(dt, { ...input.empty, ...inp }),
   };
   requestAnimationFrame(frame);
