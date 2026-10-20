@@ -139,8 +139,9 @@ export class MapView {
       // Rampen upp till luckan
       g.fillStyle = s.solved.hatch ? COL.storm : COL.dim;
       g.fillRect(BX(17.5), BZ(-195.2), 15.5 * bs, 2.4 * bs);
-      const c = b.chests.cBoss;
-      this.chest(g, BX(c.x), BZ(c.z), 5 * dpr, c.open, true);
+      // Trappan ner till The Lightning Cisterns
+      g.fillStyle = '#8fe4ff';
+      g.fillRect(BX(14) - 3 * dpr, BZ(-189.2), 4 * dpr, 2.4 * bs);
     } else {
       g.fillStyle = COL.faint;
       g.fillText('?', bx + bw / 2, by + bh / 2);
@@ -242,6 +243,90 @@ export class MapView {
     g.font = `${12 * dpr}px "Barlow Semi Condensed", sans-serif`;
     g.fillStyle = COL.dim;
     const items = [`Keys: ${s.keys}`, s.map ? 'Map ✓' : 'No map', s.bossKey ? 'Sun Key ✓' : '', s.prismTaken ? 'Prism ✓' : ''].filter(Boolean);
+    g.fillText(items.join('   ·   '), 14 * dpr, 42 * dpr);
+  }
+
+  // En av fästningens nya delar (0.8): bara våningen Cello står på
+  drawWing(wg, bastion, player) {
+    const { w, h, dpr } = this.size();
+    const g = this.ctx;
+    g.clearRect(0, 0, w, h);
+    const s = bastion.state, p = player.feet;
+    const known = (id) => s.map || s.visited.includes(`${wg.id}:${id}`);
+    const floorY = (wg.rooms[wg.roomAt(p)]?.y) ?? Object.values(wg.rooms).reduce((best, r) => (Math.abs(r.y - p.y) < Math.abs(best - p.y) ? r.y : best), 0);
+    const rooms = Object.values(wg.rooms).filter((r) => Math.abs(r.y - floorY) < 6 && r.map !== false);
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const r of Object.values(wg.rooms)) {
+      x0 = Math.min(x0, r.x0); x1 = Math.max(x1, r.x1); z0 = Math.min(z0, r.z0); z1 = Math.max(z1, r.z1);
+    }
+    const T = this.fit(x0 - 4, x1 + 4, z0 - 4, z1 + 4, w, h * 0.9, 26 * dpr);
+    const IRON = { room: '#1c2128', visited: '#2c3540', here: '#3e4c5c', stroke: '#8fc4e8' };
+    const here = wg.roomAt(p);
+    g.lineJoin = 'round';
+    for (const r of rooms) {
+      if (!known(r.id)) continue;
+      const visited = s.visited.includes(`${wg.id}:${r.id}`);
+      g.fillStyle = r.id === here ? IRON.here : visited ? IRON.visited : IRON.room;
+      const x = T.X(r.x0), y = T.Z(r.z0), ww = (r.x1 - r.x0) * T.s, hh = (r.z1 - r.z0) * T.s;
+      g.fillRect(x, y, ww, hh);
+      g.strokeStyle = visited ? IRON.stroke : COL.dim;
+      g.lineWidth = 1.5 * dpr;
+      g.strokeRect(x, y, ww, hh);
+    }
+    const onFloor = (y) => Math.abs(y - floorY) < 6;
+    const roomKnown = (x, y, z) => {
+      const id = wg.roomAt({ x, y, z });
+      return id ? known(id) : false;
+    };
+    // Blixtens kopparbanor
+    g.strokeStyle = 'rgba(143,228,255,0.35)';
+    g.lineWidth = 1.2 * dpr;
+    for (const n of Object.values(wg.nodes ?? {})) {
+      if (!onFloor(n.y) || !roomKnown(n.x, n.y, n.z)) continue;
+      for (const id of Object.values(n.links)) {
+        const m = wg.nodes[id];
+        if (!m || m.id < n.id) continue;
+        g.beginPath();
+        g.moveTo(T.X(n.x), T.Z(n.z));
+        g.lineTo(T.X(m.x), T.Z(m.z));
+        g.stroke();
+      }
+      if (n.kind === 'junction' || n.kind === 'coil' || n.kind === 'plate') {
+        g.fillStyle = n.kind === 'coil' ? '#8fe4ff' : n.kind === 'plate' ? COL.gold : '#c87a3a';
+        g.beginPath();
+        g.arc(T.X(n.x), T.Z(n.z), 3 * dpr, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    // Dörrar
+    for (const d of Object.values(wg.doors)) {
+      if (!onFloor(d.y)) continue;
+      const sides = [d.neg, d.pos].filter((id) => id && wg.rooms[id]);
+      if (!sides.some((id) => known(id))) continue;
+      const open = d.slabTarget > 1 && d.barsTarget > 1;
+      const x = T.X(d.x), y = T.Z(d.z), L = 2.4 * T.s, W = Math.max(3 * dpr, 0.8 * T.s);
+      g.fillStyle = open ? IRON.here : d.type === 'boss' ? COL.red : d.type === 'key' ? COL.gold : d.type === 'circuit' || d.type === 'cap' ? '#8fe4ff' : COL.dim;
+      if (d.axis === 'x') g.fillRect(x - W / 2, y - L / 2, W, L);
+      else g.fillRect(x - L / 2, y - W / 2, L, W);
+    }
+    // Kistor
+    for (const c of Object.values(wg.chests)) {
+      if (!onFloor(c.y) || !c.g.visible) continue;
+      if (!(s.map || roomKnown(c.x, c.y + 0.5, c.z))) continue;
+      this.chest(g, T.X(c.x), T.Z(c.z), 5 * dpr, c.open, c.big);
+    }
+    // Cello
+    if (wg.inside(p)) this.arrow(g, T.X(p.x), T.Z(p.z), player.facing, 7 * dpr, COL.ink);
+    // Rubrik
+    g.textAlign = 'left';
+    g.fillStyle = COL.ink;
+    g.font = `700 ${15 * dpr}px Cinzel, serif`;
+    g.fillText(wg.name, 14 * dpr, 24 * dpr);
+    g.font = `${12 * dpr}px "Barlow Semi Condensed", sans-serif`;
+    g.fillStyle = COL.dim;
+    const fl = rooms[0]?.floor && rooms[0].floor !== 'F' ? `Floor ${rooms[0].floor}` : 'The Tempest Bastion';
+    const roomName = here ? wg.rooms[here].name : '';
+    const items = [fl, roomName, `Keys: ${s.keys}`, s.bossKey ? 'Storm Key ✓' : ''].filter(Boolean);
     g.fillText(items.join('   ·   '), 14 * dpr, 42 * dpr);
   }
 

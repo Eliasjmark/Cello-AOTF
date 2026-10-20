@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.7 · The Sun-Scorched Pyramid (fas 0–6 klara, fas 7 påbörjad i utvecklingsplanen)
+**Version:** prototyp 0.8 · The Deepening Bastion (fas 0–7 klara; i 0.8 blev fästningen fem gånger så stor, pyramiden står näst på tur)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -22,6 +22,23 @@ En fristående version (en enda HTML-fil med all kod) byggs med:
 npm install          # en gång, hämtar esbuild
 npm run build:artifact   # → build/play.html
 ```
+
+## Vad är nytt i 0.8: fästningen blev djupare
+
+Elias klarade båda fängelsehålorna på 5–10 minuter. Målet är 30–60 minuter per fängelsehåla, så **The Tempest Bastion** har fått fyra nya delar. Den gamla fästningen är nu bara första våningen. Delarna laddas när Cello går genom trappor, dörrar och hissar, med en kort övertoning men ingen dimma (dimman finns bara mellan områdena ute i världen).
+
+| Del | Var | Vad som händer |
+| --- | --- | --- |
+| **The Lightning Cisterns** | Trappan väster om källaren | **Växlar:** kopparpilar som styr blixten från en platta (vrids med E, plattan slås med hammaren) till dörrar, en bur med en nyckel, eller en trasig ränna. **Järnblock:** tre block på ett rutnät, två tryckplattor, minst 17 skjut med tung vikt (en spak ställer tillbaka blocken). **Lyktvalvet:** fyra eldfat i mörkret lyfter en bur. **Två spolar** i två olika salar måste laddas inom tio sekunder för att öppna trappan ner |
+| **The Deep Forge** | Under cisternerna | **Fällsalen:** tre vågor fiender bakom galler. **Den spruckna smedjan:** bälgar blåser västerut i stötar över ett schakt. Med tung vikt står Cello emot vinden, men de spruckna plattorna rasar under honom. Smala järnbalkar håller. **Dynamon:** tre blixtar i rätt ordning (söder, väster, öster) får det stora hjulet att snurra, och då vaknar hissen i tornet |
+| **The Thunder Spire** | Dörren österut från vindbryggan | Hissen (som bara går när dynamon snurrar), **stormgången** runt tornet där tre plattor måste slås inom 16 sekunder i stötvisa vindar, och **klocksalen** med fler växlar, en nyckel och dörren upp |
+| **The Storm Crown** | Högst upp | **The Twin Wardens**: två Järnväktare samtidigt. Sedan **Stormnyckeln** och en stormvirvel som släpper ner Cello framför Hrungnirs dörr |
+
+Nycklarna: K3 (cisternernas bur) → dörren norrut i cisternerna · K4 (lyktvalvet) → dynamosalen · K5 (klocksalen) → kronan. Stormnyckeln ligger inte längre i källaren utan högst upp i kronan.
+
+Kartan (K) visar våningen Cello står på, med blixtens kopparbanor, växlar, plattor, spolar, dörrar och kistor.
+
+Nya filer: `src/dkit.js` (en verktygslåda för fängelsehålor: salar, dörrar, kistor, burar, blixtnätet, kondensatorer, tryckplattor, järnblock, spruckna golv, stormvind, fällrum och hissar) och `src/bastionwings.js` (fästningens fyra nya delar). Pyramiden byggs om med samma verktygslåda i nästa version.
 
 ## Vad är nytt i 0.7: öknen och pyramiden
 
@@ -186,7 +203,7 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
   - **Smideshallen** med minibossen **Järnväktaren** (en jättelik askling med sköld och yxa) och Mjölnirs skärva.
   - **Kondensatorrummet**: två plattor måste få blixt nästan samtidigt för att buren kring en kista ska lyftas. Här finns också smedens verkstad och ett brev.
   - **Vindbryggan**: en smal bro där stormen blåser Cello ner, om han inte bär hammaren tungt.
-  - **Den spräckta salen**: golvet brister under tung vikt, och i **källaren** ligger Stormnyckeln. En lucka leder upp igen.
+  - **Den spräckta salen**: golvet brister under tung vikt, och i **källaren** låg Stormnyckeln (sedan 0.8 leder källaren vidare ner, och nyckeln ligger i kronan). En lucka leder upp igen.
   - **Hrungnirs krets**: bossen **Hrungnir**, jätten med hjärta av sten. Bara blixten från de fyra stormpelarna får honom på knä.
 - **Mjölnirs skärva:** markslaget (F) skickar blixt genom kopparrännor, krossar sköldar och skadar bossar; tung vikt (G) gör Cello tung och långsam men orubblig i stormen.
 - **Fiender:** asklingar, sköldvakter (skölden tar emot svärdet men krossas av hammaren) och stormfladdrare.
@@ -208,6 +225,8 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/folk.js` | Folket ute i världen, butikerna, kistorna, eldfaten, djuren och övningsdockan |
 | `src/inventory.js` | Föremålsmenyn, snabbknapparna, skärvorna, lyktan och dryckerna |
 | `src/bastion.js` | The Tempest Bastion: rum, dörrar, kistor, kretsar, pussel, fällor och bossarna |
+| `src/bastionwings.js` | Fästningens fyra nya delar (0.8): cisternerna, smedjan, tornet och kronan |
+| `src/dkit.js` | Verktygslådan för fängelsehålor: salar, dörrar, blixtnätet, kondensatorer, järnblock, spruckna golv, stormvind, fällrum och hissar |
 | `src/bosses.js` | Järnväktaren och Hrungnir |
 | `src/pyramid.js` | The Sun-Scorched Pyramid: salar, dörrar, kistor, burar, speglar, solögon, slöjor, fällor och bossarna |
 | `src/beams.js` | Solstrålarna: fönster, schakt, speglar, solögon, slöjor och prisman |

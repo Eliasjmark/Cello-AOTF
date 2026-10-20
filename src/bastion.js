@@ -11,10 +11,12 @@
 //      (fällrum)               │ ingång      (kretsdörr)
 //                          Förgården ← stenvägen från Aetheria
 //
-// Vägen genom fästningen:
+// Vägen genom fästningen (0.8: fästningen har fyra nya delar, se bastionwings.js):
 //   R1 (karta) → R2 (fällrum, nyckel 1) → R4 (Järnväktaren, Mjölnirs skärva) → R6 (kondensatorn, nyckel 2)
-//   → R1 östra kretsdörren → R5 (vindbryggan, tung vikt) → R7 (spräckt golv) → R8 (Stormnyckeln)
-//   → luckan upp → R7 bommen → R4 → R9 Hrungnir
+//   → R1 östra kretsdörren → R5 (vindbryggan, tung vikt) → R7 (spräckt golv) → R8 källaren
+//   → trappan ner till The Lightning Cisterns och The Deep Forge (dynamon)
+//   → R5 dörren österut till The Thunder Spire och The Storm Crown (Stormnyckeln)
+//   → virveln ner till R4 → R9 Hrungnir
 import * as THREE from 'three';
 import { box, cyl, rockGeo, place, hash2 } from './geom.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -126,11 +128,11 @@ export class Bastion {
     const ops = openings.slice().sort((p, q) => p.c - q.c);
     let a = a0;
     for (const o of ops) {
-      const w = o.w ?? DOOR_W, h = o.h ?? DOOR_H;
+      const w = o.w ?? DOOR_W, h = o.h ?? DOOR_H, ofy = o.fy ?? fy;
       mk(a, o.c - w / 2, y0, y1);
-      mk(o.c - w / 2, o.c + w / 2, fy + h, y1);
+      mk(o.c - w / 2, o.c + w / 2, ofy + h, y1);
       // Tröskeln under dörröppningen fyller glappet mellan rummens golv
-      if (fy > y0) mk(o.c - w / 2, o.c + w / 2, y0, fy);
+      if (ofy > y0) mk(o.c - w / 2, o.c + w / 2, y0, ofy);
       a = o.c + w / 2;
     }
     mk(a, a1, y0, y1);
@@ -197,7 +199,11 @@ export class Bastion {
     this.wall('x', 14, 30, -169, -168, -1, 1.2, 0, [], false);
     this.wall('x', 30, 36, -169, -168, -1, H, 0, [{ c: 32.5 }]);
     W('z', -168, -150, 10, 11, [{ c: -159 }]);
-    W('z', -168, -150, 35, 36, []);
+    W('z', -168, -150, 35, 36, [{ c: -155 }]);
+    // Gången österut till The Thunder Spire
+    this.slab(35, 46, -1, 0, -156.2, -153.8, M.ironFloor);
+    this.wall('x', 36, 46, -157.2, -156.2, -1, 4.6, 0, [], false);
+    this.wall('x', 36, 46, -153.8, -152.8, -1, 4.6, 0, [], false);
     // Gången
     W('z', -175, -169, 30, 31, []);
     W('z', -175, -169, 34, 35, []);
@@ -214,7 +220,15 @@ export class Bastion {
     // Den spräckta salen och källaren (väggarna går ner till källargolvet)
     W('x', 14, 36, -176, -175, [{ c: 32.5 }], -7);
     W('x', 14, 36, -197, -196, [], -7);
-    W('z', -196, -176, 14, 15, [{ c: -183 }], -7);
+    W('z', -196, -176, 14, 15, [{ c: -183 }, { c: -188, fy: -6 }], -7);
+    // Gången västerut mot trappan ner till The Lightning Cisterns, under smideshallen
+    this.slab(8, 15, -7, -6, -189.2, -186.8, M.ironFloor);
+    this.slab(8, 15, -6 + DOOR_H, -6 + DOOR_H + 0.3, -190.2, -185.8, M.ironWall);
+    this.wall('x', 8, 14, -190.2, -189.2, -7, -6 + DOOR_H, -6, [], false);
+    this.wall('x', 8, 14, -186.8, -185.8, -7, -6 + DOOR_H, -6, [], false);
+    this.wall('z', -190.2, -185.8, 7, 8, -7, -6 + DOOR_H, -6, [], false);
+    // Trappan ner i mörkret i gångens västra ände
+    for (let i = 0; i < 3; i++) this.ctx.S.add(place(new THREE.Mesh(box(0.9, 0.04, 2.3, 1), M.char), 9.0 + i * 0.9, -5.97, -188));
     W('z', -196, -176, 35, 36, [], -7);
     // Passagen till arenan
     this.wall('z', -199.5, -197, -2.2, -1.2, -1, 4.5, 0, [], false);
@@ -459,11 +473,12 @@ export class Bastion {
       { id: 'cMap', x: -6.5, y: 0.3, z: -165.2, face: 0, item: 'map', room: 'R1' },
       { id: 'cKey1', x: -20, y: 0, z: -161, face: 0, item: 'key', room: 'R2', hidden: true },
       { id: 'cKey2', x: -32.5, y: 0, z: -193.4, face: Math.PI / 2, item: 'key', room: 'R6', caged: true },
-      { id: 'cBoss', x: 30.5, y: -6 + 0.5, z: -179.5, face: -Math.PI / 2, item: 'bosskey', room: 'R8', big: true },
+      // Stormnyckeln ligger numera högst upp i The Storm Crown
     ];
     // Låg pall under kartkistan och Stormnyckelns kista
     this.ctx.solid(place(new THREE.Mesh(cyl(1.1, 1.6, 0.3, 12, 1), M.ironWall), -6.5, 0.15, -165.2));
     this.ctx.solid(place(new THREE.Mesh(box(2.4, 0.5, 2.2, 1), M.ironWall), 30.5, -5.75, -179.5));
+    this.ctx.S.add(place(new THREE.Mesh(box(1.0, 0.6, 0.7, 1), M.char), 30.5, -5.2, -179.5));
     for (const def of defs) {
       const g = new THREE.Group();
       g.position.set(def.x, def.y, def.z);
@@ -839,7 +854,20 @@ export class Bastion {
     const out = [];
     if (this.warden && this.warden.targetable) out.push(this.warden);
     if (this.boss && this.boss.targetable) out.push(this.boss);
+    const w = this.wingAt(this.areas?.id);
+    if (w) out.push(...w.combatTargets());
     return out;
+  }
+
+  // De nya delarna (bastionwings.js): en flygel per område
+  wingAt(id) {
+    return this.wings?.find((w) => w.id === id) ?? null;
+  }
+
+  onTorch(id) {
+    const w = this.wings?.find((q) => id.startsWith(`${q.id}:`));
+    w?.onTorch?.(id);
+    return !!w;
   }
 
   inside(p) {
@@ -986,6 +1014,8 @@ export class Bastion {
         used = true;
       }
     }
+    const w = this.wingAt(this.areas?.id);
+    if (w && w.slam(point, feet)) used = true;
     return used;
   }
 
@@ -1055,6 +1085,7 @@ export class Bastion {
     if (this.trap === 'warden') { this.setBars('d14', false); this.warden.reset(); }
     if (this.trap === 'boss') { this.setBars('d49', false); this.boss.reset(); }
     this.trap = null;
+    this.wingAt(this.areas?.id)?.onPlayerDeath();
   }
 
   // ------------------------------------------------------------------
@@ -1099,6 +1130,9 @@ export class Bastion {
     if (this.game) {
       if (s.cleared.R2) this.game.enemies.killGroup('R2');
     }
+    s.junc = s.junc || {};
+    s.blocks = s.blocks || {};
+    for (const w of this.wings || []) w.applyState();
     this.syncColliders();
   }
 
@@ -1337,6 +1371,8 @@ export class Bastion {
     this.bolt.visible = this.bolt.material.opacity > 0.02;
 
     this.syncColliders();
+    // Den del av fästningen Cello är i just nu
+    this.wingAt(this.areas?.id)?.update(dt, frozen);
   }
 
   collapse() {

@@ -13,6 +13,7 @@ import { createBuilder, StonePath, DECK } from './build.js';
 import { Areas } from './areas.js';
 import { smooth, hash2, box, cyl, cylUV, breakTop, rockGeo, place } from './geom.js';
 import { Bastion } from './bastion.js';
+import { buildBastionWings } from './bastionwings.js';
 import { buildRanch } from './regions/ranch.js';
 import { buildPass } from './regions/pass.js';
 import { buildField } from './regions/field.js';
@@ -817,7 +818,7 @@ export function buildWorld(scene, lights) {
     fog: { color: 0x2c313b, near: 30, far: 220 },
   });
   B.begin(bastionArea);
-  B.bounds(-44, 44, -240, -120);
+  B.bounds(-44, 48, -240, -120);
   const bastion = new Bastion({
     scene: bastionArea.root, S: bastionArea.S, M, tex: B.tex, solid, hidden, collision: bastionArea.collision,
     lights, makeFire, rand, island, flameMat, flameMat2,
@@ -834,8 +835,16 @@ export function buildWorld(scene, lights) {
   bastionArea.entries = {
     south: { pos: V3(0, 0, -130.5), facing: Math.PI },
     entrance: { pos: V3(0, 0, -146), facing: Math.PI },
+    // 0.8: tillbaka från de nya delarna
+    depthStair: { pos: V3(17, -6, -188), facing: Math.PI / 2 },
+    spireDoor: { pos: V3(33.4, 0, -155), facing: -Math.PI / 2 },
+    stormDrop: { pos: V3(0, 0, -192), facing: Math.PI },
   };
-  bastionArea.exits = [{ x0: -3, x1: 3, z0: -127, z1: -110, to: 'cave', entry: 'north', label: 'The Hollow Cave' }];
+  bastionArea.exits = [
+    { x0: -3, x1: 3, z0: -127, z1: -110, to: 'cave', entry: 'north', label: 'The Hollow Cave' },
+    { x0: 8, x1: 10.6, z0: -189.2, z1: -186.8, y: -6, dy: 2, to: 'bdepths', entry: 'entrance', label: 'The Lightning Cisterns', text: 'The stair winds down into the dark...' },
+    { x0: 42, x1: 47, z0: -156.2, z1: -153.8, y: 0, dy: 2, to: 'bspire', entry: 'entrance', label: 'The Thunder Spire' },
+  ];
   bastionArea.connectFns.push((c) => bastion.connect(c));
   bastionArea.updaters.push(() => {});
   {
@@ -848,6 +857,11 @@ export function buildWorld(scene, lights) {
     P(33.8, -177.6, -6);
   }
   B.end();
+  // De fyra nya delarna av fästningen (0.8)
+  const bastionWings = buildBastionWings(B, areas, bastion);
+  bastion.wings = bastionWings;
+  bastion.areas = areas;
+  const BASTION_IDS = new Set(['bastion', ...bastionWings.map((w) => w.id)]);
 
   // =====================================================================
   // Resten av världen
@@ -916,7 +930,9 @@ export function buildWorld(scene, lights) {
     pyramid,
     // Fängelsehålorna: samma gränssnitt (state, interactions, trap, update, combatTargets ...)
     dungeons: { bastion, pyramid },
-    dungeonAt: (id) => (id === 'bastion' ? bastion : id === 'pyramid' ? pyramid : null),
+    dungeonAt: (id) => (BASTION_IDS.has(id) ? bastion : id === 'pyramid' ? pyramid : null),
+    bastionIds: BASTION_IDS,
+    wingAt: (id) => bastion.wingAt(id),
     inPyramid: () => areas.id === 'pyramid',
     slamGate: field.slamGate,
     setSunGate: field.setSunGate,
@@ -931,15 +947,17 @@ export function buildWorld(scene, lights) {
       return a?.isSafe?.(x, z) ?? false;
     },
     inAetheria: (x, z) => areas.id === 'village' && Math.hypot(x, z - AZ) < 32,
-    inBastion: () => areas.id === 'bastion',
+    inBastion: () => BASTION_IDS.has(areas.id),
     inVillage: (x, z) => areas.id === 'village' && Math.hypot(x, z) < 36,
     // Ett område laddas: delarna som beror på sparat läge (dörrar, lyktan i butiken)
     onEnterArea(id, state) {
       for (const r of [reach, interiors, field]) r?.onEnter?.(id, state);
+      bastion.wingAt(id)?.enter();
     },
     // Ett eldfat har tänts
     onTorch(id, story) {
       for (const r of [reach, field]) if (r?.onTorch?.(id, story)) return true;
+      if (bastion.onTorch(id)) return true;
       return false;
     },
     connect(collider) {
@@ -949,6 +967,8 @@ export function buildWorld(scene, lights) {
         for (const fn of a.connectFns) fn(collider);
       }
       collider.building = null;
+      // Fästningens interaktioner samlas från alla dess delar
+      for (const w of bastionWings) bastion.interactions.push(...w.interactions);
     },
     slamEast: field.slamEast,
     lightEast: field.lightEast,

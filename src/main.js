@@ -80,9 +80,15 @@ function start(saved = {}) {
   }
   const bastion = world.bastion;
   const pyramid = world.pyramid;
+  const spotLists = [];
   for (const [id, dg] of Object.entries(world.dungeons)) {
-    for (const s of dg.enemySpots) {
-      const e = enemies.add(s.home, s.path, { kind: s.kind, room: s.room, dormant: s.dormant, respawn: false, bounds: s.bounds, group: id, area: id });
+    spotLists.push([id, dg.enemySpots]);
+    // Fästningens nya delar har egna fiender (0.8)
+    for (const w of dg.wings ?? []) spotLists.push([id, w.enemySpots]);
+  }
+  for (const [id, spots] of spotLists) {
+    for (const s of spots) {
+      const e = enemies.add(s.home, s.path, { kind: s.kind, room: s.room, dormant: s.dormant, respawn: false, bounds: s.bounds, group: id, area: s.area ?? id });
       if (s.kind === 'shield') e.blockHint = 'The shield stops the sword. Strike the ground with the hammer to shatter it!';
       if (s.kind === 'shade') e.immuneHint = 'The blade passes through the shadow. Only sunlight can make it solid!';
     }
@@ -276,7 +282,8 @@ function start(saved = {}) {
     for (const at of B.cutGrass(areas.cur, point, 0, 2.6, Math.PI)) fx.drop(at, 'grass');
     const dg = dungeon();
     if (dg) {
-      const bosses = dg === bastion ? [bastion.warden, bastion.boss] : [pyramid.khepri, pyramid.boss];
+      const wing = dg === bastion ? bastion.wingAt(areas.id) : null;
+      const bosses = wing ? wing.bosses : dg === bastion ? [bastion.warden, bastion.boss] : [pyramid.khepri, pyramid.boss];
       for (const b of bosses) {
         if (!b) continue;
         const hp = b.hp;
@@ -325,11 +332,16 @@ function start(saved = {}) {
   const inRooms = () => {
     const dg = inDungeon() ? dungeon() : null;
     if (!dg) return null;
-    if (dg === bastion) return player.feet.z < -142 ? dg : null;
+    if (dg === bastion) {
+      if (bastion.wingAt(areas.id)) return dg;
+      return player.feet.z < -142 ? dg : null;
+    }
     return dg.inside(player.feet) ? dg : null;
   };
   const drawMap = (mv) => {
     const dg = inRooms();
+    const wing = dg === bastion ? bastion.wingAt(areas.id) : null;
+    if (wing) return mv.drawWing(wing, bastion, player);
     if (dg === bastion) return mv.drawBastion(bastion, player);
     if (dg === pyramid) return mv.drawPyramid(pyramid, player);
     return mv.drawArea(areas, story, player);
@@ -374,6 +386,13 @@ function start(saved = {}) {
       if (bastion.state.cleared.boss && P.z < -196.5) return { id: 'dawn', now: true };
       if (P.z < -150) return { id: 'skull' };
       return { id: 'march' };
+    }
+    // Fästningens nya delar
+    const wing = bastion.wingAt(here);
+    if (wing) {
+      if (wing.bossFight) return { id: 'warlord', now: true };
+      if (wing.trap) return { id: 'march', now: true };
+      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull' }[here] };
     }
     if (here === 'village') {
       if (world.inAetheria(P.x, P.z)) return { id: 'hearth' };

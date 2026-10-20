@@ -372,7 +372,7 @@ export class Story {
     s.spawnAt = this.world.inBastion() ? 'bastion' : 'aetheria';
     s.area = this.areas.id;
     if (entry) s.entry = entry;
-    if (s.area === 'bastion' || s.area === 'pyramid') s.entry = 'entrance';
+    if (this.world.dungeonAt(s.area)) s.entry = 'entrance';
     s.sword = this.player.sword.dur;
     this.goat?.store(s);
     this.inventory?.store(s);
@@ -712,7 +712,7 @@ export class Story {
   // Var Cello börjar om efter att ha fallit i strid: där han kom in i området
   respawnPoint() {
     const a = this.areas.cur;
-    if (a.id === 'bastion' || a.id === 'pyramid') return a.entry('entrance');
+    if (this.world.dungeonAt(a.id)) return a.entry('entrance');
     return a.entry(this.state.entry);
   }
 
@@ -1319,7 +1319,7 @@ export class Story {
           if (Math.abs(ox) > Math.abs(oz)) P.nudge(-Math.sign(ox) * 0.5, 0); else P.nudge(0, -Math.sign(oz) * 0.5);
           P.vel.set(0, P.vel.y, 0);
           this.gateNotice(block);
-        } else this.travel(ex.to, ex.entry);
+        } else this.travel(ex.to, ex.entry, ex.text ? { text: ex.text } : undefined);
       }
     }
 
@@ -1334,7 +1334,9 @@ export class Story {
     this.prompt = null;
     if (!this.dialog.active && !this.fade && !this.cinematic && P.state === 'move' && P.grounded && !P.carried && !this.combat.lock) {
       let best = null, bd = Infinity;
-      const list = P.mount ? [] : this.world.dungeonAt(here)?.interactions ?? this.interactions;
+      const dg = this.world.dungeonAt(here);
+      // I fängelsehålorna: deras egna saker, plus eldfaten och annat som hör till just det området
+      const list = P.mount ? [] : dg ? dg.interactions.concat(this.interactions.filter((it) => it.area === here)) : this.interactions;
       if (P.mount) best = this.dismountIt;
       for (const it of list) {
         if (it.area && it.area !== here) continue;
