@@ -5,7 +5,7 @@
 //                        P7 Apophis' helgedom (cirkel kring 0, -66.5)
 //                                   │ bossdörr (Solnyckeln)
 //   P5 Spegelgalleriet ── slöja ── P4 Ras sal ── nyckeldörr ── P6 Skarabégropen (Khepri → prisman)
-//   (två solögon, Solnyckeln)     (ljusschakt)
+//   (två solögon → trappan ner)   (ljusschakt)
 //                                   │ nyckeldörr
 //   P2 Skuggkryptan ──────────── P1 Förkammaren ── ögondörr ── P3 Solgården (nyckel 1)
 //   (fällrum, nyckel 2,           │ ingång (från öknen)
@@ -14,7 +14,8 @@
 // Vägen genom pyramiden:
 //   P1 (karta, spegeln väcker ögat över östra dörren) → P3 (två speglar, nyckel 1) → P2 (fällrum, nyckel 2)
 //   → P4 → P6 (Khepri, Ra's Shattered Prism) → P4 (skuggor, schaktet bränner slöjan) → P5 (speglar,
-//   schakt och två solögon på en gång: Solnyckeln) → P4 bossdörren → P7 Apophis
+//   schakt och två solögon på en gång öppnar trappan ner) → de fyra nya delarna (pyramidwings.js) upp till toppen,
+//   där Solnyckeln ligger → ljusrännan ner till P4 bossdörren → P7 Apophis
 import * as THREE from 'three';
 import { box, cyl, rockGeo, place, hash2 } from './geom.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -51,6 +52,8 @@ const DOORS = [
   { id: 'd45', x: -14, z: -33, axis: 'x', type: 'veil', neg: 'P5', pos: 'P4' },
   { id: 'd46', x: 14, z: -33, axis: 'x', type: 'key', neg: 'P4', pos: 'P6' },
   { id: 'd47', x: 0, z: -46.5, axis: 'z', type: 'boss', neg: 'C7', pos: 'P4' },
+  // 0.10: trappan ner till The Sunken Galleries (solögonen i spegelgalleriet öppnar den)
+  { id: 'd5w', x: -38, z: -31, axis: 'x', type: 'eye', neg: null, pos: 'P5' },
 ];
 
 const INSCRIPTIONS = [
@@ -58,7 +61,7 @@ const INSCRIPTIONS = [
   { x: 17.5, z: -1.0, face: Math.PI, text: ['Carved into the sandstone:', '"The sun turns twice before it rests."'] },
   { x: -15, z: -1.0, face: Math.PI, text: ['Carved into the sandstone:', '"Here sleep those the light forgot. Shadow fears the sun, and nothing else."'] },
   { x: 4.6, z: -21.0, face: Math.PI, text: ['Carved into the sandstone:', `"Where Ra's light falls from the summit, the hand that holds it may burn the night."`] },
-  { x: -26, z: -21.0, face: Math.PI, text: ['Carved into the sandstone:', '"Two eyes of Ra must see the sun at once. One drinks the window\'s light, the other the light you carry."'] },
+  { x: -26, z: -21.0, face: Math.PI, text: ['Carved into the sandstone:', '"Two eyes of Ra must see the sun at once. One drinks the window\'s light, the other the light you carry. Then the way to the deep opens."'] },
   { x: 4.4, z: -45.0, face: 0, text: ['Carved above the great door:', '"Behind this door the serpent of chaos dreams of a world without sun."'] },
 ];
 
@@ -209,7 +212,14 @@ export class Pyramid {
     // Spegelgalleriet
     W('x', -38, -14, -20, -19, []);
     W('x', -38, -14, -47, -46, []);
-    W('z', -46, -20, -38, -37, []);
+    W('z', -46, -20, -38, -37, [{ c: -31 }]);
+    // Gången västerut till trappan ner
+    this.slab(-47, -37, -1, 0, -32.2, -29.8, M.sandstone, 2);
+    this.wall('x', -47, -38, -33.2, -32.2, []);
+    this.wall('x', -47, -38, -29.8, -28.8, []);
+    this.wall('z', -33.2, -28.8, -48, -47, []);
+    this.ceiling(-48, -38, -33.2, -28.8, null, H);
+    for (let i = 0; i < 4; i++) this.deco(box(0.9, 0.08, 2.3, 1), M.sandstoneDark, -45.6 + i * 0.9, 0.02, -31);
     W('z', -46, -20, -15, -14, [{ c: -33 }]);
     // Skarabégropen
     W('x', 14, 38, -20, -19, []);
@@ -239,6 +249,7 @@ export class Pyramid {
     const sunMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
     const barMat = new THREE.MeshLambertMaterial({ color: 0x3a2c1c, flatShading: true });
     this.eyeDoorMat = new THREE.MeshBasicMaterial({ color: 0x5a3a18 });
+    this.eyeDoorMat2 = new THREE.MeshBasicMaterial({ color: 0x5a3a18 });
     for (const d0 of DOORS) {
       const d = { ...d0, x: OX + d0.x };
       const g = new THREE.Group();
@@ -261,7 +272,7 @@ export class Pyramid {
             slab.add(disc, place(new THREE.Mesh(new THREE.CircleGeometry(0.4, 14), sunMat), 0, 2.0, 0.41 * s));
             if (s < 0) slab.children[slab.children.length - 1].rotation.y = Math.PI;
           } else if (d.type === 'eye') {
-            const eye = place(new THREE.Mesh(new THREE.CircleGeometry(0.42, 14), this.eyeDoorMat), 0, 2.4, 0.21 * s);
+            const eye = place(new THREE.Mesh(new THREE.CircleGeometry(0.42, 14), d.id === 'd5w' ? this.eyeDoorMat2 : this.eyeDoorMat), 0, 2.4, 0.21 * s);
             if (s < 0) eye.rotation.y = Math.PI;
             slab.add(eye, place(new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.07, 4, 14), M.goldPlate), 0, 2.4, 0.21 * s));
           }
@@ -459,10 +470,8 @@ export class Pyramid {
       { id: 'pKey1', x: 28.5, y: 0, z: -15.5, face: -Math.PI / 2, item: 'pkey', room: 'P3', cage: 'c3' },
       { id: 'pKey2', x: -17.5, y: 0, z: -15.6, face: 0, item: 'pkey', room: 'P2', hidden: true },
       { id: 'pCrypt', x: -32.2, y: 0, z: -9, face: Math.PI / 2, shards: 100, room: 'P2' },
-      { id: 'pSun', x: -34, y: 0.5, z: -31, face: Math.PI / 2, item: 'sunkey', room: 'P5', big: true, cage: 'c5' },
     ];
     this.B.solid(place(new THREE.Mesh(cyl(1.1, 1.5, 0.3, 12, 1), M.sandstoneDark), OX + 6.5, 0.15, -3.5));
-    this.B.solid(place(new THREE.Mesh(box(2.6, 0.5, 2.6, 1), M.sandstoneDark), OX - 34, 0.25, -31));
     for (const d0 of defs) {
       const def = { ...d0, x: OX + d0.x };
       const g = new THREE.Group();
@@ -498,7 +507,6 @@ export class Pyramid {
       this.cages[id] = { g, x: OX + x, z, y0, half, y: 0, target: 0, box: null };
     };
     mkCage('c3', 28.5, -15.5, 0, 1.05);
-    mkCage('c5', -34, -31, 0.5, 1.2);
   }
 
   // ---------------- Prismans piedestal i skarabégropen ----------------
@@ -655,7 +663,20 @@ export class Pyramid {
     this.buildInteractions();
   }
 
+  // De nya delarna (pyramidwings.js): en flygel per område
+  wingAt(id) {
+    return this.wings?.find((w) => w.id === id) ?? null;
+  }
+
+  onTorch(id) {
+    const w = this.wings?.find((q) => id.startsWith(`${q.id}:`));
+    w?.onTorch?.(id);
+    return !!w;
+  }
+
   combatTargets() {
+    const wing = this.wingAt(this.areas?.id);
+    if (wing) return wing.combatTargets();
     const out = [];
     if (this.khepri?.targetable) out.push(this.khepri);
     if (this.boss?.targetable) out.push(this.boss);
@@ -729,7 +750,9 @@ export class Pyramid {
         this.interactions.push({
           label: 'Examine the door', pos: () => front(d, side(d)), radius: 1.9,
           ok: () => !this.state.doors.includes(d.id),
-          run: () => this.game.story.read(['A sun eye is carved into the door. It is dull and closed.', 'Somewhere in this room, light is waiting to be turned.']),
+          run: () => this.game.story.read(d.id === 'd5w'
+            ? ['A sun eye is carved into the door. Stairs lead down behind it, into the dark.', 'Both eyes of Ra in this gallery must see the sun at once.']
+            : ['A sun eye is carved into the door. It is dull and closed.', 'Somewhere in this room, light is waiting to be turned.']),
         });
       } else if (d.type === 'veil') {
         this.interactions.push({
@@ -817,8 +840,9 @@ export class Pyramid {
   }
 
   // Hammarslaget: inga plattor här, men Khepri vänds på rygg (main.js sköter bossarna)
-  slam() {
-    return false;
+  slam(point, feet) {
+    const w = this.wingAt(this.areas?.id);
+    return w ? w.slam(point, feet) : false;
   }
 
   // ------------------------------------------------------------------
@@ -911,6 +935,7 @@ export class Pyramid {
       for (const e of this.game.enemies.list) if (e.room === grp && e.trapGroup) { e.dormant = true; e.reset(); }
     }
     this.trap = null;
+    this.wingAt(this.areas?.id)?.onPlayerDeath();
   }
 
   // ------------------------------------------------------------------
@@ -935,7 +960,12 @@ export class Pyramid {
       c.g.visible = !c.hidden || !!s.cleared.P2;
     }
     this.cages.c3.y = this.cages.c3.target = s.solved.e3 ? 2.4 : 0;
-    this.cages.c5.y = this.cages.c5.target = s.solved.sun ? 2.4 : 0;
+    // 0.9 och tidigare: tvillingögonen gav Solnyckeln, nu öppnar de trappan ner
+    if (s.solved.sun && !s.doors.includes('d5w')) s.doors.push('d5w');
+    this.eyeDoorMat2.color.set(s.solved.sun ? 0xffc040 : 0x5a3a18);
+    s.junc = s.junc || {};
+    s.blocks = s.blocks || {};
+    for (const w of this.wings || []) w.applyState();
     const bz = this.beams;
     const defaults = { m1: 2, m3a: 0, m3b: 0, m5a: 0, m5b: 0, m5c: 0 };
     for (const m of bz.mirrors) {
@@ -986,6 +1016,9 @@ export class Pyramid {
   update(dt, t, frozen = false) {
     const g = this.game;
     if (!g) return;
+    // I en av de nya delarna sköter flygeln allt
+    const wing = this.wingAt(this.areas?.id);
+    if (wing) { wing.update(dt, frozen); return; }
     this.t += dt;
     const p = g.player;
     this.beams.ctx.sfx = g.sfx;
@@ -1044,9 +1077,10 @@ export class Pyramid {
     // Spegelgalleriet: båda ögonen måste se solen samtidigt
     if (!this.state.solved.sun && this.eyeA.on && this.eyeB.on) {
       this.state.solved.sun = true;
-      this.cages.c5.target = 2.4;
+      this.openDoor('d5w');
+      this.eyeDoorMat2.color.set(0xffc040);
       g.sfx.play('secret');
-      g.hud.toast('Both eyes of Ra see the sun – the golden cage rises!', 3000);
+      g.hud.toast('Both eyes of Ra see the sun! In the west wall, a door to the depths grinds open.', 3600);
       g.story.save(true);
     }
     // Tips: prisman i ljuset

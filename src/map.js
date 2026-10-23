@@ -324,9 +324,9 @@ export class MapView {
     g.fillText(wg.name, 14 * dpr, 24 * dpr);
     g.font = `${12 * dpr}px "Barlow Semi Condensed", sans-serif`;
     g.fillStyle = COL.dim;
-    const fl = rooms[0]?.floor && rooms[0].floor !== 'F' ? `Floor ${rooms[0].floor}` : 'The Tempest Bastion';
+    const fl = rooms[0]?.floor && rooms[0].floor !== 'F' ? `Floor ${rooms[0].floor}` : (bastion.title ?? 'The Tempest Bastion');
     const roomName = here ? wg.rooms[here].name : '';
-    const items = [fl, roomName, `Keys: ${s.keys}`, s.bossKey ? 'Storm Key ✓' : ''].filter(Boolean);
+    const items = [fl, roomName, `Keys: ${s.keys}`, s.bossKey ? `${bastion.bossKeyName ?? 'Storm Key'} ✓` : ''].filter(Boolean);
     g.fillText(items.join('   ·   '), 14 * dpr, 42 * dpr);
   }
 

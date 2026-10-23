@@ -37,6 +37,7 @@ export class Beams {
     this.mirrors = [];
     this.eyes = [];
     this.veils = [];
+    this.splitters = [];
     this.targets = () => [];
     this.segs = [];
     this.hits = [];
@@ -173,6 +174,24 @@ export class Beams {
     this.ctx.sfx?.play('stonegrind', { vol: 0.8 });
   }
 
+  // Solkristall (0.10): delar en stråle i två, åt vänster och åt höger (vinkelrätt mot strålen)
+  addSplitter(id, pos, M = {}, opts = {}) {
+    const g = new THREE.Group();
+    g.position.copy(pos);
+    this.parent.add(g);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 0.75, 6), M.base);
+    base.position.y = 0.37;
+    g.add(base);
+    const mat = new THREE.MeshLambertMaterial({ color: 0xbfe6ff, emissive: 0x2a4a60, transparent: true, opacity: 0.85, flatShading: true });
+    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0), mat);
+    gem.scale.set(1, 1.35, 1);
+    gem.position.y = BEAM_Y;
+    g.add(gem);
+    const s = { id, pos: pos.clone(), center: new THREE.Vector3(pos.x, pos.y + BEAM_Y, pos.z), g, gem, mat, lit: 0, room: opts.room };
+    this.splitters.push(s);
+    return s;
+  }
+
   addEye(id, pos, facing, opts = {}) {
     const g = new THREE.Group();
     g.position.copy(pos);
@@ -232,7 +251,7 @@ export class Beams {
   connect(collider) {
     this.collider = collider;
     for (const v of this.veils) v.box = collider.addBox(v.bbox.min.x, v.bbox.min.y, v.bbox.min.z, v.bbox.max.x, v.bbox.max.y, v.bbox.max.z, `veil-${v.id}`);
-    for (const m of this.mirrors) m.box = collider.addBox(m.pos.x - 0.45, m.pos.y, m.pos.z - 0.45, m.pos.x + 0.45, m.pos.y + 1.0, m.pos.z + 0.45, `mirror-${m.id}`);
+    for (const m of this.mirrors) if (!m.onBlock) m.box = collider.addBox(m.pos.x - 0.45, m.pos.y, m.pos.z - 0.45, m.pos.x + 0.45, m.pos.y + 1.0, m.pos.z + 0.45, `mirror-${m.id}`);
   }
 
   setVeil(v, burnt) {
@@ -251,7 +270,7 @@ export class Beams {
 
   // ---------- strålarna ----------
   // Följer en stråle från o i riktning d. Returnerar segmenten och vad den slutade i.
-  trace(o0, d0, player, skip = null) {
+  trace(o0, d0, player, skip = null, depth = 0) {
     const out = [];
     const o = o0.clone(), d = d0.clone().normalize();
     let from = skip;
@@ -260,7 +279,7 @@ export class Beams {
       _ray.origin.copy(o);
       _ray.direction.copy(d);
       let best = MAX_LEN, kind = 'wall', obj = null;
-      const wall = this.collider.rayIntersect(_ray, MAX_LEN);
+      const wall = this.collider.rayIntersect(_ray, MAX_LEN, true);
       if (wall) best = wall.distance;
       for (const v of this.veils) {
         if (v.burnt) continue;
@@ -271,6 +290,11 @@ export class Beams {
         if (m === from) continue;
         const t = raySphere(o, d, m.center, 0.5, best);
         if (t !== null && t < best) { best = t; kind = 'mirror'; obj = m; }
+      }
+      for (const sp of this.splitters) {
+        if (sp === from) continue;
+        const t = raySphere(o, d, sp.center, 0.5, best);
+        if (t !== null && t < best) { best = t; kind = 'splitter'; obj = sp; }
       }
       for (const e of this.eyes) {
         if (e.sleeping) continue;
@@ -292,8 +316,20 @@ export class Beams {
         if (t !== null && t < best && player.state !== 'dead') { best = t; kind = 'player'; obj = player; }
       }
       const end = o.clone().addScaledVector(d, best);
-      if (kind === 'mirror') end.copy(obj.center);
+      if (kind === 'mirror' || kind === 'splitter') end.copy(obj.center);
       out.push({ a: o.clone(), b: end, kind, obj });
+      if (kind === 'splitter') {
+        // Två nya strålar, vinkelrätt åt vänster och höger
+        if (depth < 4) {
+          for (const sgn of [1, -1]) {
+            const nd = new THREE.Vector3(d.z * sgn, 0, -d.x * sgn);
+            const ang = Math.round(Math.atan2(nd.x, nd.z) / (Math.PI / 4)) * (Math.PI / 4);
+            nd.set(Math.sin(ang), 0, Math.cos(ang));
+            out.push(...this.trace(obj.center, nd, player, obj, depth + 1));
+          }
+        }
+        break;
+      }
       if (kind === 'mirror') {
         const n = this.mirrorNormal(obj, _v);
         const dn = d.dot(n);
@@ -322,6 +358,7 @@ export class Beams {
     this.t += dt;
     const P = g.player;
     for (const e of this.eyes) e.lit = false;
+    for (const v of this.veils) v.litNow = false;
     for (const tg of this.targets()) tg.beamLit = false;
     const all = [];
     if (this.enabled && this.collider) {
@@ -353,7 +390,7 @@ export class Beams {
       seg.g.quaternion.copy(_q);
       const pulse = 1 + Math.sin(this.t * 18 + si) * 0.12;
       seg.g.scale.set(pulse, pulse, Math.max(0.01, len));
-      if (s.kind !== 'mirror' && s.kind !== 'player' || (s.kind === 'player' && !P.prismUp)) {
+      if (s.kind !== 'mirror' && s.kind !== 'splitter' && s.kind !== 'player' || (s.kind === 'player' && !P.prismUp)) {
         if (hi < this.hits.length) {
           const sp = this.hits[hi++];
           sp.visible = true;
@@ -367,6 +404,7 @@ export class Beams {
       else if (s.kind === 'veil') this.burnVeil(s.obj, dt, g, s.b);
       else if (s.kind === 'target') { s.obj.beamLit = true; s.obj.onBeam?.(dt, g, s.b); }
       else if (s.kind === 'mirror') s.obj.lit = 0.25;
+      else if (s.kind === 'splitter') s.obj.lit = 0.3;
     }
     for (; si < this.segs.length; si++) this.segs[si].g.visible = false;
     for (; hi < this.hits.length; hi++) this.hits[hi].visible = false;
@@ -412,6 +450,14 @@ export class Beams {
       m.lit = Math.max(0, m.lit - dt);
       m.glassMat.emissive.setRGB(0.25 + m.lit * 2, 0.19 + m.lit * 1.5, 0.12 + m.lit * 0.6);
     }
+    // Solkristallerna snurrar och lyser när ljuset går igenom dem
+    for (const sp of this.splitters) {
+      sp.gem.rotation.y += dt * (0.6 + sp.lit * 4);
+      if (sp.lit > 0 && !sp.wasLit) this.ctx.sfx?.play('crystal', { vol: 0.6 });
+      sp.wasLit = sp.lit > 0;
+      sp.lit = Math.max(0, sp.lit - dt);
+      sp.mat.emissive.setRGB(0.16 + sp.lit * 2.5, 0.29 + sp.lit * 2.2, 0.38 + sp.lit * 1.6);
+    }
     // Slöjorna bleknar när de har brunnit
     for (const v of this.veils) {
       if (v.burnt && v.mesh.visible) {
@@ -419,6 +465,8 @@ export class Beams {
         v.mat.opacity = Math.max(0, v.fade) * 0.94;
         if (v.fade <= 0) v.mesh.visible = false;
       } else if (!v.burnt) {
+        // Slöjan läker om ljuset försvinner innan den har brunnit upp
+        if (!v.litNow) v.burn = Math.max(0, v.burn - dt * 0.7);
         v.mat.opacity = 0.94 - v.burn * 0.4;
         v.mesh.position.y = v.center.y + Math.sin(this.t * 2 + v.center.x) * 0.03;
       }
@@ -427,6 +475,7 @@ export class Beams {
 
   burnVeil(v, dt, g, at) {
     if (v.burnt) return;
+    v.litNow = true;
     v.burn += dt / 1.3;
     if (Math.random() < dt * 20) g.fx.burst('ash', at.clone(), 2);
     if (Math.random() < dt * 4) g.sfx.play('sizzle', { vol: 0.5 });

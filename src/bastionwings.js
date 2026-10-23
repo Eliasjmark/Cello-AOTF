@@ -509,6 +509,7 @@ export function buildBastionWings(B, areas, bastion) {
     for (const [x, z] of [[-13, -3], [13, -3], [-13, -29], [13, -29], [-3, 7], [3, 7]]) w.brazier(x, z);
     w.inscription(5, -3, Math.PI, ['Carved into the iron:', '"Two wardens, one oath. When one is struck, the other strikes back."']);
     // Två Järnväktare på en gång
+    w.fightBars = ['c01'];
     w.onConnect.push(() => {
       const mkW = (x, f) => {
         const b = new IronWarden(w.D, w.V(x, 0, -20), f, w.rooms.C1, w.groundAt);

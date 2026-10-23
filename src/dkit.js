@@ -29,6 +29,12 @@ export class Wing {
     this.H = opts.H ?? 6.5;
     this.floorMat = opts.floorMat ?? B.M.ironFloor;
     this.wallMat = opts.wallMat ?? B.M.ironWall;
+    // Materialen för dörrar, eldfat, block och list (fästningen: järn och koppar, pyramiden: sandsten och guld)
+    const M0 = B.M;
+    this.mats = {
+      slab: M0.ironWall, trim: M0.copper, metal: M0.iron, runes: M0.runes, cracked: M0.cracked, block: M0.ironWall, rubble: M0.char,
+      ...(opts.mats || {}),
+    };
     this.D = new THREE.Group();
     area.root.add(this.D);
     this.rooms = {};
@@ -135,8 +141,8 @@ export class Wing {
 
   brazier(x, z, y = 0) {
     const B = this.B, M = this.M;
-    B.solid(place(new THREE.Mesh(cyl(0.18, 0.28, 1.1, 6, 1), M.ironWall), this.ox + x, y + 0.55, z));
-    B.deco(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.3, 0.4, 8), M.iron), this.ox + x, y + 1.2, z);
+    B.solid(place(new THREE.Mesh(cyl(0.18, 0.28, 1.1, 6, 1), this.mats.slab), this.ox + x, y + 0.55, z));
+    B.deco(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.3, 0.4, 8), this.mats.metal), this.ox + x, y + 1.2, z);
     B.makeFire(this.ox + x, y + 1.25, z, 0.65, 16, 3);
   }
 
@@ -148,7 +154,7 @@ export class Wing {
   }
 
   inscription(x, z, face, lines, y = 0) {
-    const m = new THREE.Mesh(box(1.3, 1.7, 0.3, 1.3), this.M.runes);
+    const m = new THREE.Mesh(box(1.3, 1.7, 0.3, 1.3), this.mats.runes);
     m.position.set(this.ox + x, y + 0.85, z);
     m.rotation.y = face;
     this.B.solid(m);
@@ -181,8 +187,8 @@ export class Wing {
     g.add(slab);
     const barMat = this.barMat ?? (this.barMat = new THREE.MeshLambertMaterial({ color: 0x2c2c32, flatShading: true }));
     if (d.type !== 'open') {
-      slab.add(place(new THREE.Mesh(box(2.6, 3.8, 0.4, 1.3), M.ironWall), 0, 1.9, 0));
-      for (const y of [0.6, 3.2]) slab.add(place(new THREE.Mesh(box(2.6, 0.18, 0.5, 1), M.copper), 0, y, 0));
+      slab.add(place(new THREE.Mesh(box(2.6, 3.8, 0.4, 1.3), this.mats.slab), 0, 1.9, 0));
+      for (const y of [0.6, 3.2]) slab.add(place(new THREE.Mesh(box(2.6, 0.18, 0.5, 1), this.mats.trim), 0, y, 0));
       const lockMat = new THREE.MeshLambertMaterial({ color: 0x9a7a3a, flatShading: true });
       for (const s of [-1, 1]) {
         if (d.type === 'key') {
@@ -353,7 +359,7 @@ export class Wing {
         n.coilMat = mat;
         n.charge = 0;
       } else if (n.kind === 'broken') {
-        this.D.add(place(new THREE.Mesh(rockGeo(0.3, 3000 + hash2(n.x, n.z) * 99, 0.5), M.char), n.x, n.y + 0.1, n.z));
+        this.D.add(place(new THREE.Mesh(rockGeo(0.3, 3000 + hash2(n.x, n.z) * 99, 0.5), this.mats.rubble), n.x, n.y + 0.1, n.z));
       }
     }
   }
@@ -468,7 +474,7 @@ export class Wing {
     const m = new THREE.Mesh(box(1.8, 0.16, 1.8, 1), mat);
     m.position.set(this.ox + x, (o.y ?? 0) + 0.06, z);
     this.D.add(m);
-    for (const s of [-1, 1]) this.D.add(place(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.04, 0.1), this.M.copper), this.ox + x, (o.y ?? 0) + 0.15, z + s * 0.85));
+    for (const s of [-1, 1]) this.D.add(place(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.04, 0.1), this.mats.trim), this.ox + x, (o.y ?? 0) + 0.15, z + s * 0.85));
     const p = { id, x: this.ox + x, z, y: o.y ?? 0, mat, m, pressed: false, onChange: o.onChange ?? null, blockOnly: !!o.blockOnly };
     this.pressure.push(p);
     return p;
@@ -481,15 +487,15 @@ export class Wing {
     for (const [c, r] of walls) {
       const x = x0 + c * 2, z = z0 + r * 2;
       this.slab(x - 0.95, x + 0.95, -1, 2.6, z - 0.95, z + 0.95, this.wallMat);
-      this.deco(box(2.0, 0.2, 2.0, 1), this.M.copper, x, 2.7, z);
+      this.deco(box(2.0, 0.2, 2.0, 1), this.mats.trim, x, 2.7, z);
     }
     return g;
   }
 
   pushBlock(id, gridId, c, r) {
     const g = this.blockGrids.find((q) => q.id === gridId);
-    const m = new THREE.Mesh(box(1.9, 1.9, 1.9, 1.9), this.M.ironWall);
-    const band = new THREE.Mesh(box(1.94, 0.2, 1.94, 1), this.M.copper);
+    const m = new THREE.Mesh(box(1.9, 1.9, 1.9, 1.9), this.mats.block);
+    const band = new THREE.Mesh(box(1.94, 0.2, 1.94, 1), this.mats.trim);
     band.position.y = 0.4;
     m.add(band);
     const b = { id, g, home: [c, r], c, r, m, box: null, slide: null, pushT: 0 };
@@ -523,11 +529,11 @@ export class Wing {
 
   // ---------------- spruckna golv ----------------
   // En platta som rasar när Cello står på den med tung vikt
-  crackTile(x0, x1, z0, z1, y = 0) {
-    const m = new THREE.Mesh(box(x1 - x0 - 0.02, 0.5, z1 - z0 - 0.02, 2), this.M.cracked);
+  crackTile(x0, x1, z0, z1, y = 0, o = {}) {
+    const m = new THREE.Mesh(box(x1 - x0 - 0.02, 0.5, z1 - z0 - 0.02, 2), o.mat ?? this.mats.cracked);
     m.position.set(this.ox + (x0 + x1) / 2, y - 0.25, (z0 + z1) / 2);
     this.D.add(m);
-    const t = { x0: this.ox + x0, x1: this.ox + x1, z0, z1, y, m, box: null, fallen: false, crack: 0, vy: 0 };
+    const t = { x0: this.ox + x0, x1: this.ox + x1, z0, z1, y, m, box: null, fallen: false, crack: 0, vy: 0, sand: !!o.sand };
     this.tiles.push(t);
     return t;
   }
@@ -535,15 +541,16 @@ export class Wing {
   // ---------------- stormvind ----------------
   // Vind i stötar: dir = [dx, dz], strength i m/s, period och andel av perioden som blåser
   wind(x0, x1, z0, z1, dir, o = {}) {
-    const w = { x0: this.ox + x0, x1: this.ox + x1, z0, z1, y0: o.y0 ?? -4, y1: o.y1 ?? 6, dir, strength: o.strength ?? 7.5, period: o.period ?? 3.2, on: o.on ?? 0.55, phase: o.phase ?? 0, gust: 0 };
+    const w = { x0: this.ox + x0, x1: this.ox + x1, z0, z1, y0: o.y0 ?? -4, y1: o.y1 ?? 6, dir, strength: o.strength ?? 7.5, period: o.period ?? 3.2, on: o.on ?? 0.55, phase: o.phase ?? 0, gust: 0, sand: !!o.sand };
     const n = 70;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 6), 3).setUsage(THREE.DynamicDrawUsage));
-    w.lines = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xc8d4e8, transparent: true, opacity: 0.3 }));
+    w.lines = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: w.sand ? 0xe0b878 : 0xc8d4e8, transparent: true, opacity: 0.3 }));
     w.lines.frustumCulled = false;
     this.D.add(w.lines);
     w.seeds = [];
-    for (let i = 0; i < n; i++) w.seeds.push({ x: w.x0 + Math.random() * (w.x1 - w.x0), y: w.y0 + 3 + Math.random() * 5, z: w.z0 + Math.random() * (w.z1 - w.z0), s: 0.8 + Math.random() * 0.4 });
+    // Sanden rinner längs golvet, stormen blåser högre upp
+    for (let i = 0; i < n; i++) w.seeds.push({ x: w.x0 + Math.random() * (w.x1 - w.x0), y: w.sand ? (o.floor ?? 0) + 0.05 + Math.random() * 0.5 : w.y0 + 3 + Math.random() * 5, z: w.z0 + Math.random() * (w.z1 - w.z0), s: 0.8 + Math.random() * 0.4 });
     this.winds.push(w);
     return w;
   }
@@ -754,6 +761,8 @@ export class Wing {
       this.trap = null;
     }
     for (const b of this.bosses) if (b.state !== 'gone' && b.state !== 'dormant' && !this.state.cleared[b.clearId]) b.reset();
+    // Gallren som en bossstrid sänkte går upp igen
+    if (this.bossFight) for (const id of this.fightBars || []) this.setBars(id, false);
     this.bossFight = false;
   }
 
@@ -921,7 +930,7 @@ export class Wing {
         if (t.m.visible) {
           t.vy -= 20 * dt;
           t.m.position.y += t.vy * dt;
-          t.m.rotation.x += dt * 1.5;
+          if (!t.sand) t.m.rotation.x += dt * 1.5;
           if (t.m.position.y < t.y - 7) t.m.visible = false;
         }
         continue;
@@ -933,16 +942,22 @@ export class Wing {
         if (t.crack > 0.3) {
           t.fallen = true;
           t.vy = -1;
-          g.sfx.play('crumble', { vol: 0.8 });
+          g.sfx.play(t.sand ? 'sandrush' : 'crumble', { vol: 0.8 });
           g.rig.shake(0.3);
         }
       } else {
         t.crack = Math.max(0, t.crack - dt);
         if (on && !this.hinted.crack) {
           this.hinted.crack = true;
-          g.hud.toast("The floor creaks under Cello's feet... it would not hold anything heavy.", 3200);
+          g.hud.toast(t.sand ? "The sand shifts under Cello's feet... it would swallow anything heavy." : "The floor creaks under Cello's feet... it would not hold anything heavy.", 3200);
         }
       }
+    }
+    // Återuppståndelsen får aldrig ligga på en platta som kan rasa (då faller Cello igen och igen)
+    if (this.tiles.length) {
+      const overTile = (q) => this.tiles.some((t) => q.x > t.x0 - 1.3 && q.x < t.x1 + 1.3 && q.z > t.z0 - 1.3 && q.z < t.z1 + 1.3 && Math.abs(q.y - t.y) < 1);
+      if (overTile(p.safe)) { if (this.safeBackup) p.safe.copy(this.safeBackup); }
+      else (this.safeBackup ??= new THREE.Vector3()).copy(p.safe);
     }
     // Stormvind
     let wx = 0, wz = 0;
@@ -950,7 +965,7 @@ export class Wing {
       const ph = ((this.t + w.phase) % w.period) / w.period;
       const strong = ph < w.on;
       w.gust += ((strong ? w.strength : 0.6) - w.gust) * (1 - Math.exp(-dt * 6));
-      if (strong && !w.wasStrong && this.inZone(w, p.feet, 6)) g.sfx.play('gust', { vol: 0.8 });
+      if (strong && !w.wasStrong && this.inZone(w, p.feet, 6)) g.sfx.play(w.sand ? 'sandrush' : 'gust', { vol: 0.8 });
       w.wasStrong = strong;
       if (this.inZone(w, p.feet)) { wx += w.dir[0] * w.gust; wz += w.dir[1] * w.gust; }
       const a = w.lines.geometry.attributes.position.array;
@@ -967,12 +982,12 @@ export class Wing {
       w.lines.geometry.attributes.position.needsUpdate = true;
       w.lines.material.opacity = 0.1 + w.gust * 0.04;
     }
-    if (this.winds.length) {
-      p.wind.set(wx, 0, wz);
-      if ((wx || wz) && Math.hypot(wx, wz) > 3 && !p.heavy && p.grounded && !this.hinted.wind) {
-        this.hinted.wind = true;
-        g.hud.toast('The storm tears at Cello! With heavy weight he can stand his ground.', 4000);
-      }
+    // Vinden sätts varje bildruta (noll där det inte blåser), så att den inte följer med till nästa område
+    p.wind.set(wx, 0, wz);
+    if ((wx || wz) && Math.hypot(wx, wz) > 3 && !p.heavy && p.grounded && !this.hinted.wind) {
+      this.hinted.wind = true;
+      const sandy = this.winds.some((w) => w.sand && this.inZone(w, p.feet));
+      g.hud.toast(sandy ? 'The river of sand drags Cello along! With heavy weight he can stand his ground.' : 'The storm tears at Cello! With heavy weight he can stand his ground.', 4000);
     }
     // Bossar
     if (!frozen) for (const b of this.bosses) if (b.state !== 'gone' && (b.state !== 'dormant' || this.bossFight)) b.update(dt, g);

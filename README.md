@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.9 · A Hero Awakens (en ny startmeny med Cellos hjältemodell och två sparfiler; pyramiden står näst på tur)
+**Version:** prototyp 0.10 · The Deepening Pyramid (pyramiden fem gånger så stor; fas 8 och 9 står näst på tur i utvecklingsplanen)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -22,6 +22,21 @@ En fristående version (en enda HTML-fil med all kod) byggs med:
 npm install          # en gång, hämtar esbuild
 npm run build:artifact   # → build/play.html
 ```
+
+## Vad är nytt i 0.10: pyramiden blev djupare
+
+Pyramiden har fått samma behandling som fästningen i 0.8: den gamla delen är första våningen, och fyra nya delar laddas när Cello går genom trappor och dörrar (en kort övertoning, ingen dimma). Solögonen i Spegelgalleriet ger inte längre Solnyckeln: de öppnar en dörr i västra väggen och en trappa ner. Solnyckeln ligger nu högst upp.
+
+| Del | Vad som händer |
+| --- | --- |
+| **The Sunken Galleries** | *Den kluvna solens sal:* en ny **solkristall** delar strålen i två, åt vänster och höger. Fyra speglar ska leda båda halvorna till två ögon samtidigt. *De glidande speglarna:* speglar på stenblock som skjuts med tung vikt (strålen går över blocket, men stenblock stoppar den). *Sandfloden:* sand som rinner i stötar mot ett schakt. Med tung vikt står Cello emot, men den lösa sanden sväljer honom, och sandridåer rasar från taket i takt. *Balsamerarnas valv:* fällrum i tre vågor med skuggor och fyra eldfat som lyfter en bur |
+| **The Hall of the Sun Barque** | *Solbåtens sal:* fällrum i tre vågor runt solbåten. *Timmarnas sal:* en spegel som vrider sig själv som en solvisare. Står Cello tungt på bromsplattan stannar den, så att strålen hinner bränna bort tre skuggslöjor framför solögonen (slöjorna läker om ljuset försvinner för tidigt). *Solväktaren:* en ny miniboss i guld. Skölden tar både svärd och hammare, men reflekterat solljus från prisman bländar den |
+| **The Inner Ascent** | En lång ramp där **stenkulor** rullar ner. Bara nischerna i väggarna skyddar. Sedan **timglaset**: vänd det, så stiger sanden i en grop och sjunker i två andra. En väg leder ner till en skattkammare, en annan över sanden till dörren upp |
+| **The Apex of Ra** | Ljuset från toppen, två solkristaller, en kristall på ett block som ska skjutas på plats, två speglar och **fyra solögon som måste lysa på en gång**. Sedan Solnyckeln och en ljusränna rakt ner till Apophis dörr |
+
+Små nycklar: K1 (de glidande speglarna) → dörren till sandfloden · K2 (sandfloden) → valvets norra dörr · K3 (timglasets skattkammare) → dörren upp till toppen.
+
+Nytt i koden: `src/sunkit.js` (solljus, solkristaller, spegel- och kristallblock, solvisaren, sandfall, stenkulor, timglas och sandgropar, Solväktaren) och `src/pyramidwings.js` (pyramidens fyra nya delar). Blockpusslen är kontrollerade med en lösare. Verktygslådan `dkit.js` har fått material per tema, sandströmmar och lös sand. Den räknar inte längre en platta som kan rasa som säker plats att återuppstå på. Galler från en bossstrid går upp igen om Cello dör.
 
 ## Vad är nytt i 0.9: startmenyn
 
@@ -244,6 +259,8 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/bastion.js` | The Tempest Bastion: rum, dörrar, kistor, kretsar, pussel, fällor och bossarna |
 | `src/title.js` | Startmenyn: scenen med hjälten, menyerna, de två sparfilerna och inställningarna |
 | `src/heroModel.js` | Läser hjältemodellen (`models/cello-hero.bin`) |
+| `src/pyramidwings.js` | Pyramidens fyra nya delar (0.10): djupet, solbåten, uppstigningen och toppen |
+| `src/sunkit.js` | Pyramidens verktygslåda: solljus, kristaller, spegelblock, solvisaren, sandfall, stenkulor, timglaset och Solväktaren |
 | `src/bastionwings.js` | Fästningens fyra nya delar (0.8): cisternerna, smedjan, tornet och kronan |
 | `src/dkit.js` | Verktygslådan för fängelsehålor: salar, dörrar, blixtnätet, kondensatorer, järnblock, spruckna golv, stormvind, fällrum och hissar |
 | `src/bosses.js` | Järnväktaren och Hrungnir |

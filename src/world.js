@@ -14,6 +14,7 @@ import { Areas } from './areas.js';
 import { smooth, hash2, box, cyl, cylUV, breakTop, rockGeo, place } from './geom.js';
 import { Bastion } from './bastion.js';
 import { buildBastionWings } from './bastionwings.js';
+import { buildPyramidWings } from './pyramidwings.js';
 import { buildRanch } from './regions/ranch.js';
 import { buildPass } from './regions/pass.js';
 import { buildField } from './regions/field.js';
@@ -888,10 +889,22 @@ export function buildWorld(scene, lights) {
   pyrArea.entries = {
     south: { pos: V3(PYR_X, 0, 9), facing: Math.PI },
     entrance: { pos: V3(PYR_X, 0, 9), facing: Math.PI },
+    // 0.10: tillbaka från de nya delarna
+    fromDepths: { pos: V3(PYR_X - 35, 0, -31), facing: Math.PI / 2 },
+    sunDrop: { pos: V3(PYR_X, 0, -40), facing: Math.PI },
   };
-  pyrArea.exits = [{ x0: PYR_X - 3, x1: PYR_X + 3, z0: 12.5, z1: 20, to: 'desert', entry: 'pyramid', label: 'The Ember Wastes' }];
+  pyrArea.exits = [
+    { x0: PYR_X - 3, x1: PYR_X + 3, z0: 12.5, z1: 20, to: 'desert', entry: 'pyramid', label: 'The Ember Wastes' },
+    { x0: PYR_X - 48, x1: PYR_X - 44.5, z0: -32.2, z1: -29.8, to: 'pdepths', entry: 'entrance', label: 'The Sunken Galleries', text: 'The stair winds down into the dark...' },
+  ];
   pyrArea.connectFns.push((c) => pyramid.connect(c));
   B.end();
+  // De fyra nya delarna av pyramiden (0.10)
+  const pyramidWings = buildPyramidWings(B, areas, pyramid);
+  pyramid.wings = pyramidWings;
+  pyramid.areas = areas;
+  pyramid.bossKeyName = 'Sun Key';
+  const PYRAMID_IDS = new Set(['pyramid', ...pyramidWings.map((w) => w.id)]);
 
   const world = {
     areas,
@@ -930,10 +943,11 @@ export function buildWorld(scene, lights) {
     pyramid,
     // Fängelsehålorna: samma gränssnitt (state, interactions, trap, update, combatTargets ...)
     dungeons: { bastion, pyramid },
-    dungeonAt: (id) => (BASTION_IDS.has(id) ? bastion : id === 'pyramid' ? pyramid : null),
+    dungeonAt: (id) => (BASTION_IDS.has(id) ? bastion : PYRAMID_IDS.has(id) ? pyramid : null),
+    pyramidIds: PYRAMID_IDS,
     bastionIds: BASTION_IDS,
-    wingAt: (id) => bastion.wingAt(id),
-    inPyramid: () => areas.id === 'pyramid',
+    wingAt: (id) => bastion.wingAt(id) ?? pyramid.wingAt(id),
+    inPyramid: () => PYRAMID_IDS.has(areas.id),
     slamGate: field.slamGate,
     setSunGate: field.setSunGate,
     sunGate: field.gate,
@@ -953,11 +967,13 @@ export function buildWorld(scene, lights) {
     onEnterArea(id, state) {
       for (const r of [reach, interiors, field]) r?.onEnter?.(id, state);
       bastion.wingAt(id)?.enter();
+      pyramid.wingAt(id)?.enter();
     },
     // Ett eldfat har tänts
     onTorch(id, story) {
       for (const r of [reach, field]) if (r?.onTorch?.(id, story)) return true;
       if (bastion.onTorch(id)) return true;
+      if (pyramid.onTorch(id)) return true;
       return false;
     },
     connect(collider) {
@@ -969,6 +985,7 @@ export function buildWorld(scene, lights) {
       collider.building = null;
       // Fästningens interaktioner samlas från alla dess delar
       for (const w of bastionWings) bastion.interactions.push(...w.interactions);
+      for (const w of pyramidWings) pyramid.interactions.push(...w.interactions);
     },
     slamEast: field.slamEast,
     lightEast: field.lightEast,

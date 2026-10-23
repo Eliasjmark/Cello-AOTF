@@ -325,6 +325,31 @@ export class Sfx {
         this.osc('sine', 62, 24, t, 0.6, this.gain(t, 0.004, 0.9 * v, 0.6));
         this.noiseThrough('lowpass', 500, 90, 0.8, t, 0.7, this.gain(t, 0.01, 0.5 * v, 0.7), this.brown);
         break;
+      // ---------- 0.10: pyramidens djup ----------
+      case 'sandrush': // sand som rinner i en ström
+        this.noiseThrough('bandpass', 1800, 700, 0.7, t, 1.1, this.gain(t, 0.2, 0.32 * v, 0.9));
+        this.noiseThrough('lowpass', 500, 200, 0.6, t, 1.0, this.gain(t, 0.15, 0.2 * v, 0.9), this.brown);
+        break;
+      case 'sandfall': // en ridå av sand rasar från taket
+        this.noiseThrough('highpass', 2400, 1200, 0.6, t, 1.4, this.gain(t, 0.08, 0.26 * v, 1.3));
+        this.noiseThrough('lowpass', 300, 120, 0.7, t, 0.8, this.gain(t, 0.01, 0.35 * v, 0.8), this.brown);
+        break;
+      case 'boulder': // en stenkula börjar rulla
+        this.noiseThrough('lowpass', 160, 60, 0.9, t, 2.4, this.gain(t, 0.3, 0.7 * v, 2.0), this.brown);
+        this.osc('sine', 48, 36, t, 2.2, this.gain(t, 0.3, 0.3 * v, 1.9));
+        break;
+      case 'crystal': // solkristallen delar ljuset
+        [1318.5, 1975.5, 2637].forEach((f, i) => this.osc('sine', f, f, t + i * 0.05, 0.6, this.gain(t + i * 0.05, 0.003, 0.06 * v, 0.6)));
+        break;
+      case 'rotor': // solvisarens spegel tar ett steg
+        this.osc('square', 220, 180, t, 0.08, this.lowpass(this.gain(t, 0.002, 0.08 * v, 0.08), 1200));
+        this.noiseThrough('bandpass', 900, 500, 1.2, t, 0.12, this.gain(t, 0.004, 0.12 * v, 0.12));
+        break;
+      case 'hourglass': // timglaset vänds: ett dovt slag och sand som börjar rinna
+        this.osc('sine', 110, 70, t, 0.6, this.gain(t, 0.005, 0.5 * v, 0.6));
+        this.noiseThrough('bandpass', 1500, 900, 0.8, t + 0.2, 3.2, this.gain(t + 0.2, 0.4, 0.22 * v, 2.8));
+        [523.25, 783.99].forEach((f, i) => this.osc('triangle', f, f, t + i * 0.12, 0.8, this.gain(t + i * 0.12, 0.004, 0.08 * v, 0.8)));
+        break;
       // ---------- 0.9: startmenyn ----------
       case 'menuMove': // markören flyttas: en liten kristallklang
         this.osc('sine', 1318.5, 1318.5, t, 0.09, this.gain(t, 0.002, 0.07 * v, 0.09));

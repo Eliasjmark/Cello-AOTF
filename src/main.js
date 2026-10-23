@@ -305,7 +305,7 @@ function start(saved = {}) {
     for (const at of B.cutGrass(areas.cur, point, 0, 2.6, Math.PI)) fx.drop(at, 'grass');
     const dg = dungeon();
     if (dg) {
-      const wing = dg === bastion ? bastion.wingAt(areas.id) : null;
+      const wing = dg.wingAt?.(areas.id);
       const bosses = wing ? wing.bosses : dg === bastion ? [bastion.warden, bastion.boss] : [pyramid.khepri, pyramid.boss];
       for (const b of bosses) {
         if (!b) continue;
@@ -357,16 +357,14 @@ function start(saved = {}) {
   const inRooms = () => {
     const dg = inDungeon() ? dungeon() : null;
     if (!dg) return null;
-    if (dg === bastion) {
-      if (bastion.wingAt(areas.id)) return dg;
-      return player.feet.z < -142 ? dg : null;
-    }
+    if (dg.wingAt?.(areas.id)) return dg;
+    if (dg === bastion) return player.feet.z < -142 ? dg : null;
     return dg.inside(player.feet) ? dg : null;
   };
   const drawMap = (mv) => {
     const dg = inRooms();
-    const wing = dg === bastion ? bastion.wingAt(areas.id) : null;
-    if (wing) return mv.drawWing(wing, bastion, player);
+    const wing = dg?.wingAt?.(areas.id);
+    if (wing) return mv.drawWing(wing, dg, player);
     if (dg === bastion) return mv.drawBastion(bastion, player);
     if (dg === pyramid) return mv.drawPyramid(pyramid, player);
     return mv.drawArea(areas, story, player);
@@ -413,12 +411,12 @@ function start(saved = {}) {
       if (P.z < -150) return { id: 'skull' };
       return { id: 'march' };
     }
-    // Fästningens nya delar
-    const wing = bastion.wingAt(here);
+    // Fästningens och pyramidens nya delar
+    const wing = bastion.wingAt(here) ?? pyramid.wingAt(here);
     if (wing) {
       if (wing.bossFight) return { id: 'warlord', now: true };
       if (wing.trap) return { id: 'march', now: true };
-      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull' }[here] };
+      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull', pdepths: 'whispers', pbarque: 'skull', pascent: 'march', papex: 'skull' }[here] };
     }
     if (here === 'village') {
       if (world.inAetheria(P.x, P.z)) return { id: 'hearth' };

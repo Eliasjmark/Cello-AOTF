@@ -112,7 +112,8 @@ export class WorldCollider {
   }
 
   // Som Octree.rayIntersect, men bara inom ett visst avstånd (mycket snabbare i en stor värld).
-  rayIntersect(ray, far = 60) {
+  // beam: solstrålar går igenom lådor märkta noBeam (t.ex. stenblocken under speglarna)
+  rayIntersect(ray, far = 60, beam = false) {
     let best = null, bestT = far;
     _end.copy(ray.origin).addScaledVector(ray.direction, far);
     _seg.start.copy(ray.origin);
@@ -127,7 +128,7 @@ export class WorldCollider {
       if (t < bestT) { bestT = t; best = { distance: t, position: _hit.clone(), triangle: tri }; }
     }
     for (const b of this.boxes) {
-      if (!b.enabled || (b.area && b.area !== this.area)) continue;
+      if (!b.enabled || (b.area && b.area !== this.area) || (beam && b.noBeam)) continue;
       const h = rayBox(ray, b, bestT);
       if (h && h.t < bestT) {
         bestT = h.t;
