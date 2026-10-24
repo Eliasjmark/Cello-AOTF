@@ -61,11 +61,12 @@ function buildHighland(B, areas) {
   const road = R([[0, 112], [0, 92], [-12, 66], [-18, 40], [-6, 12], [12, -10], [15, -32], [5, -52], [0, -66]]);
   const isl = B.island({
     cx: X0, cz: 12, baseR: 102, rNoise: 9, seed: 501, amp: 1.0, hills: 6, hillFreq: 0.022,
-    keepAngles: [Math.PI / 2, -Math.PI / 2], depth: 64, rings: 54, segs: 150, label: 'Stormreach',
+    keepAngles: [Math.PI / 2, -Math.PI / 2, Math.PI], depth: 64, rings: 54, segs: 150, label: 'Stormreach',
     topMat: M.rockTop, mapCol: '#3a3833',
     pads: [
       { x: X0, z: 110, r: 6, h: 0 }, { x: X0, z: -64, r: 12, h: 0 }, { x: X0 + 11, z: -48, r: 6, h: 0 },
       { x: X0 - 34, z: 30, r: 9, h: 1.0 },
+      { x: X0 - 100, z: 12, r: 7, h: 0 },
     ],
     roads: [{ pts: road, w: 3.4 }],
     grass: 260,
@@ -77,6 +78,11 @@ function buildHighland(B, areas) {
   // Bron från fältet och dimman
   B.bridge('z', 110, 132, X0);
   B.mist(X0, -3, 132, 11, 5, 9);
+  // 0.14: bron västerut till The Galecrown (vinden släpper inte förbi någon förrän titanerna har vaknat)
+  B.bridge('x', X0 - 132, X0 - 99, 12, DECK, { rails: true });
+  B.mist(X0 - 132, -3, 12, 11, 5, 9, { axis: 'x' });
+  B.sign(X0 - 94, H(X0 - 94, 16), 16, -Math.PI / 2, ['Carved into a post, the letters scoured by wind:', '"West: the Galecrown. The bridge sings when the wind blows. Lately it screams."']);
+  a.map.pois.push({ x: X0 - 116, z: 12, label: 'The Gale Bridge', icon: 'bridge' });
 
   // ---------- bergväggen i norr med grottans mynning ----------
   const cliffZ = -74;
@@ -194,12 +200,14 @@ function buildHighland(B, areas) {
     south: { pos: V3(X0, DECK, 122), facing: Math.PI },
     cave: { pos: V3(X0, H(X0, cliffZ + 5), cliffZ + 5), facing: 0 },
     rest: { pos: V3(campFire.x - 1.8, H(campFire.x - 1.8, campFire.z + 1.4), campFire.z + 1.4), facing: 2.3 },
+    galecrown: { pos: V3(X0 - 112, DECK, 12), facing: Math.PI / 2 },
   };
   a.exits = [
     { x0: X0 - 3, x1: X0 + 3, z0: 131, z1: 160, to: 'field', entry: 'north' },
     { x0: X0 - 3.2, x1: X0 + 3.2, z0: cliffZ - 12, z1: cliffZ - 3.5, to: 'cave', entry: 'south' },
+    { x0: X0 - 136, x1: X0 - 126, z0: 9, z1: 15, to: 'galecrown', entry: 'east', gale: true, text: 'The wind parts for Cello...' },
   ];
-  a.map.exits = [{ x: X0, z: 131, label: 'The Stormvale', to: 'field' }, { x: X0, z: cliffZ - 4, label: 'The Hollow Cave', to: 'cave' }];
+  a.map.exits = [{ x: X0, z: 131, label: 'The Stormvale', to: 'field' }, { x: X0, z: cliffZ - 4, label: 'The Hollow Cave', to: 'cave' }, { x: X0 - 128, z: 12, label: 'The Galecrown', to: 'galecrown' }];
   B.end();
   return {
     npcs: { fenn: { area: 'stormreach', pos: VV(8.2, -45.6), face: -2.4 } },

@@ -305,6 +305,49 @@ def hydra(target=20000, H=7.0):
     body_v = (Z < -0.05) | (Y < 0.11)
     return finish(m, H, tag, HYDRA_REGIONS, sk_def, cost, locked_mask=body_v, iters=6)
 
+# ---------------------------------------------------------------- Spindelgolemen (The Brass Weaver, 0.14)
+WEAVER_REGIONS = ['bronze', 'iron', 'copper', 'stone']
+
+def weaver(target=14000, H=4.6):
+    m = src('boss4', target)
+    V = m.vertices; X, Y, Z = V.T
+    n = len(V)
+    ax = np.abs(X)
+    tag = np.array([''] * n, dtype=object)
+    def paint(mask, name):
+        tag[mask & (tag == '')] = name
+    paint((Y < 0.42) & (ax < 0.35) & (np.abs(Z) < 0.35), 'stone')      # bakkroppen: sten med koppar
+    paint((Y < 0.36), 'iron')                                          # benen
+    paint((Y > 0.8) & (ax < 0.12) & (Z > 0.0), 'iron')                 # hjälmen
+    paint((ax > 0.25) & (Y > 0.4) & (Y < 0.62), 'copper')              # händerna
+    paint(np.ones(n, bool), 'bronze')
+    J = {
+        'L': [np.array([-0.30, 0.78, 0.02]), np.array([-0.40, 0.62, 0.08]), np.array([-0.44, 0.45, 0.12])],
+        'R': [np.array([0.30, 0.78, 0.02]), np.array([0.40, 0.62, 0.08]), np.array([0.44, 0.45, 0.12])],
+    }
+    def sk_def():
+        sk = Skeleton()
+        sk.add('body', None, [0, 0.4, 0])
+        sk.add('torso', 'body', [0, 0.55, 0])
+        sk.add('head', 'torso', [0, 0.82, 0.12])
+        for nm in ['L', 'R']:
+            sh_, el_, ha_ = J[nm]
+            sk.add('arm' + nm, 'torso', sh_)
+            sk.add('elbow' + nm, 'arm' + nm, el_)
+        return sk
+    def cost(V, bn):
+        X, Y, Z = V.T
+        c = np.full((len(V), len(bn)), 9.0)
+        c[:, bn.index('body')] = np.where(Y < 0.5, 0.4, 3.0)
+        c[:, bn.index('torso')] = column_cost(V, 0.5, 0.82, 0.26, 0.22, 0, -0.02, ry=0.04)
+        c[:, bn.index('head')] = np.where((Y > 0.8) & (np.abs(X) < 0.13) & (Z > 0.0), 0.0, 9.0)
+        for nm in ['L', 'R']:
+            sh_, el_, ha_ = J[nm]
+            c[:, bn.index('arm' + nm)] = capsule_cost(V, [(sh_, el_)], 0.1)
+            c[:, bn.index('elbow' + nm)] = capsule_cost(V, [(el_, ha_), (ha_, ha_ + (ha_ - el_) * 0.5)], 0.07)
+        return c
+    return finish(m, H, tag, WEAVER_REGIONS, sk_def, cost, iters=5)
+
 def build_all():
     d, h = dwarf()
-    return {'bybo': bybo(), 'maiden': maiden(), 'dwarf': d, 'dwarfhammer': h, 'hydra': hydra()}
+    return {'bybo': bybo(), 'maiden': maiden(), 'dwarf': d, 'dwarfhammer': h, 'hydra': hydra(), 'weaver': weaver()}

@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.13 · A New Look (Elias egna 3D-modeller i spelet och ljus)
+**Version:** prototyp 0.14 · The Windbound Spire (ett nytt tempel, titanerna vaknar, Seren följer med, ett moraliskt val och sidouppdrag)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -33,6 +33,24 @@ python3 tools/models/dump_fbx.py Boss1.fbx:boss1 ...   # FBX → tools/models/sr
 python3 tools/models/build_models.py                    # → models/pack.bin
 python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
 ```
+
+## Vad är nytt i 0.14: The Windbound Spire
+
+Titanerna vaknar. Efter nekropolen faller en titan ur stormen över Willowmere, och titankungen **Kronos** talar för första gången. Seren kommer till undsättning, och sedan följer hon med västerut.
+
+- **Mjukare grafik**: texturerna jämnas ut (`soften` i `src/textures.js`) och filtreras mjukt i stället för pixligt, så att världen ser mindre ut som klossar. retroläget (pixlar) är nu av som standard (går att slå på i inställningarna).
+- **Ny region: The Galecrown** (`src/regions/galecrown.js`), över Stormbron väster om Stormreach (bron är stängd av vinden tills titanen har anfallit Willowmere). Seren har sitt läger där. Vägen till tornet går över en stenbro där vindbyarna blåser i takt (gå när det är lugnt, eller gör dig tung).
+- **Nytt tempel: The Windbound Spire** (`src/spire.js`), fyra delar:
+  - *The Gale Gate*: en trappa där vinden blåser nedför (gör dig tung med hammaren), och arkivet med kartan och en nyckel.
+  - *The Hall of Winds*: ett schakt 44 m högt. Ventiler öppnar uppvindar som lyfter Cello mellan balkongerna, och med sandalerna springer man längs väggarna med bronsfjädrar.
+  - *The Weaver's Loom*: miniboss **The Brass Weaver**, en spindelgolem av mässing som hänger i taket och faller som en sten. Fast i golvet är kärnan öppen. Hammarslaget gör den yr.
+  - *The Crown of Storms*: under öppen himmel, bossen **Typhon**, stormtitanen. Näven slår mot plattformen: hugg runstenen på handleden tre gånger, så sjunker han ihop. Rid uppvinden till den övre ringen och hugg hjärtat. Andedräkten blåser Cello mot kanten (göm dig bakom pelarna), och blixtar slår ner där han står.
+- **Ny relik: Hermes Wing Sandals** (knappen för föremål): snabbt läge, högre hopp och väggspring (spring och hoppa mot en vägg snett, hoppa igen för att ta fart från väggen). Sandalerna och hammarens tyngd tar ut varandra.
+- **Moraliskt val**: när Typhon har fallit ber han om nåd. *Skona* honom och han berättar var Kronos sover (och vinden blir snällare: väggspringet räcker längre), eller *förgör* honom (100 skärvor och Kronos vrede).
+- **Sidouppdrag**: Tobs drake (blåste bort till The Galecrown), Fenns brev till Seren, och de tysta klockorna i klocktemplet (tre klockkläppar gömda i regionen, och en skattkista med ett hjärta).
+- Nya röster för Kronos och Typhon, och nya ljud (klockor, sandalerna, väggspring, tyfonen).
+
+Nytt i koden: `src/regions/galecrown.js`, `src/spire.js`, `src/spirekit.js` (vindtemplets delar, uppvindar, ventiler, The Brass Weaver och Typhon), `src/chronicle.js` (berättelsen i 0.14: anfallet, Seren, valet och sidouppdragen) och modellen `weaver()` i `tools/models/people.py`.
 
 ## Vad är nytt i 0.13: ett nytt utseende
 
@@ -314,7 +332,7 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/areas.js` | Områdena: var och en har sin egen grupp, sitt kollisionsträd, ingångar och utgångar |
 | `src/build.js` | Byggverktygen alla områden använder: öar, vägar, broar, hus, ladan, träd, staket, eldar, dimma vid gränserna |
 | `src/world.js` | Cellos hem, byn och Aetheria, fästningens och pyramidens områden, och kopplingen mellan områdena |
-| `src/regions/` | `ranch.js`, `pass.js`, `field.js`, `willowmere.js`, `stormreach.js` (med grottan), `desert.js` (The Ember Wastes) och `interiors.js` (butiken och Cellos hus) |
+| `src/regions/` | `ranch.js`, `pass.js`, `field.js`, `willowmere.js`, `stormreach.js` (med grottan), `desert.js` (The Ember Wastes), `galecrown.js` (The Galecrown, 0.14) och `interiors.js` (butiken och Cellos hus) |
 | `src/folk.js` | Folket ute i världen, butikerna, kistorna, eldfaten, djuren och övningsdockan |
 | `src/inventory.js` | Föremålsmenyn, snabbknapparna, skärvorna, lyktan och dryckerna |
 | `src/bastion.js` | The Tempest Bastion: rum, dörrar, kistor, kretsar, pussel, fällor och bossarna |
@@ -324,6 +342,9 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/weather.js` | Vädret (0.11): lugnt, regn, åska, dimma och sanddis, regnet, och blixten som slår ner i metall |
 | `src/talk.js` | Dialogträd (0.11): frågor i valfri ordning, det dumma svaret, humör och ikoner över huvudet |
 | `src/songs.js` | Flöjten (0.11): spelläget, sångerna, lektionerna och sångstenarna |
+| `src/spire.js` | The Windbound Spire (0.14): templets fyra delar och tillståndet (nycklar, dörrar, kistor) |
+| `src/spirekit.js` | Vindtemplets byggdelar (0.14): uppvindar, ventiler, väggar att springa på, The Brass Weaver och Typhon |
+| `src/chronicle.js` | Berättelsen i 0.14: titanen över Willowmere, Kronos, Seren i The Galecrown, valet efter Typhon och sidouppdragen |
 | `src/skinned.js` | Modellpaketet (0.13): läser models/pack.bin och bygger figurer med skelett, färger per region |
 | `src/heroRig.js` | Cello som Elias skulptur (0.13): skelettet, benen, svärdet och ögonen |
 | `src/peopleRig.js` | Byborna, Seren, dvärgen (Hrungnir) och hydran (Apophis) som skulpturer (0.13) |

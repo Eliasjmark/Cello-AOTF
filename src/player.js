@@ -20,6 +20,9 @@ const HEAVY_SPEED = 2.3, HEAVY_SPEED_GLOVES = 3.3;
 // Grumble, getabocken: dubbelt så fort som Cello springer, vidare svängar och högre hopp
 export const RIDE_SPEED = 12.5;
 const RIDE_ACCEL = 20, RIDE_JUMP_V = 9.4;
+// 0.14: Hermes' Wing Sandals: snabbläget, väggspring och uppvindar
+export const SWIFT_SPEED = 10.2;
+const SWIFT_JUMP_V = 8.4, WALLRUN_SPEED = 9.2, WALLRUN_TIME = 1.7;
 const SLAM_WIND = 0.42, SLAM_WIND_GLOVES = 0.3, SLAM_RECOVER = 0.38, SLAM_REACH = 1.25;
 
 // Tre slag i kombination: från höger, från vänster, och ett tungt slag uppifrån
@@ -361,6 +364,12 @@ export class Player {
     this.autoWalk = null; // { yaw, speed } – Cello går själv (in i ett nytt område)
     this.onSwordWear = null; // ('dull' | 'broken')
     this.wind = new THREE.Vector3(); // stormvind som knuffar Cello (sätts av fästningen)
+    this.gust = new THREE.Vector3(); // 0.14: vindbyar i The Galecrown och tornet (sätts av området)
+    this.swift = false; // 0.14: Hermes' sandaler på
+    this.hasSandals = false;
+    this.wallRun = null; // { n, dir, t, side }
+    this.updrafts = null; // [{ x, z, r, y0, y1, power }]
+    this.inDraft = 0;
     this.anim = { phase: 0, run: 0, air: 0, land: 0, t: 0, shield: 0, lastStep: 0, blink: 2.5, scarf: [0.3, 0.3, 0.3], scarfV: [0, 0, 0] };
     this.model = buildModel();
     mergeRigid(this.model.root, [this.model.skirt, ...this.model.eyes]);
@@ -408,6 +417,9 @@ export class Player {
     this.hp = this.maxHp;
     this.heavy = false;
     this.wind.set(0, 0, 0);
+    this.gust.set(0, 0, 0);
+    this.wallRun = null;
+    this.swift = false;
     this.invuln = 1.5;
     this.safe.copy(p);
     this.safeFacing = facing;
@@ -582,6 +594,14 @@ export class Player {
       this.heavy = !this.heavy;
       this.onHeavy?.(this.heavy);
       if (this.heavy) this.setPrism(false);
+      if (this.heavy && this.swift) { this.swift = false; this.onSwift?.(false); }
+    }
+    // 0.14: sandalerna av eller på (tung vikt och snabba fötter går inte ihop)
+    if (input.swift && this.hasSandals && !this.carried && !this.mount && (this.state === 'move' || this.state === 'attack')) {
+      this.swift = !this.swift;
+      if (this.swift && this.heavy) { this.heavy = false; this.onHeavy?.(false); }
+      if (!this.swift) this.wallRun = null;
+      this.onSwift?.(this.swift);
     }
     if (input.prism && this.hasPrism && !this.carried && !this.mount && this.state === 'move') this.setPrism(!this.prismUp);
     // Prisman sänks när Cello hugger, hoppar, rullar, tar upp skölden eller blir träffad
@@ -624,7 +644,8 @@ export class Player {
         this.shielding = !!input.shield && this.grounded && !carrying;
         const heavySpeed = this.gloves ? HEAVY_SPEED_GLOVES : HEAVY_SPEED;
         const speed = carrying ? 3.6 : this.heavy ? Math.min(heavySpeed, this.shielding ? SHIELD_SPEED : heavySpeed)
-          : this.prismUp ? PRISM_SPEED : this.shielding ? SHIELD_SPEED : this.lockTarget ? LOCK_SPEED : input.walk ? WALK_SPEED : RUN_SPEED;
+          : this.prismUp ? PRISM_SPEED : this.shielding ? SHIELD_SPEED : this.lockTarget ? LOCK_SPEED : input.walk ? WALK_SPEED
+          : this.swift ? SWIFT_SPEED : RUN_SPEED;
         tvx = this.wish.x * speed * mag;
         tvz = this.wish.z * speed * mag;
         accel = mag > 0.01 ? ACCEL : DECEL;
@@ -632,6 +653,11 @@ export class Player {
         allowAuto = !this.lockTarget && !this.shielding && !carrying && !this.heavy && !this.prismUp;
         turnRate = this.grounded ? (this.shielding ? 0 : carrying ? 10 : this.heavy ? 9 : this.prismUp ? 7 : 16) : 6;
         if (carrying) break;
+        // Väggspring: hopp tar Cello ut från väggen, annars springer han längs den tills tiden tar slut
+        if (this.wallRun) {
+          if (this.jumpBuf > 0) this.wallJump();
+          break;
+        }
         const wantSlam = this.hasHammer && (this.slamBuf > 0 || (this.heavy && this.attackBuf > 0));
         if (wantSlam && this.grounded) this.startSlam();
         else if (this.heavy) { this.jumpBuf = 0; this.dodgeBuf = 0; } // för tung för att hoppa eller rulla
@@ -715,7 +741,10 @@ export class Player {
     } else if (this.state === 'dodge' && this.dodge.kind !== 'roll' && faceAngle !== null) {
       this.facing += wrap(faceAngle - this.facing) * (1 - Math.exp(-dt * 10));
     }
+    if (this.wallRun) this.facing = Math.atan2(this.wallRun.dir.x, this.wallRun.dir.z);
     this.facing = wrap(this.facing);
+    // Lutar mot väggen vid väggspring
+    this.model.body.rotation.z = approach(this.model.body.rotation.z, this.wallRun ? -this.wallRun.side * 0.42 : 0, 12, dt);
 
     this.updateFeet();
     this.updateAim();
@@ -726,8 +755,32 @@ export class Player {
     this.updateShadow();
   }
 
+  // 0.14: står Cello precis intill en vägg och springer längs den när han hoppar, börjar väggspringet direkt
+  wallBeside() {
+    const hv = Math.hypot(this.vel.x, this.vel.z);
+    if (hv < 3.5) return null;
+    const dx = this.vel.x / hv, dz = this.vel.z / hv;
+    for (const s of [1, -1]) {
+      _cap.copy(this.collider);
+      this.collider.translate(_w.set(dz * s * 0.45, 0.15, -dx * s * 0.45));
+      const r = this.world.capsuleIntersect(this.collider);
+      this.collider.copy(_cap);
+      if (r && r.depth > 1e-4 && Math.abs(r.normal.y) < 0.35) return r.normal.clone();
+    }
+    return null;
+  }
+
   jump() {
-    this.vel.y = JUMP_V;
+    if (this.swift && this.state === 'move' && !this.wallRun && !this.carried) {
+      const n = this.wallBeside();
+      if (n) {
+        this.grounded = false;
+        this.vel.y = 0;
+        this.tryWallRun(n);
+        if (this.wallRun) { this.coyote = 0; this.jumpBuf = 0; this.onJump?.(); return; }
+      }
+    }
+    this.vel.y = this.swift ? SWIFT_JUMP_V : JUMP_V;
     this.jumping = true;
     this.grounded = false;
     this.coyote = 0;
@@ -807,7 +860,70 @@ export class Player {
     this.onDodge?.(kind);
   }
 
+  // 0.14: börja springa längs en vägg (Cello är i luften med sandalerna på och träffar en brant yta snett)
+  tryWallRun(n) {
+    if (!this.swift || this.grounded || this.wallRun || this.state !== 'move' || this.carried || this.mount) return;
+    if (Math.abs(n.y) > 0.35 || this.wallCool > 0) return;
+    const hv = Math.hypot(this.vel.x, this.vel.z);
+    if (hv < 3.5) return;
+    const nx = n.x, nz = n.z, nl = Math.hypot(nx, nz) || 1;
+    const wx = nx / nl, wz = nz / nl;
+    // Rakt in i väggen räknas inte: farten längs väggen måste vara tydlig
+    let dx = this.vel.x - wx * (this.vel.x * wx + this.vel.z * wz), dz = this.vel.z - wz * (this.vel.x * wx + this.vel.z * wz);
+    const along = Math.hypot(dx, dz);
+    if (along < 2.2) return;
+    dx /= along; dz /= along;
+    const side = Math.sign(dx * wz - dz * wx) || 1;
+    this.wallRun = { n: new THREE.Vector3(wx, 0, wz), dir: new THREE.Vector3(dx, 0, dz), t: 0, side };
+    this.jumping = false;
+    this.facing = Math.atan2(dx, dz);
+    this.onWallRun?.(true);
+  }
+
+  wallJump() {
+    const w = this.wallRun;
+    this.wallRun = null;
+    this.wallCool = 0.25;
+    this.vel.set(w.n.x * 6.5 + w.dir.x * 5.5, SWIFT_JUMP_V, w.n.z * 6.5 + w.dir.z * 5.5);
+    this.facing = Math.atan2(this.vel.x, this.vel.z);
+    this.jumping = true;
+    this.jumpBuf = 0;
+    this.onJump?.();
+    this.onWallRun?.(false);
+  }
+
+  endWallRun() {
+    if (!this.wallRun) return;
+    this.wallRun = null;
+    this.wallCool = 0.35;
+    this.onWallRun?.(false);
+  }
+
+  stepWallRun(h) {
+    const w = this.wallRun;
+    w.t += h;
+    // Lite uppåt i början, sedan sjunker han sakta
+    const vy = 2.2 - 3.6 * (w.t / (WALLRUN_TIME + (this.wallRunBonus ?? 0)));
+    this.vel.set(w.dir.x * WALLRUN_SPEED, vy, w.dir.z * WALLRUN_SPEED);
+    this.collider.translate(_v.copy(this.vel).multiplyScalar(h));
+    // Tryck mot väggen för att känna att den finns kvar
+    this.collider.translate(_v.set(-w.n.x * 0.05, 0, -w.n.z * 0.05));
+    let touching = false, floor = false;
+    for (let k = 0; k < 2; k++) {
+      const r = this.world.capsuleIntersect(this.collider);
+      if (!r || r.depth < 1e-6) break;
+      if (r.normal.y > FLOOR_NY) { floor = true; this.collider.translate(_w.set(0, r.depth / r.normal.y, 0)); continue; }
+      if (r.normal.x * w.n.x + r.normal.z * w.n.z > 0.6) touching = true;
+      else if (r.normal.x * w.dir.x + r.normal.z * w.dir.z < -0.6) { this.endWallRun(); return; } // en vägg rakt framför
+      this.collider.translate(_w.copy(r.normal).multiplyScalar(r.depth));
+    }
+    if (floor) { this.endWallRun(); this.grounded = true; this.vel.y = 0; this.land(); return; }
+    if (!touching || w.t > WALLRUN_TIME + (this.wallRunBonus ?? 0)) this.endWallRun();
+  }
+
   step(h, tvx, tvz, accel, airControl, allowAuto, mag) {
+    this.wallCool = Math.max(0, (this.wallCool ?? 0) - h);
+    if (this.wallRun) { this.stepWallRun(h); return; }
     const wasGrounded = this.grounded;
     if (wasGrounded || airControl) {
       const a = wasGrounded ? accel : AIR_ACCEL;
@@ -824,10 +940,31 @@ export class Player {
       this.vel.y = Math.max(this.vel.y - g * h, -MAX_FALL);
       this.airVy = this.vel.y;
     }
+    // 0.14: uppvindar lyfter Cello (inte när han är tung)
+    this.inDraft = 0;
+    if (this.updrafts && !this.heavy && this.state !== 'dead') {
+      const f = this.feet;
+      for (const u of this.updrafts) {
+        if (u.on === false) continue;
+        if (Math.hypot(f.x - u.x, f.z - u.z) < u.r && f.y > u.y0 - 0.5 && f.y < u.y1) {
+          const top = Math.min(1, (u.y1 - f.y) / 2.5);
+          this.vel.y = Math.min(u.power, this.vel.y + (u.power * 3.2 * top + GRAVITY) * h);
+          this.inDraft = 1;
+          // Utan styrning bär vinden Cello in mot mitten av pelaren
+          if (!(mag > 0.2)) {
+            const k = Math.min(1, 3 * h);
+            this.vel.x += ((u.x - f.x) * 1.6 - this.vel.x) * k;
+            this.vel.z += ((u.z - f.z) * 1.6 - this.vel.z) * k;
+          }
+          if (this.grounded || wasGrounded) { this.grounded = false; this.jumping = true; }
+        }
+      }
+    }
 
     this.collider.translate(_v.copy(this.vel).multiplyScalar(h));
     // Stormvinden knuffar Cello, men inte när han bär hammaren tungt
     if (!this.heavy && (this.wind.x || this.wind.z)) this.collider.translate(_v.set(this.wind.x * h, 0, this.wind.z * h));
+    if (!this.heavy && (this.gust.x || this.gust.z)) this.collider.translate(_v.set(this.gust.x * h, 0, this.gust.z * h));
     let onFloor = this.resolve();
     if (this.resolve()) onFloor = true;
     if (!onFloor && wasGrounded && !this.jumping) onFloor = this.snapDown();
@@ -860,8 +997,9 @@ export class Player {
       return true;
     }
     this.collider.translate(_w.copy(n).multiplyScalar(r.depth));
+    this.tryWallRun(n);
     const vn = this.vel.dot(n);
-    if (vn < 0) this.vel.addScaledVector(n, -vn);
+    if (vn < 0 && !this.wallRun) this.vel.addScaledVector(n, -vn);
     return false;
   }
 
@@ -923,11 +1061,13 @@ export class Player {
     a.t += dt;
     const run = Math.min(1, this.speed / RUN_SPEED);
     a.run = approach(a.run, this.state === 'move' ? run : 0, 12, dt);
-    a.air = approach(a.air, this.grounded ? 0 : 1, this.grounded ? 18 : 8, dt);
+    // Väggspring räknas som att springa på marken (benen går), fast kroppen lutar mot väggen
+    a.air = approach(a.air, this.grounded || this.wallRun ? 0 : 1, this.grounded || this.wallRun ? 18 : 8, dt);
+    if (this.wallRun) a.run = approach(a.run, 1, 12, dt);
     a.land = Math.max(0, a.land - dt * 3.5);
     a.shield = approach(a.shield, this.shielding ? 1 : 0, 22, dt);
     a.prism = approach(a.prism ?? 0, this.prismUp ? 1 : 0, 16, dt);
-    if (this.grounded && this.state === 'move') {
+    if ((this.grounded || this.wallRun) && this.state === 'move') {
       const before = Math.floor(a.phase / Math.PI);
       a.phase += dt * (this.mount ? 2 + this.speed * 0.75 : 2.2 + this.speed * (this.heavy ? 1.9 : 1.55));
       if (Math.floor(a.phase / Math.PI) !== before && this.speed > 1.2) {

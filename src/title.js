@@ -11,11 +11,15 @@ import { listSaves, eraseSave, copySave, continueSlot } from './story.js';
 import { heartSvg } from './hud.js';
 
 const SETTINGS_KEY = 'cello-ashes-of-the-fallen:settings';
-export const DEFAULT_SETTINGS = { music: 8, sound: 8, pixel: true };
+// 0.14: retroläget är avstängt från början (det går att slå på i inställningarna eller med P)
+export const DEFAULT_SETTINGS = { music: 8, sound: 8, pixel: false, v: 2 };
 
 export function loadSettings() {
   try {
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') || {}) };
+    const s = { ...DEFAULT_SETTINGS, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') || {}) };
+    // äldre sparade inställningar hade retroläget på från början: stäng av det en gång
+    if (!(s.v >= 2)) { s.pixel = false; s.v = 2; }
+    return s;
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -176,6 +180,7 @@ const fmtDate = (ms) => {
 const ICONS = {
   hammer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h11v6H4z M8.5 11h2v9h-2z" fill="currentColor"/><path d="M15 6l4-2v8l-4-2z" fill="currentColor" opacity=".7"/></svg>',
   prism: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 16H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9l3 7H9z" fill="currentColor"/></svg>',
+  sandals: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h12l3-3h3v4H3z" fill="currentColor"/><path d="M14 9c3-4 6-5 9-5-2 2-3 4-4 6 1 0 2 0 3 1-3 1-5 1-8-2z" fill="currentColor" opacity=".7"/></svg>',
   scales: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v15h-2z M7 20h10v2H7z M3 7h18v1.6H3z" fill="currentColor"/><path d="M3 9l-2 5h6z M21 9l-2 5h6z" fill="currentColor" opacity=".75"/></svg>',
   horn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16c4 0 9-3 12-9l3 1c-2 7-8 12-15 12z" fill="currentColor"/></svg>',
   shard: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l5 8-5 12-5-12z" fill="currentColor"/></svg>',
@@ -614,7 +619,7 @@ export class TitleScreen {
     const s = save.state;
     const hearts = (6 + (s.amulet ? 2 : 0) + 2 * (s.hearts || 0)) / 2;
     const heartRow = Array.from({ length: hearts }, (_, i) => `<span class="heart">${heartSvg(`f${n}${i}`)}</span>`).join('');
-    const relics = [s.items?.hammer && ['hammer', "Mjölnir's Shard"], s.items?.prism && ['prism', "Ra's Shattered Prism"], s.items?.scales && ['scales', "Anubis' Broken Scales"], s.goat?.have && ['horn', 'Grumble']]
+    const relics = [s.items?.hammer && ['hammer', "Mjölnir's Shard"], s.items?.prism && ['prism', "Ra's Shattered Prism"], s.items?.scales && ['scales', "Anubis' Broken Scales"], s.items?.sandals && ['sandals', "Hermes' Wing Sandals"], s.goat?.have && ['horn', 'Grumble']]
       .filter(Boolean).map(([k, name]) => `<span class="relic" title="${name}">${ICONS[k]}<span class="sr">${name}</span></span>`).join('');
     return `<span class="file-num">File ${n}</span>
       <span class="file-where">${this.where(save)}</span>

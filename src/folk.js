@@ -842,6 +842,9 @@ export class Folk {
     if (!s.items.prism) return 'desert';
     if (!s.pyramidDone) return 'pyramid';
     if (!s.necropolisDone) return 'necropolis';
+    if (!s.titanRaid) return 'raid';
+    if (!s.items.sandals && !s.talked.serenGale) return 'gale';
+    if (!s.spireDone) return 'spire';
     return 'later';
   }
   goalText(key = this.story.state.hint) {
@@ -855,7 +858,10 @@ export class Folk {
       desert: "Beyond the golden gate, the Ember Wastes. The sun god's pyramid waits at their far edge. Nefret, the priestess at the Sunwell oasis, keeps its secrets.",
       pyramid: 'A serpent of endless night coils in the heart of the pyramid. Steel cannot touch it. Only sunlight, caught and thrown, can bring it low.',
       necropolis: 'South of the Sunwell, the sand has opened a door of black stone. The dead below cannot rest; something devours their hearts. Find the scales of the jackal god, and walk where the dead walk.',
-      later: 'The threads end in the wind... The rest of your road is not yet woven. Rest, child.',
+      raid: 'The storm over the mere sounds wrong, child. Something is falling out of it. Stay close to Willowmere... you will be needed here.',
+      gale: 'The bridge west of Stormreach has stopped screaming. Cross it to the Galecrown. Your sword-friend waits by her fire.',
+      spire: 'A tower of white stone, where no bird lands. The wind climbs it, and so must you. At its crown waits the titan of the storm.',
+      later: 'The threads lead under the sea now, where the sea god fell... That road is not yet woven. Rest, child.',
     }[key] ?? null;
   }
 
@@ -931,6 +937,7 @@ export class Folk {
         { id: 'monsters', q: 'I fought some Ashlings.', a: ['WHOA. Did they explode? Mira says they explode into ash.', "When I grow up I'm going to fight them too. With a big stick."] },
         { id: 'mira', q: 'Is Mira scared of the windmill?', a: ["Mira's scared of the windmill. I'm not. I'm not scared of anything. Except Grandma Ysolde."] },
         { id: 'secret', q: 'Know any secrets?', a: ['The old pilgrim on the bridge plays a flute to the stones. Doran says it is just noise.', 'But I saw a stone glow once when he played. I SAW it.'] },
+        ...(this.story.chronicle?.extraTopics('tob', n) ?? []),
       ],
       rude: { q: "You'd run from an Ashling.", mood: 'sad', a: ['...would not.', '*sniff* Go away.'] },
       bye: 'Hit one for me!',
@@ -968,6 +975,8 @@ export class Folk {
   // 0.13: Seren vid västra porten i Willowmere
   talkSeren(n) {
     const s = this.story.state;
+    // 0.14: efter titanens anfall slår hon läger i The Galecrown
+    if (s.titanRaid && this.story.chronicle) { this.story.chronicle.talkSeren(n); return; }
     if (!s.talked.seren) {
       this.say(n, [
         'Hold. ...You carry yourself like someone who has used that sword.',
@@ -1019,6 +1028,7 @@ export class Folk {
         { id: 'bastion', q: 'What do you know about the Bastion?', a: ['Iron walls, burned black. Thunder never stops over it. I got as far as the cave and turned back.', 'Some scout, I know.'] },
         { id: 'storm', q: 'Is it always this stormy here?', a: ['Up here? The storm is born here. Thunder comes over those peaks three times a day.', 'If your sword starts to crackle, move. Lightning looks for metal.'] },
         { id: 'fire', q: 'Can I rest by your fire?', a: ['Of course. It is the last warm place before the storm.'] },
+        ...(this.story.chronicle?.extraTopics('fenn', n) ?? []),
       ],
       rude: { q: 'Some scout, hiding by a fire.', a: ['Hiding? I am WATCHING. There is a difference.', 'Go freeze in the cave, then.'] },
       bye: 'Keep your oil dry.',

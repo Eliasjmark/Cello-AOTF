@@ -60,8 +60,8 @@ export function buildPrism() {
 export function buildItem(kind) {
   const M = ITEM_MATS;
   const g = new THREE.Group();
-  if (kind === 'pmap' || kind === 'nmap') kind = 'map';
-  else if (kind === 'pkey' || kind === 'nkey') kind = 'key';
+  if (kind === 'pmap' || kind === 'nmap' || kind === 'smap') kind = 'map';
+  else if (kind === 'pkey' || kind === 'nkey' || kind === 'skey') kind = 'key';
   if (kind === 'prism') {
     g.add(buildPrism());
   } else if (kind === 'sunkey') {
@@ -127,6 +127,42 @@ export function buildItem(kind) {
     tip.position.set(0.2, 0.0, 0);
     g.add(tip);
     g.add(B(0.3, 0.03, 0.03, ITEM_MATS.ribbon, -0.02, -0.12, 0.05));
+  } else if (kind === 'kite') {
+    // Tobs drake: röd, med en gul svans
+    const red = lam(0xc83a2a), yel = lam(0xf0c040);
+    const sail = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0.5, 0), new THREE.Vector3(0.35, 0, 0), new THREE.Vector3(0, -0.6, 0),
+      new THREE.Vector3(0, 0.5, 0), new THREE.Vector3(0, -0.6, 0), new THREE.Vector3(-0.35, 0, 0),
+    ]), red);
+    sail.geometry.computeVertexNormals();
+    sail.material = red.clone();
+    sail.material.side = THREE.DoubleSide;
+    g.add(sail);
+    for (let k = 0; k < 5; k++) g.add(B(0.12, 0.05, 0.02, yel, Math.sin(k) * 0.08, -0.7 - k * 0.15, 0));
+  } else if (kind === 'clapper') {
+    // En klockkläpp av brons
+    const br = lam(0xb08040);
+    g.add(B(0.06, 0.6, 0.06, br, 0, 0, 0));
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), br);
+    ball.position.y = -0.34;
+    g.add(ball);
+    g.add(B(0.18, 0.06, 0.06, br, 0, 0.3, 0));
+  } else if (kind === 'sandals') {
+    // Hermes sandaler: två gyllene sulor med remmar och små vita vingar vid hälarna
+    const gold = M.gold, strap = lam(0x8a6a3a), wing = lam(0xf2f4ff);
+    for (const s of [-1, 1]) {
+      const g2 = new THREE.Group();
+      g2.position.set(s * 0.17, 0, 0);
+      g2.rotation.y = s * 0.15;
+      g2.add(B(0.16, 0.05, 0.42, gold, 0, -0.2, 0));
+      for (const z of [-0.1, 0.06]) g2.add(B(0.18, 0.12, 0.03, strap, 0, -0.13, z));
+      for (let k = 0; k < 3; k++) {
+        const f = B(0.03, 0.08 + k * 0.03, 0.14 - k * 0.025, wing, s * 0.1, -0.08 + k * 0.05, -0.16 - k * 0.02);
+        f.rotation.x = -0.5;
+        g2.add(f);
+      }
+      g.add(g2);
+    }
   } else if (kind === 'scales') {
     // Anubis vågskål: en stång av svart sten, en bom av guld och två pannor – den ena bruten
     const gold = M.gold, dark = lam(0x15151a);
@@ -145,6 +181,19 @@ export function buildItem(kind) {
       g.add(pan);
     }
     g.add(B(0.12, 0.12, 0.02, new THREE.MeshBasicMaterial({ color: 0x6af0d4 }), 0, 0.42, 0.09));
+  } else if (kind === 'galekey') {
+    // Stormnyckeln: brons med en vinge och en blå sten
+    const br = lam(0xb08040);
+    const loop = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.05, 6, 12), br);
+    loop.position.y = 0.3;
+    g.add(loop);
+    g.add(B(0.07, 0.55, 0.06, br, 0, -0.1, 0));
+    g.add(B(0.18, 0.06, 0.06, br, 0.08, -0.32, 0));
+    g.add(B(0.14, 0.06, 0.06, br, 0.06, -0.2, 0));
+    const wing = B(0.03, 0.22, 0.3, lam(0xf2f4ff), -0.18, 0.32, 0);
+    wing.rotation.x = -0.4;
+    g.add(wing);
+    g.add(B(0.08, 0.08, 0.08, new THREE.MeshBasicMaterial({ color: 0x9fe8ff }), 0, 0.3, 0.04));
   } else if (kind === 'ankhkey') {
     // Ankhnyckeln: livets tecken i guld
     const gold = M.gold;
@@ -211,6 +260,15 @@ export const ITEM_TEXT = {
   nmap: ['You found the Necropolis Map!', 'Press K to view it. The rooms you have not visited are on it now.'],
   nkey: ['You got a Iron Key!', 'It opens a locked door somewhere in the necropolis.'],
   ankhkey: ['You got the Ankh Key!', 'The key of life. It opens the great door behind which the Devourer waits.'],
+  smap: ['You found the Spire Map!', 'Press K to view it. The rooms of the tower are on it now.'],
+  skey: ['You got a Iron Key!', 'It opens a locked door somewhere in the tower.'],
+  galekey: ['You got the Gale Key!', 'A key cast from bronze, cold as the north wind. It opens the great door to the Crown of Storms.'],
+  sandals: [
+    "You got Hermes' Wing Sandals!",
+    'The messenger of the gods ran in these from one end of the sky to the other. The little wings still beat.',
+    'Put them on F, G or V (Tab) and press that button: Cello runs like the wind and jumps much further.',
+    'Run and jump at a wall at an angle, and Cello runs along it for a few heartbeats. Jump again to leap off. Updrafts lift him high, unless he is heavy.',
+  ],
   scales: [
     "You got Anubis' Broken Scales!",
     'The scales on which the god of the dead weighed every heart. One pan is cracked, but they still weigh true.',

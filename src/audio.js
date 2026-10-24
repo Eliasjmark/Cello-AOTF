@@ -25,6 +25,8 @@ export const VOICES = {
   odo: { f: 128, wave: 'triangle', form: [[540, 3], [1000, 4]], breath: 0.3 },
   nell: { f: 300, wave: 'triangle', form: [[780, 4], [1500, 5]] },
   wren: { f: 315, wave: 'triangle', form: [[800, 4], [1600, 5]] },
+  kronos: { f: 62, wave: 'sawtooth', form: [[300, 3], [700, 4]], wobble: 0.5, breath: 0.6 },
+  typhon: { f: 85, wave: 'sawtooth', form: [[420, 3], [1100, 5]], breath: 0.9 },
   seren: { f: 270, wave: 'triangle', form: [[720, 4], [1450, 5]], wobble: 0.6 },
   // 0.7: öknen och pyramiden
   nefret: { f: 240, wave: 'triangle', form: [[680, 3], [1250, 4]], breath: 0.3 },
@@ -624,6 +626,27 @@ export class Sfx {
         break;
       }
       // ---------- 0.12: de dödas värld och vattnet ----------
+      case 'chime': // klockorna i The Galecrown
+        for (const [f, d] of [[523, 0], [659, 0.15], [784, 0.3], [1046, 0.45]]) {
+          this.osc('sine', f, f, t + d, 2.2, this.gain(t + d, 0.004, 0.12 * v, 2.2));
+          this.osc('sine', f * 2.01, f * 2.01, t + d, 1.4, this.gain(t + d, 0.004, 0.03 * v, 1.4));
+        }
+        break;
+      case 'swifton': // sandalerna: ett lätt vingflax och en stigande glans
+        this.noiseThrough('bandpass', 2400, 4200, 1.5, t, 0.25, this.gain(t, 0.01, 0.12 * v, 0.25));
+        for (const [f, d] of [[880, 0], [1320, 0.06], [1760, 0.12]]) this.osc('triangle', f, f, t + d, 0.25, this.gain(t + d, 0.005, 0.07 * v, 0.25));
+        break;
+      case 'swiftoff':
+        this.osc('triangle', 1320, 660, t, 0.2, this.gain(t, 0.005, 0.06 * v, 0.2));
+        break;
+      case 'wallrun': // fötter mot sten och vind
+        this.noiseThrough('bandpass', 900, 1800, 1.2, t, 0.5, this.gain(t, 0.05, 0.12 * v, 0.45));
+        this.osc('sine', 520, 700, t, 0.2, this.gain(t, 0.01, 0.05 * v, 0.2));
+        break;
+      case 'typhoon': // Typhons vind: ett djupt vrål av luft
+        this.noiseThrough('lowpass', 300, 1200, 0.8, t, 2.2, this.gain(t, 0.4, 0.4 * v, 1.6), this.brown);
+        this.noiseThrough('bandpass', 1200, 2600, 1.5, t + 0.3, 1.6, this.gain(t + 0.3, 0.4, 0.1 * v, 1.2));
+        break;
       case 'realmdown': // vågskålen tippar ner i de dödas värld: ett djupt sus och en sjunkande ton
         this.noiseThrough('lowpass', 1600, 200, 0.7, t, 0.9, this.gain(t, 0.08, 0.3 * v, 0.85), this.brown);
         this.osc('sine', 330, 110, t, 0.9, this.gain(t, 0.05, 0.16 * v, 0.9));

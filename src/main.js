@@ -27,6 +27,7 @@ import { Songs } from './songs.js';
 import { Realm } from './realm.js';
 import { loadPack } from './skinned.js';
 import { WIND } from './build.js';
+import { Chronicle } from './chronicle.js';
 
 const PIXEL_LINES = 360; // retroläge: spelet ritas i ungefär så här många rader
 const FLASH = new THREE.Color(0x8d98b4);
@@ -190,6 +191,8 @@ function start(saved = {}) {
   player.onHoof = (k) => sfx.play('hoof', { vol: 0.45 + k * 0.5 });
   hud.onItems = () => inventory.refresh(true);
   for (const dg of Object.values(world.dungeons)) dg.game = { player, enemies, sfx, fx, hud, rig, dialog, story, lights, realm };
+  // 0.14: krönikan (titanerna vaknar, Seren, valet efter Typhon, sidouppdragen)
+  const chronicle = new Chronicle({ story, world, areas, player, hud, sfx, fx, rig, folk, inventory, combat, music });
   const world2 = { player, fx, sfx, onBlocked() {}, onPlayerHit() {} };
 
   // ---------- skärvor, hjärtan och vad fiender och krukor lämnar efter sig ----------
@@ -362,6 +365,17 @@ function start(saved = {}) {
     if (on) fx.burst('spark', player.feet.clone().setY(player.feet.y + 1.0), 10, 0x9fdcff);
     inventory.refresh();
   };
+  // 0.14: Hermes' sandaler
+  player.onSwift = (on) => {
+    sfx.play(on ? 'swifton' : 'swiftoff');
+    if (on) fx.burst('spark', player.feet.clone().setY(player.feet.y + 0.3), 14, 0xfff0b0);
+    if (on && !story.state.swiftHint) {
+      story.state.swiftHint = true;
+      hud.toast('Wings flutter at Cello\'s heels! Run and jump at a wall at an angle to run along it. Jump again to leap off. Updrafts lift him high.', 6500);
+    }
+    inventory.refresh();
+  };
+  player.onWallRun = (on) => { if (on) sfx.play('wallrun'); };
   player.onSwordWear = (kind) => {
     if (kind === 'broken') {
       sfx.play('snap');
@@ -507,12 +521,13 @@ function start(saved = {}) {
       return { id: 'march' };
     }
     // Fästningens och pyramidens nya delar
-    const wing = bastion.wingAt(here) ?? pyramid.wingAt(here) ?? world.necropolis.wingAt(here);
+    const wing = bastion.wingAt(here) ?? pyramid.wingAt(here) ?? world.necropolis.wingAt(here) ?? world.spire.wingAt(here);
     if (wing) {
       if (wing.bossFight) return { id: 'warlord', now: true };
       if (wing.trap) return { id: 'march', now: true };
       if (here === 'nthrone' && world.necropolis.state.cleared.ammit) return { id: 'dawn' };
-      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull', pdepths: 'whispers', pbarque: 'skull', pascent: 'march', papex: 'skull', ncrypts: 'whispers', nhall: 'skull', nduat: 'whispers', nthrone: 'skull' }[here] };
+      if (here === 'scrown' && world.spire.state.cleared.typhon) return { id: 'dawn' };
+      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull', pdepths: 'whispers', pbarque: 'skull', pascent: 'march', papex: 'skull', ncrypts: 'whispers', nhall: 'skull', nduat: 'whispers', nthrone: 'skull', sgate: 'march', shall: 'march', sweb: 'skull', scrown: 'skull' }[here] };
     }
     // Natten (0.11): byarna somnar och fälten blir kusliga
     if (clock.isNight && outdoorArea(areas.cur)) {
@@ -641,6 +656,8 @@ function start(saved = {}) {
         enemies.env.rain = outNow ? weather.cur.rain : 0;
         enemies.env.lantern = inventory.lit;
         enemies.env.dead = realm.dead;
+        // 0.14: uppvindar och vindbyar i området (The Galecrown och The Windbound Spire)
+        applyWinds(sim);
         player.update(sim, pin, rig.yaw);
         goat.update(sim);
         if (!talking && !story.shown) enemies.update(sim, world2);
@@ -706,6 +723,7 @@ function start(saved = {}) {
     clock.update(sim, freePlay && !dialog.active && !story.cinematic && !story.fade);
     weather.update(dt, { camera, now: clock.day * 24 + clock.hour, running: freePlay });
     realm.update(dt);
+    chronicle.update(dt);
     const flash = sky.update(dt, t, camera) * base.flash;
     applyEnv(flash);
     world.update(t, dt);
@@ -718,6 +736,32 @@ function start(saved = {}) {
     sfx.ambience(dt, story.ambienceState());
     updateMusic(dt);
     hud.frame(dt, player);
+  }
+
+  // 0.14: områdets uppvindar (lyfter Cello) och vindbyar (knuffar honom, men inte när han är tung)
+  //   area.updrafts: [{ x, z, r, y0, y1, power, on? }]
+  //   area.gusts:    [{ x0, x1, z0, z1, wx, wz, period?, duty? }]  (period: byarna kommer och går)
+  let windT = 0, gustSfx = 0;
+  function applyWinds(dt) {
+    windT += dt;
+    const a = areas.cur;
+    player.updrafts = a?.updrafts ?? null;
+    player.gust.set(0, 0, 0);
+    if (!a?.gusts) return;
+    const f = player.feet;
+    for (const g of a.gusts) {
+      if (g.on === false || f.x < g.x0 || f.x > g.x1 || f.z < g.z0 || f.z > g.z1) continue;
+      let k = 1;
+      if (g.period) {
+        const ph = ((windT + (g.phase ?? 0)) % g.period) / g.period;
+        k = ph < (g.duty ?? 0.5) ? Math.sin((ph / (g.duty ?? 0.5)) * Math.PI) : 0;
+      }
+      player.gust.x += g.wx * k;
+      player.gust.z += g.wz * k;
+      g.k = k;
+    }
+    gustSfx -= dt;
+    if (player.gust.lengthSq() > 4 && gustSfx <= 0) { gustSfx = 2.4; sfx.play('gust', { vol: 0.8 }); }
   }
 
   // Ljuset, dimman och himlen efter tid på dygnet och väder
@@ -758,7 +802,7 @@ function start(saved = {}) {
   // Handtag för felsökning i webbläsarens konsol
   window.__realm = {
     player, rig, world, areas, input, hud, scene, camera, enemies, combat, fx, sfx, story, dialog, bastion, pyramid, lights, collider, renderer,
-    culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs, realm, necropolis: world.necropolis,
+    culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs, realm, necropolis: world.necropolis, spire: world.spire, chronicle,
     tick: (dt, inp) => update(dt, { ...input.empty, ...inp }),
   };
   requestAnimationFrame(frame);

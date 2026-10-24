@@ -14,17 +14,56 @@ export function mulberry(seed) {
 
 const clamp255 = (v) => Math.max(0, Math.min(255, Math.round(v)));
 
+// 0.13+: texturerna ritas som förut i låg upplösning, men förstoras sedan mjukt till fyra gånger storleken
+// och får ett fint korn ovanpå. Då försvinner de skarpa pixelrutorna (Minecraft-känslan) och ytorna ser
+// målade ut, mer. Med upprepning (wrap) ritas kanterna så att mönstret går ihop.
+export function soften(src, { scale = 4, grain = 7, wrap = true, seed = 7 } = {}) {
+  const w = src.width, h = src.height;
+  const c = document.createElement('canvas');
+  c.width = w * scale;
+  c.height = h * scale;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
+  if (wrap) {
+    // tre gånger tre kopior, så att den mjuka förstoringen även blandar över kanterna
+    const big = document.createElement('canvas');
+    big.width = w * 3;
+    big.height = h * 3;
+    const bg = big.getContext('2d');
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) bg.drawImage(src, i * w, j * h);
+    g.drawImage(big, -w * scale, -h * scale, w * 3 * scale, h * 3 * scale);
+  } else {
+    g.drawImage(src, 0, 0, w * scale, h * scale);
+  }
+  if (grain > 0) {
+    const img = g.getImageData(0, 0, c.width, c.height);
+    const r = mulberry(seed);
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const k = (r() - 0.5) * 2 * grain;
+      d[i] = clamp255(d[i] + k); d[i + 1] = clamp255(d[i + 1] + k); d[i + 2] = clamp255(d[i + 2] + k * 0.9);
+    }
+    g.putImageData(img, 0, 0);
+  }
+  return c;
+}
+
+export function smoothTexture(t, wrap = true) {
+  if (wrap) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.anisotropy = 8;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 function canvasTexture(size, seed, draw) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const g = c.getContext('2d');
   draw(g, size, mulberry(seed));
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.magFilter = THREE.NearestFilter;
-  t.minFilter = THREE.NearestMipmapLinearFilter;
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+  return smoothTexture(new THREE.CanvasTexture(soften(c, { seed })));
 }
 
 function noisyFill(g, size, rand, [r, gg, b], spread) {
@@ -152,9 +191,9 @@ export function createTextures() {
       g.lineTo(x0 + 1.7, 64);
       g.fill();
     }
-    const t = new THREE.CanvasTexture(c);
-    t.magFilter = THREE.NearestFilter;
-    t.minFilter = THREE.NearestFilter;
+    const t = new THREE.CanvasTexture(soften(c, { scale: 2, grain: 0, wrap: false }));
+    t.magFilter = THREE.LinearFilter;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
   })();
@@ -179,11 +218,7 @@ export function createTextures() {
       }
     }
     g.globalAlpha = 1;
-    const t = new THREE.CanvasTexture(c);
-    t.magFilter = THREE.NearestFilter;
-    t.minFilter = THREE.NearestMipmapLinearFilter;
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
+    return smoothTexture(new THREE.CanvasTexture(soften(c, { scale: 3, grain: 5 })));
   })();
 
   // Stentavlor med inristade tecken till Lyras arkiv

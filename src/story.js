@@ -107,6 +107,8 @@ const freshState = () => ({
   clock: 8, day: 1, weather: null, mood: {}, asked: {}, flute: false, songs: [], songStones: {},
   // 0.12: nekropolen
   necropolis: null, necropolisDone: false,
+  // 0.14: tornet, titanerna vaknar, det andra valet och sidouppdragen
+  spire: null, spireDone: false, titanRaid: false, choice2: null, quests: {},
 });
 
 export class Story {
@@ -115,6 +117,7 @@ export class Story {
     this.bastion = this.world.bastion;
     this.pyramid = this.world.pyramid;
     this.necropolis = this.world.necropolis;
+    this.spire = this.world.spire;
     this.areas = this.world.areas;
     // Porten till nekropolen är full av sand tills ormen i pyramiden har fallit
     const necroExit = this.areas.get('desert')?.exits.find((e) => e.necro);
@@ -327,6 +330,9 @@ export class Story {
     this.state.pyramid = this.pyramid.state;
     this.necropolis.applyState(null);
     this.state.necropolis = this.necropolis.state;
+    this.spire.applyState(null);
+    this.state.spire = this.spire.state;
+    this.chronicle?.applyState();
     this.realm?.reset();
     this.world.setSunGate(false, true);
     this.goat?.load(this.state);
@@ -371,6 +377,9 @@ export class Story {
     s.pyramid = this.pyramid.state;
     this.necropolis.applyState(s.necropolis);
     s.necropolis = this.necropolis.state;
+    this.spire.applyState(s.spire);
+    s.spire = this.spire.state;
+    this.chronicle?.applyState();
     this.realm?.reset();
     this.setupFree();
     this.enemies.resetAll();
@@ -456,6 +465,7 @@ export class Story {
     s.bastion = this.bastion.state;
     s.pyramid = this.pyramid.state;
     s.necropolis = this.necropolis.state;
+    s.spire = this.spire.state;
     s.spawnAt = this.world.inBastion() ? 'bastion' : 'aetheria';
     s.area = this.areas.id;
     if (entry) s.entry = entry;
@@ -579,8 +589,12 @@ export class Story {
     const pool = [
       [L('Every heart that stops makes them stronger... I keep thinking about it.'), L('Then every person in Aetheria is a wall against them. Every one of us who lives.')],
       [L('The third titan spoke of others. Of fewer of us every day.'), L('We will not make it easy for them.')],
-      s.necropolisDone
-        ? [L('Anubis... the god of the dead, speaking to you. And the dead speak to you still, through his scales.'), L('Listen to them, Cello. The stones were scratched out. The dead were not.')]
+      s.spireDone
+        ? [L('Kronos. The titan king. So the songs were true, all of them.'), L(s.choice2 === 'spared' ? 'You spared the wind itself. I think the gods would have been proud of you, Cello. I am.' : 'The storm-titan is gone. The wind over Aetheria feels... thinner. Like an empty room.')]
+        : s.titanRaid
+        ? [L('A titan over Willowmere... and a voice that called itself a king.'), L('Go to the Galecrown, Cello. Your friend Seren is right: if Typhon waits anywhere, it is in that tower.')]
+        : s.necropolisDone
+        ? [L('Anubis... the god of the dead, speaking to you. And the dead speak to you still, through his scales.'), L('Listen to them, Cello. The stones were scratched out. The dead were not.'), L('Ysolde in Willowmere sent word. She says the storm over the mere sounds wrong. Go and see her.')]
         : [L('Nefret sent word from the oasis. Since the serpent fell, the sand south of the Wastes has moved. An old doorway has opened, where the necropolis sank.'), L('Follow the road south from the Sunwell. Whatever waits down there has waited a long time.')],
     ];
     s.talked.lyraP = ((s.talked.lyraP || 0) + 1) % pool.length;
@@ -1138,9 +1152,16 @@ export class Story {
       this.pyramid.grant(kind);
     } else if (kind === 'nmap' || kind === 'nkey' || kind === 'ankhkey') {
       this.necropolis.grant(kind);
+    } else if (kind === 'smap' || kind === 'skey' || kind === 'galekey') {
+      this.spire.grant(kind);
     } else if (kind === 'scales') {
       s.items.scales = true;
       this.inventory?.autoSlot('scales');
+      this.inventory?.refresh(true);
+    } else if (kind === 'sandals') {
+      s.items.sandals = true;
+      P.hasSandals = true;
+      this.inventory?.autoSlot('sandals', true);
       this.inventory?.refresh(true);
     } else if (kind === 'heart') {
       s.hearts = (s.hearts || 0) + 1;
@@ -1419,7 +1440,7 @@ export class Story {
         L('Rest here tonight. When the road opens, the Wastes will remember you.'),
       ], () => {
         this.cinematic = false;
-        this.hud.toast('More of the realm opens in the next version of the game.', 4200);
+        this.hud.toast('Strange storms gather over Willowmere...', 4200);
         this.save(true);
       });
     });

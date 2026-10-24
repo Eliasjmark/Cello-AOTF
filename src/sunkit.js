@@ -12,6 +12,7 @@
 // Läget (speglar, slöjor, ögon, timglas) sparas i pyramidens state, precis som resten av flygeln.
 import * as THREE from 'three';
 import { Wing } from './dkit.js';
+import { soften, smoothTexture } from './textures.js';
 import { Beams, BEAM_Y } from './beams.js';
 import { IronWarden } from './bosses.js';
 import { box, cyl, place, rockGeo, hash2 } from './geom.js';
@@ -31,10 +32,7 @@ function sandTexture() {
       g.fillRect(x, y, 1, 1);
     }
   }
-  SAND_TEX = new THREE.CanvasTexture(c);
-  SAND_TEX.wrapS = SAND_TEX.wrapT = THREE.RepeatWrapping;
-  SAND_TEX.colorSpace = THREE.SRGBColorSpace;
-  SAND_TEX.magFilter = THREE.NearestFilter;
+  SAND_TEX = smoothTexture(new THREE.CanvasTexture(soften(c)));
   return SAND_TEX;
 }
 

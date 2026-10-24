@@ -24,6 +24,8 @@ import { Necropolis, buildNecropolis } from './necropolis.js';
 import { buildStormreach } from './regions/stormreach.js';
 import { buildInteriors } from './regions/interiors.js';
 import { buildDesert } from './regions/desert.js';
+import { buildGalecrown } from './regions/galecrown.js';
+import { Spire, buildSpire } from './spire.js';
 import { Pyramid, OX as PYR_X } from './pyramid.js';
 
 const AZ = -78; // Aetherias mittpunkt i z
@@ -876,6 +878,8 @@ export function buildWorld(scene, lights) {
   const reach = buildStormreach(B, areas);
   const interiors = buildInteriors(B, areas);
   const desert = buildDesert(B, areas);
+  // 0.14: The Galecrown (x 17000) och The Windbound Spire (x 18000–19800)
+  const gale = buildGalecrown(B, areas);
 
   // =====================================================================
   // The Sun-Scorched Pyramid (x 9000)
@@ -915,6 +919,10 @@ export function buildWorld(scene, lights) {
   necropolis.areas = areas;
   const necroWings = buildNecropolis(B, areas, necropolis);
   const NECRO_IDS = new Set(necroWings.map((w) => w.id));
+  const spire = new Spire();
+  spire.areas = areas;
+  const spireWings = buildSpire(B, areas, spire);
+  const SPIRE_IDS = new Set(spireWings.map((w) => w.id));
 
   const world = {
     areas,
@@ -948,19 +956,21 @@ export function buildWorld(scene, lights) {
     prologue: { refugee: V(4.6, 12.4), titanHome: V(-16.5, 9) },
     east: field.east,
     paths: { north: paths.north, east: field.eastPath },
-    ranch, pass, field, willow, reach, interiors, desert,
+    ranch, pass, field, willow, reach, interiors, desert, gale,
     // 0.11: stenarna som öppnas med Waking Chant (kistorna under dem registreras nu)
     songStones: defineSongStones({ pass: pass?.H, field: field?.H, desert: desert?.H }, B.chests),
     bastion,
     pyramid,
     necropolis,
+    spire,
     // Fängelsehålorna: samma gränssnitt (state, interactions, trap, update, combatTargets ...)
-    dungeons: { bastion, pyramid, necropolis },
-    dungeonAt: (id) => (BASTION_IDS.has(id) ? bastion : PYRAMID_IDS.has(id) ? pyramid : NECRO_IDS.has(id) ? necropolis : null),
+    dungeons: { bastion, pyramid, necropolis, spire },
+    dungeonAt: (id) => (BASTION_IDS.has(id) ? bastion : PYRAMID_IDS.has(id) ? pyramid : NECRO_IDS.has(id) ? necropolis : SPIRE_IDS.has(id) ? spire : null),
     necroIds: NECRO_IDS,
+    spireIds: SPIRE_IDS,
     pyramidIds: PYRAMID_IDS,
     bastionIds: BASTION_IDS,
-    wingAt: (id) => bastion.wingAt(id) ?? pyramid.wingAt(id) ?? necropolis.wingAt(id),
+    wingAt: (id) => bastion.wingAt(id) ?? pyramid.wingAt(id) ?? necropolis.wingAt(id) ?? spire.wingAt(id),
     inPyramid: () => PYRAMID_IDS.has(areas.id),
     slamGate: field.slamGate,
     setSunGate: field.setSunGate,
@@ -983,6 +993,7 @@ export function buildWorld(scene, lights) {
       bastion.wingAt(id)?.enter();
       pyramid.wingAt(id)?.enter();
       necropolis.wingAt(id)?.enter();
+      spire.wingAt(id)?.enter();
     },
     // Ett eldfat har tänts
     onTorch(id, story) {
@@ -990,6 +1001,7 @@ export function buildWorld(scene, lights) {
       if (bastion.onTorch(id)) return true;
       if (pyramid.onTorch(id)) return true;
       if (necropolis.onTorch(id)) return true;
+      if (spire.onTorch(id)) return true;
       return false;
     },
     connect(collider) {
@@ -1003,6 +1015,7 @@ export function buildWorld(scene, lights) {
       for (const w of bastionWings) bastion.interactions.push(...w.interactions);
       for (const w of pyramidWings) pyramid.interactions.push(...w.interactions);
       for (const w of necroWings) necropolis.interactions.push(...w.interactions);
+      for (const w of spireWings) spire.interactions.push(...w.interactions);
     },
     slamEast: field.slamEast,
     lightEast: field.lightEast,

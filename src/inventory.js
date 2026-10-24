@@ -27,6 +27,7 @@ export const ICONS = {
   prism: px('<rect x="3" y="0" width="2" height="1" fill="#ffe8a8"/><rect x="2" y="1" width="4" height="2" fill="#ffd27a"/><rect x="1" y="3" width="6" height="2" fill="#ffc040"/><rect x="2" y="5" width="4" height="1" fill="#e0a030"/><rect x="3" y="6" width="2" height="1" fill="#c08020"/><rect x="3" y="2" width="1" height="3" fill="#fff6d8"/><rect x="0" y="3" width="1" height="1" fill="#c9a24f"/><rect x="7" y="3" width="1" height="1" fill="#c9a24f"/><rect x="3.5" y="7" width="1" height="1" fill="#c9a24f"/>'),
   whetstone: px('<rect x="1" y="3" width="6" height="2" fill="#8a8c94"/><rect x="2" y="2" width="4" height="1" fill="#a8aab2"/><rect x="1" y="5" width="6" height="1" fill="#5a5c66"/><rect x="5" y="1" width="1" height="2" fill="#dfe6ee"/>'),
   horn: px('<rect x="1" y="1" width="3" height="2" fill="#d8c8a4"/><rect x="4" y="2" width="2" height="2" fill="#c8b48c"/><rect x="5" y="4" width="2" height="2" fill="#b09c74"/><rect x="4" y="6" width="2" height="1" fill="#9a8460"/><rect x="2" y="3" width="2" height="1" fill="#8c2a27"/><rect x="1" y="1" width="1" height="1" fill="#f0e6cc"/>'),
+  sandals: px('<rect x="1" y="5" width="5" height="2" fill="#c9a24f"/><rect x="5" y="4" width="2" height="3" fill="#c9a24f"/><rect x="2" y="3" width="1" height="2" fill="#8a6a3a"/><rect x="4" y="3" width="1" height="2" fill="#8a6a3a"/><rect x="6" y="1" width="2" height="1" fill="#f4f4ff"/><rect x="5" y="2" width="3" height="1" fill="#dfe8ff"/><rect x="6" y="3" width="2" height="1" fill="#b8c8ff"/>'),
   scales: px('<rect x="3.5" y="1" width="1" height="6" fill="#2a2a30"/><rect x="2.5" y="7" width="3" height="1" fill="#2a2a30"/><rect x="0" y="1.5" width="8" height="0.8" fill="#c9a24f"/><rect x="3" y="0" width="2" height="1.5" fill="#6af0d4"/><rect x="0" y="2.3" width="0.5" height="2" fill="#c9a24f"/><rect x="7.5" y="2.3" width="0.5" height="2.4" fill="#c9a24f"/><rect x="0" y="4.3" width="2" height="0.8" fill="#c9a24f"/><rect x="6.3" y="4.7" width="1.7" height="0.8" fill="#9a7a3a"/>'),
   flute: px('<rect x="6" y="0" width="2" height="1" fill="#8c2a27"/><rect x="5" y="1" width="2" height="1" fill="#c8a06a"/><rect x="4" y="2" width="2" height="1" fill="#b8925a"/><rect x="3" y="3" width="2" height="1" fill="#c8a06a"/><rect x="2" y="4" width="2" height="1" fill="#b8925a"/><rect x="1" y="5" width="2" height="1" fill="#c8a06a"/><rect x="0" y="6" width="2" height="1" fill="#9a7444"/><rect x="4" y="2" width="1" height="1" fill="#3a2a1a"/><rect x="2" y="4" width="1" height="1" fill="#3a2a1a"/><rect x="0" y="7" width="1" height="1" fill="#6a4a2a"/>'),
   heart: px('<rect x="1" y="1" width="2" height="1" fill="#d8382f"/><rect x="5" y="1" width="2" height="1" fill="#d8382f"/><rect x="0" y="2" width="8" height="2" fill="#d8382f"/><rect x="1" y="4" width="6" height="1" fill="#d8382f"/><rect x="2" y="5" width="4" height="1" fill="#d8382f"/><rect x="3" y="6" width="2" height="1" fill="#d8382f"/><rect x="1" y="2" width="1" height="1" fill="#f4a196"/>'),
@@ -39,10 +40,11 @@ export const ITEMS = {
   potion: { name: 'Healing Draught', desc: 'Restores four hearts. Bitter, but it works.', icon: 'potion' },
   prism: { name: "Ra's Shattered Prism", desc: 'Raise it to catch sunlight and throw it where Cello faces. Lock on to aim. Sunlight burns shadow and wakes sun eyes.', icon: 'prism' },
   horn: { name: "Grumble's Horn", desc: 'Blow it outdoors and Grumble comes running. Press E next to him to ride; he is twice as fast as Cello.', icon: 'horn' },
+  sandals: { name: "Hermes' Wing Sandals", desc: 'Golden sandals with tiny wings. Put them on and Cello runs like the wind, jumps further, and can run along walls for a few heartbeats. Updrafts lift him high.', icon: 'sandals' },
   scales: { name: "Anubis' Broken Scales", desc: 'Tip them to step between the realm of the living and the realm of the dead. The dead realm shows spirits, hidden bridges and the truth behind false stone.', icon: 'scales' },
   flute: { name: "Pilgrim's Flute", desc: 'Press its button to play. Play notes with ↑ ← → ↓ and Space; Esc stops. Songs you learn are listed below.', icon: 'flute' },
 };
-const ORDER = ['strike', 'weight', 'prism', 'scales', 'lantern', 'horn', 'flute', 'potion'];
+const ORDER = ['strike', 'weight', 'prism', 'scales', 'sandals', 'lantern', 'horn', 'flute', 'potion'];
 
 export class Inventory {
   constructor(ctx) {
@@ -67,6 +69,8 @@ export class Inventory {
     this.player.setLantern(false, false);
     this.player.hasPrism = false;
     this.player.setPrism(false);
+    this.player.hasSandals = false;
+    this.player.swift = false;
     this.player.wearMul = 1;
     this.refresh(true);
   }
@@ -76,6 +80,8 @@ export class Inventory {
     // Sparningar från 0.5: hammaren låg alltid på F och G
     if (s.items?.hammer && !s.slots.includes('strike') && !s.slots.includes('weight')) s.slots = ['strike', 'weight', s.slots[2]];
     this.player.hasPrism = !!s.items?.prism;
+    this.player.hasSandals = !!s.items?.sandals;
+    this.player.swift = false;
     this.player.wearMul = s.whetstone ? 0.5 : 1;
     this.lit = false;
     this.player.setLantern(!!s.lantern, false);
@@ -88,7 +94,7 @@ export class Inventory {
   owned() {
     const s = this.s;
     return ORDER.filter((id) => (id === 'strike' || id === 'weight' ? s.items?.hammer : id === 'prism' ? s.items?.prism : id === 'lantern' ? s.lantern
-      : id === 'horn' ? !!s.goat?.have : id === 'flute' ? !!s.flute : id === 'scales' ? !!s.items?.scales : id === 'potion' ? s.potions > 0 : false));
+      : id === 'horn' ? !!s.goat?.have : id === 'flute' ? !!s.flute : id === 'scales' ? !!s.items?.scales : id === 'sandals' ? !!s.items?.sandals : id === 'potion' ? s.potions > 0 : false));
   }
 
   // ---------- skärvor ----------
@@ -105,11 +111,13 @@ export class Inventory {
 
   // ---------- att få föremål ----------
   // Lägger ett föremål på första lediga knapp (om det inte redan ligger på en)
-  autoSlot(id) {
+  // force: om alla knappar är upptagna byts den sista ut (för föremål man behöver direkt)
+  autoSlot(id, force = false) {
     const sl = this.s.slots;
     if (sl.includes(id)) return;
     const free = sl.indexOf(null);
     if (free >= 0) sl[free] = id;
+    else if (force) sl[2] = id;
   }
   gotPrism() {
     this.autoSlot('prism');
@@ -174,6 +182,7 @@ export class Inventory {
       if (id === 'strike') out.slam = true;
       else if (id === 'weight') out.heavy = true;
       else if (id === 'prism') out.prism = true;
+      else if (id === 'sandals') out.swift = true;
       else this.use(id);
     });
     return out;
@@ -438,7 +447,7 @@ export class Inventory {
       const ok = id && owned.includes(id);
       b.querySelector('.ico').innerHTML = ok ? ICONS[ITEMS[id].icon] : '';
       b.classList.toggle('empty', !ok);
-      b.classList.toggle('on', ok && ((id === 'weight' && P.heavy) || (id === 'lantern' && this.lit) || (id === 'prism' && P.prismUp) || (id === 'scales' && !!this.story.realm?.dead)));
+      b.classList.toggle('on', ok && ((id === 'weight' && P.heavy) || (id === 'lantern' && this.lit) || (id === 'prism' && P.prismUp) || (id === 'scales' && !!this.story.realm?.dead) || (id === 'sandals' && P.swift)));
       b.classList.toggle('gloves', ok && id === 'strike' && P.gloves);
       b.querySelector('.count').textContent = ok && id === 'potion' ? s.potions : '';
       const oil = b.querySelector('.oil');

@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { Wing } from './dkit.js';
 import { IronWarden } from './bosses.js';
 import { box, cyl, place } from './geom.js';
-import { mulberry } from './textures.js';
+import { mulberry, soften, smoothTexture } from './textures.js';
 import { ring } from './titan.js';
 
 const approach = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
@@ -26,12 +26,7 @@ function tex(size, seed, draw) {
   c.width = c.height = size;
   const g = c.getContext('2d');
   draw(g, size, mulberry(seed));
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.magFilter = THREE.NearestFilter;
-  t.minFilter = THREE.NearestMipmapLinearFilter;
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+  return smoothTexture(new THREE.CanvasTexture(soften(c, { seed })));
 }
 const rgb = (r, g, b) => `rgb(${r | 0},${g | 0},${b | 0})`;
 function noise(g, s, r, [R, G, B], k) {
