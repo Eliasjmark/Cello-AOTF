@@ -332,6 +332,8 @@ export function buildWillowmere(B, areas) {
       rosa: { area: 'willowmere', pos: V3(innFront.x + 1.4, innFront.y, innFront.z - 0.2), face: -0.3 },
       ysolde: { area: 'willowmere', pos: V3(ysoldeSpot.x, H(ysoldeSpot.x, ysoldeSpot.z), ysoldeSpot.z), face: -0.4, pose: 'sit' },
       doran: { area: 'willowmere', pos: VV(-46.5, 4.2), face: -Math.PI / 2 },
+      // 0.13: Seren, svärdsflickan (Elias modell Love_interest)
+      seren: { area: 'willowmere', pos: VV(-40.5, 9.0), face: 1.1 },
       fenwick: { area: 'willowmere', pos: V3(MERE.x - 0.4, waterY + 0.6, dockZ1 - 0.2), face: 0, pose: 'sit' },
       mira: { area: 'willowmere', pos: VV(4, 6), face: 0, wander: { center: VV(0, 0), radius: 6.5 } },
       tob: { area: 'willowmere', pos: VV(-4, -6), face: 0, wander: { center: VV(1, 1), radius: 7.4 } },

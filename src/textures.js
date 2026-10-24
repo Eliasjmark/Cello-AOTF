@@ -50,12 +50,32 @@ function walk(g, size, rand, steps, color, dir = [1, 0]) {
 }
 
 export function createTextures() {
-  const grass = canvasTexture(32, 11, (g, s, r) => {
-    noisyFill(g, s, r, [52, 66, 42], 9);
-    for (let i = 0; i < 46; i++) {
-      const light = r() > 0.5;
-      g.fillStyle = light ? 'rgba(86,104,60,0.9)' : 'rgba(36,46,30,0.9)';
-      g.fillRect(Math.floor(r() * s), Math.floor(r() * s), 1, 2 + Math.floor(r() * 2));
+  // 0.13: gräsmarken: olivgrönt med mossa, torra strån och fläckar av jord
+  const grass = canvasTexture(64, 11, (g, s, r) => {
+    noisyFill(g, s, r, [62, 74, 40], 10);
+    // mjuka fläckar: mossa (mörkare, grönare) och torrt gräs (gulare)
+    for (let i = 0; i < 14; i++) {
+      const x = r() * s, y = r() * s, rad = 4 + r() * 9;
+      const kind = r();
+      const col = kind < 0.45 ? 'rgba(44,62,30,0.35)' : kind < 0.8 ? 'rgba(112,110,58,0.28)' : 'rgba(92,72,46,0.32)';
+      for (const [ox, oy] of [[0, 0], [s, 0], [-s, 0], [0, s], [0, -s]]) {
+        const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, rad);
+        gr.addColorStop(0, col);
+        gr.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = gr;
+        g.fillRect(x + ox - rad, y + oy - rad, rad * 2, rad * 2);
+      }
+    }
+    // strån
+    for (let i = 0; i < 170; i++) {
+      const t = r();
+      g.fillStyle = t < 0.4 ? 'rgba(104,120,62,0.85)' : t < 0.75 ? 'rgba(40,52,28,0.85)' : 'rgba(132,126,70,0.75)';
+      g.fillRect(Math.floor(r() * s), Math.floor(r() * s), 1, 2 + Math.floor(r() * 3));
+    }
+    // små stenar och jord
+    for (let i = 0; i < 10; i++) {
+      g.fillStyle = r() < 0.5 ? 'rgba(96,84,66,0.8)' : 'rgba(70,58,44,0.8)';
+      g.fillRect(Math.floor(r() * s), Math.floor(r() * s), 2, 1);
     }
   });
 
@@ -111,19 +131,25 @@ export function createTextures() {
     g.fillRect(0, 0, s, 1);
   });
 
+  // 0.13: högre, tätare tuvor med ljusare toppar
   const tuft = (() => {
     const c = document.createElement('canvas');
-    c.width = c.height = 32;
+    c.width = 32;
+    c.height = 64;
     const g = c.getContext('2d');
     const r = mulberry(79);
-    const cols = ['rgb(70,92,52)', 'rgb(56,76,42)', 'rgb(90,110,62)', 'rgb(48,64,38)'];
-    for (let i = 0; i < 10; i++) {
-      const x0 = 4 + r() * 24, xt = x0 + (r() - 0.5) * 12, yt = 3 + r() * 13;
-      g.fillStyle = cols[i % cols.length];
+    const cols = [[78, 98, 50], [62, 82, 42], [100, 116, 60], [54, 70, 38], [118, 120, 66]];
+    for (let i = 0; i < 16; i++) {
+      const x0 = 3 + r() * 26, xt = x0 + (r() - 0.5) * 14, yt = 2 + r() * 26;
+      const cc = cols[i % cols.length];
+      const gr = g.createLinearGradient(0, 64, 0, yt);
+      gr.addColorStop(0, `rgb(${cc[0] * 0.55 | 0},${cc[1] * 0.55 | 0},${cc[2] * 0.55 | 0})`);
+      gr.addColorStop(1, `rgb(${Math.min(255, cc[0] * 1.25) | 0},${Math.min(255, cc[1] * 1.2) | 0},${cc[2]})`);
+      g.fillStyle = gr;
       g.beginPath();
-      g.moveTo(x0 - 1.6, 32);
-      g.lineTo(xt, yt);
-      g.lineTo(x0 + 1.6, 32);
+      g.moveTo(x0 - 1.7, 64);
+      g.quadraticCurveTo((x0 + xt) / 2 + (r() - 0.5) * 4, (64 + yt) / 2, xt, yt);
+      g.lineTo(x0 + 1.7, 64);
       g.fill();
     }
     const t = new THREE.CanvasTexture(c);

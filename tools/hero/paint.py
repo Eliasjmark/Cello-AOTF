@@ -1,18 +1,21 @@
 # Målar Cellos hjältemodell (modellen Elias skickade) och skriver den kompakta binärfilen CHM1 som src/heroModel.js läser.
-#   python3 tools/hero/paint.py [tools/hero/cello-hero.stl] [models/cello-hero.bin]
+#   python3 tools/hero/paint.py [tools/models/src/hero.ply] [models/cello-hero.bin]
 # Kräver: pip install trimesh fast-simplification
 # Modellen förenklas till 40 % av trianglarna, och varje hörn får en färg efter regioner (huvud, hår, pannband,
 # hud, tunika, läder, svärd, sköld). Regionerna är mätta på just den här skulpturen (tre-koordinater: Y upp, Z framåt).
 import trimesh, numpy as np, struct, sys, os
 HERE = os.path.dirname(os.path.abspath(__file__))
-src = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'cello-hero.stl')
+# 0.13: källan är huvudkaraktär.fbx (sparad som tools/models/src/hero.ply, redan med Y upp)
+src = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, '..', 'models', 'src', 'hero.ply')
 out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, '..', '..', 'models', 'cello-hero.bin')
 m = trimesh.load(src, process=True)
 if len(m.faces) > 120000:
     import fast_simplification as fs
     v, f = fs.simplify(m.vertices.astype(np.float32), m.faces.astype(np.int32), target_reduction=0.6)
     m = trimesh.Trimesh(v, f, process=True)
-V = m.vertices; V = np.c_[V[:,0], V[:,2], -V[:,1]].astype(np.float64)
+V = m.vertices.astype(np.float64)
+if src.lower().endswith('.stl'):
+    V = np.c_[V[:,0], V[:,2], -V[:,1]]
 F = m.faces[:, [0, 1, 2]]
 mesh3 = trimesh.Trimesh(V, F, process=False)
 N = mesh3.vertex_normals

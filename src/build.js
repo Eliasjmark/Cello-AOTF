@@ -98,6 +98,28 @@ function segDist(px, pz, ax, az, bx, bz) {
   return [Math.hypot(px - (ax + dx * t), pz - (az + dz * t)), t];
 }
 
+// 0.13: gräset vajar i vinden. Toppen av varje tuva svajar (uv.y = höjden i tuvan), olika takt på olika ställen.
+export const WIND = { time: { value: 0 }, strength: { value: 1 } };
+function windy(mat) {
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uWindT = WIND.time;
+    sh.uniforms.uWindS = WIND.strength;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uWindT;\nuniform float uWindS;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        {
+          vec4 wp = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+          float k = uv.y * uv.y;
+          float ph = uWindT * 1.7 + wp.x * 0.35 + wp.z * 0.27;
+          float gust = 0.6 + 0.4 * sin(uWindT * 0.45 + wp.x * 0.05);
+          transformed.x += (sin(ph) * 0.13 + sin(ph * 2.3) * 0.04) * k * uWindS * gust;
+          transformed.z += cos(ph * 0.8) * 0.09 * k * uWindS * gust;
+        }`);
+  };
+  mat.customProgramCacheKey = () => 'windy-tuft';
+  return mat;
+}
+
 export function createBuilder(scene, lights) {
   const noise = new ImprovedNoise();
   const tex = createTextures();
@@ -115,7 +137,7 @@ export function createBuilder(scene, lights) {
     rope: lam({ color: 0x5e4f3a }),
     iron: lam({ color: 0x45434a, flatShading: true }),
     obsidian: lam({ color: 0x1c1b23, flatShading: true }),
-    tuft: lam({ map: tex.tuft, alphaTest: 0.5 }),
+    tuft: windy(lam({ map: tex.tuft, alphaTest: 0.5 })),
     mosaic: lam({ map: tex.mosaic }),
     runes: lam({ map: tex.runes }),
     char: lam({ map: tex.charred, flatShading: true }),
@@ -404,6 +426,11 @@ export function createBuilder(scene, lights) {
       if (avoid(x, z) || (roads.length && roadW(x, z) > 0.3)) continue;
       A.tufts.push(x, H(x, z), z, rand() * Math.PI, 0.7 + rand() * 0.7);
       placed++;
+      // 0.13: tätare gräs, tuvor i små klungor
+      if (rand() < 0.6) {
+        const x2 = x + (rand() - 0.5) * 1.6, z2 = z + (rand() - 0.5) * 1.6;
+        if (!avoid(x2, z2) && !(roads.length && roadW(x2, z2) > 0.3)) A.tufts.push(x2, H(x2, z2), z2, rand() * Math.PI, 0.6 + rand() * 0.6);
+      }
     }
     if (map) {
       const outline = [];
@@ -503,16 +530,22 @@ export function createBuilder(scene, lights) {
   }
 
   // ---------- grästuvor (en instansierad mesh per område, som går att skära) ----------
+  // 0.13: tre korsade plan, högre tuvor (mjukt) som vajar i vinden (se M.tuft)
   const tuftGeo = (() => {
-    const w = 0.38, hgt = 0.55;
-    const pos = [-w, 0, 0, w, 0, 0, w, hgt, 0, -w, hgt, 0, 0, 0, -w, 0, 0, w, 0, hgt, w, 0, hgt, -w];
-    const uv = [0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1];
-    const nrm = new Array(24).fill(0).map((_, i) => (i % 3 === 1 ? 1 : 0));
+    const w = 0.42, hgt = 0.95;
+    const pos = [], uv = [], idx = [];
+    for (let k = 0; k < 3; k++) {
+      const a = (k / 3) * Math.PI, cx = Math.cos(a) * w, cz = Math.sin(a) * w, b = pos.length / 3;
+      pos.push(-cx, 0, -cz, cx, 0, cz, cx, hgt, cz, -cx, hgt, -cz);
+      uv.push(0, 0, 1, 0, 1, 1, 0, 1);
+      idx.push(b, b + 1, b + 2, b, b + 2, b + 3, b, b + 2, b + 1, b, b + 3, b + 2);
+    }
+    const nrm = new Array(pos.length).fill(0).map((_, i) => (i % 3 === 1 ? 1 : 0));
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-    g.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 0, 2, 1, 0, 3, 2, 4, 6, 5, 4, 7, 6]);
+    g.setIndex(idx);
     return g;
   })();
   const CELL = 4;

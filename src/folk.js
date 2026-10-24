@@ -13,26 +13,28 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 export const PRICES = { lantern: 40, oil: 10, potion: 20, sword: 30, reforge: 20, magsOil: 14, magsPotion: 25, hamidOil: 12, hamidPotion: 22, hamidSword: 34 };
 
 const LOOKS = {
-  hollis: { name: 'Hollis', look: { skin: 0xb88a68, hairStyle: 'bald', beard: 0x8a7a6a, top: 0x6a5238, bottom: 0x3a3228, extraColor: 0x4a3a28, width: 1.18, scale: 1.0 } },
+  hollis: { name: 'Hollis', look: { sculpt: 'bybo', skin: 0xb88a68, hairStyle: 'bald', beard: 0x8a7a6a, top: 0x6a5238, bottom: 0x3a3228, extraColor: 0x4a3a28, width: 1.18, scale: 1.0 } },
   nell: { name: 'Nell', look: { skin: 0xd0aa8c, hair: 0x6a4a3a, hairStyle: 'bun', top: 0x7a6a8a, apron: true, extraColor: 0xd8cfb4, robe: true, scale: 0.9 } },
   tilly: { name: 'Tilly', look: { skin: 0xd8b090, hair: 0xa86a3a, hairStyle: 'long', top: 0x8a4a4a, scale: 0.56 } },
   garrick: { name: 'Garrick', look: { skin: 0xa8805f, helmet: true, beard: 0x3a2a20, top: 0x4a5a6a, extraColor: 0x6a5a40, item: 'spear', width: 1.1, scale: 1.0 } },
-  odo: { name: 'Odo', look: { skin: 0xc49f83, hairStyle: 'hood', hood: 0x6a5a40, top: 0x6a5a40, robe: true, beard: 0xd8d0c0, scale: 0.88 } },
+  odo: { name: 'Odo', look: { sculpt: 'bybo', skin: 0xc49f83, hairStyle: 'hood', hood: 0x6a5a40, top: 0x6a5a40, robe: true, beard: 0xd8d0c0, scale: 0.88 } },
   mags: { name: 'Mags', look: { skin: 0xc8a080, hair: 0x9a9a9a, hairStyle: 'bun', shawl: 0x7a3a4a, top: 0x5a4a3a, robe: true, scale: 0.86, width: 1.15 } },
   pell: { name: 'Pell', look: { skin: 0xd0a888, hair: 0x3a2a1a, top: 0x3a5a4a, apron: true, extraColor: 0x8a7a5a, width: 1.12, scale: 0.95 } },
   rosa: { name: 'Rosa', look: { skin: 0xc89878, hair: 0x2a1a14, hairStyle: 'bun', top: 0xa84a3a, apron: true, extraColor: 0xe0d8c4, robe: true, scale: 0.9 } },
   ysolde: { name: 'Ysolde', look: { skin: 0xc8a890, hairStyle: 'hood', hood: 0x4a2a5a, top: 0x4a2a5a, robe: true, shawl: 0x8a6ab0, scale: 0.85, extraColor: 0xc9a24f } },
   doran: { name: 'Doran', look: { skin: 0x9a7a5a, helmet: true, top: 0x5a3a3a, extraColor: 0x8a8a8a, item: 'spear', width: 1.12, scale: 1.0 } },
-  fenwick: { name: 'Fenwick', look: { skin: 0xb8906a, hairStyle: 'bald', beard: 0xb0a090, top: 0x4a5a6a, scale: 0.95 } },
+  fenwick: { name: 'Fenwick', look: { sculpt: 'bybo', skin: 0xb8906a, hairStyle: 'bald', beard: 0xb0a090, top: 0x4a5a6a, scale: 0.95 } },
   mira: { name: 'Mira', look: { skin: 0xd8b090, hair: 0x3a2a1a, hairStyle: 'long', top: 0x5a7a4a, scale: 0.55 } },
   tob: { name: 'Tob', look: { skin: 0xc49f83, hair: 0x8a5a2a, top: 0x6a6aa0, scale: 0.55 } },
   wren: { name: 'Wren', look: { skin: 0xc8a080, hair: 0xb0603a, hairStyle: 'long', top: 0x5a6a4a, extraColor: 0x8a7a50, item: 'scroll', scale: 0.88 } },
+  // 0.13: Seren, en vandrande svärdsflicka (Elias skulptur)
+  seren: { name: 'Seren', look: { sculpt: 'maiden', scale: 0.92 } },
   fenn: { name: 'Fenn', look: { skin: 0xc49f83, hair: 0x4a3020, hairStyle: 'hood', hood: 0x3a4a3a, top: 0x3a4a3a, extraColor: 0x5a4632, item: 'spear', scale: 0.95 } },
   // 0.7: öknen
   nefret: { name: 'Nefret', look: { skin: 0x9a6a48, hairStyle: 'hood', hood: 0xd8ccb0, top: 0xd8ccb0, robe: true, shawl: 0xc9a24f, extraColor: 0x2a4a8a, item: 'scroll', scale: 0.9 } },
-  hamid: { name: 'Hamid', look: { skin: 0x8a5a3a, hairStyle: 'hood', hood: 0x3a7a78, beard: 0x2a1a14, top: 0x3a7a78, apron: true, extraColor: 0xd8ccb0, width: 1.18, scale: 0.98 } },
+  hamid: { name: 'Hamid', look: { sculpt: 'bybo', skin: 0x8a5a3a, hairStyle: 'hood', hood: 0x3a7a78, beard: 0x2a1a14, top: 0x3a7a78, apron: true, extraColor: 0xd8ccb0, width: 1.18, scale: 0.98 } },
   sabi: { name: 'Sabi', look: { skin: 0x8a5a3a, hair: 0x1a1210, top: 0xd8a050, scale: 0.55 } },
-  tarek: { name: 'Tarek', look: { skin: 0x9a6a48, hairStyle: 'hood', hood: 0x8a6a3a, beard: 0x3a2a1c, top: 0x6a4a2a, extraColor: 0x8a6a3a, scale: 0.95 } },
+  tarek: { name: 'Tarek', look: { sculpt: 'bybo', skin: 0x9a6a48, hairStyle: 'hood', hood: 0x8a6a3a, beard: 0x3a2a1c, top: 0x6a4a2a, extraColor: 0x8a6a3a, scale: 0.95 } },
 };
 
 // ---------- djur ----------
@@ -211,6 +213,7 @@ export class Folk {
     talk('mira', (n) => this.talkKid(n, 'mira'));
     talk('tob', (n) => this.talkKid(n, 'tob'));
     talk('fenn', (n) => this.talkFenn(n));
+    talk('seren', (n) => this.talkSeren(n));
     talk('wren', (n) => this.talkWren(n));
     talk('nefret', (n) => this.talkNefret(n));
     talk('hamid', (n) => this.talkHamid(n));
@@ -959,6 +962,33 @@ export class Folk {
       rude: { q: "Your map is wrong. That river's in the wrong place.", a: ['WRONG? I walked every step of that river!', '...Go draw your own map, then.'] },
       bye: 'Follow the roads!',
       forgive: "I checked the river. It's in the right place. ...I forgive you anyway.",
+    });
+  }
+
+  // 0.13: Seren vid västra porten i Willowmere
+  talkSeren(n) {
+    const s = this.story.state;
+    if (!s.talked.seren) {
+      this.say(n, [
+        'Hold. ...You carry yourself like someone who has used that sword.',
+        "I'm Seren. I walk the north road from town to town, and I stay wherever the Ashlings are thickest.",
+        'Doran lets me keep watch at this gate. He pretends he does not need the help.',
+        'If you ever want to trade blows for practice, find me here. I hit softly. Mostly.',
+      ], () => { s.talked.seren = true; });
+      return;
+    }
+    const relics = ['hammer', 'prism', 'scales'].filter((k) => s.items?.[k]).length;
+    this.chats.chat(n, {
+      greet: [this.night ? 'Quiet night. I do not trust quiet nights.' : 'Back again? Good. The gate is dull without company.'],
+      topics: [
+        { id: 'road', q: 'Where have you travelled?', a: ['North, mostly. Villages behind palisades, and watchtowers with no one left to watch.', 'Wherever the titans walked, the ground still remembers. The grass grows grey there.'] },
+        { id: 'fight', q: 'Any advice for a fight?', a: ['Keep your shield up until they commit. Then step in, not back.', 'And never fight on a full stomach. I learned that one the hard way.'] },
+        { id: 'relics', q: 'Have you heard of the old relics?', a: () => [relics === 0 ? 'Stories. A hammer that remembers thunder. A prism full of sunlight. I never believed them.' : relics === 1 ? 'So the stories are true. You found one. ...May I look? No? Fair.' : `You carry ${relics} of them now. People will start writing songs about you. Bad ones.`, 'They say the next one waits on a tower that the wind never stops circling.'] },
+        { id: 'doran', q: 'What do you think of Doran?', a: ['Stubborn. Loyal. Snores standing up.', "Don't tell him I said the second one."] },
+      ],
+      rude: { q: 'That armor looks more decorative than useful.', a: ['...Decorative.', 'Come back when you can say that after a real fight.'] },
+      bye: 'Keep your guard up.',
+      forgive: 'About yesterday. You were half right. The shoulder pieces are for show. The rest is not.',
     });
   }
 

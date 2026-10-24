@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Capsule } from 'three/addons/math/Capsule.js';
 import { buildHammer, ITEM_MATS } from './items.js';
 import { mergeRigid } from './geom.js';
+import { heroAvailable, sculptHero } from './heroRig.js';
 
 const R = 0.35, HEIGHT = 1.7;
 export const RUN_SPEED = 6.6;
@@ -282,7 +283,8 @@ function buildModel() {
     skirt, sword, shield, eyes, lids, M, hammerHand, hammerBack, hammerGlow: glow, blade, tip, jag, lantern, lanternGlass, prism,
   };
   root.scale.setScalar(0.9);
-  return { root, ...parts };
+  // 0.13: Elias hjälteskulptur, när modellpaketet finns
+  return heroAvailable() ? sculptHero({ root, ...parts }) : { root, ...parts };
 }
 
 const place = (mesh, x, y, z) => {
@@ -440,6 +442,7 @@ export class Player {
 
   // Valen syns på Cello: hämndens väg ger mörkare halsduk och glödande ögon
   setPath(kind) {
+    if (this.model.recolor) { this.model.recolor(kind); return; }
     const M = this.model.M;
     M.scarf.color.set(kind === 'vengeful' ? 0x3a1212 : kind === 'heroic' ? 0xa8302a : 0x8c2a27);
     M.tunic.color.set(kind === 'vengeful' ? 0x3a3f4a : 0x4a5465);
@@ -530,7 +533,7 @@ export class Player {
     this.sword.broken = this.sword.dur <= 0;
     const m = this.model, b = this.sword.broken;
     m.blade.scale.y = b ? 0.36 : 1;
-    m.blade.position.y = b ? -0.29 : -0.55;
+    m.blade.position.y = m.bladeY ?? (b ? -0.29 : -0.55);
     m.tip.visible = !b;
     m.jag.visible = b;
   }
@@ -1093,6 +1096,16 @@ export class Player {
       P.elbowL = P.elbowR = -0.25; P.kneeL = 0.15; P.kneeR = 0.05;
     }
 
+    // 0.13: skulpturen har skölden fast på underarmen, så sköldposen blir en annan
+    P.armLy = 0;
+    if (m.sculpt && a.shield > 0.01) {
+      const s = a.shield;
+      // överarmen framåt och inåt, underarmen tvärs över bröstet: skölden täcker bålen
+      P.armLx = P.armLx * (1 - s) - 1.0 * s;
+      P.armLz = P.armLz * (1 - s);
+      P.armLy = -1.4 * s;
+      P.elbowL = P.elbowL * (1 - s) - 1.2 * s;
+    }
     // Rullning och volt ska inte "spola tillbaka" när de tar slut
     if (this.state !== 'dodge') m.hips.rotation.x = wrap(m.hips.rotation.x);
     m.hips.rotation.x = this.state === 'dodge' ? P.hipsX : approach(m.hips.rotation.x, 0, 30, dt);
@@ -1103,6 +1116,7 @@ export class Player {
     ap(m.armR.rotation, 'x', P.armRx);
     ap(m.armL.rotation, 'z', P.armLz);
     ap(m.armR.rotation, 'z', P.armRz);
+    if (m.sculpt) ap(m.armL.rotation, 'y', P.armLy);
     ap(m.hips.position, 'y', P.hipsY);
     ap(m.torso.rotation, 'x', P.torsoX);
     ap(m.torso.rotation, 'y', P.torsoY);

@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.12 · The Sunken Necropolis (fas 9 i utvecklingsplanen: den tredje dungeonen, Anubis' Broken Scales och de dödas värld)
+**Version:** prototyp 0.13 · A New Look (Elias egna 3D-modeller i spelet och ljus)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -23,7 +23,36 @@ npm install          # en gång, hämtar esbuild
 npm run build:artifact   # → build/play.html
 ```
 
-## Vad är nytt i 0.12: The Sunken Necropolis
+### Bygga om modellerna
+
+Modellerna i `models/pack.bin` byggs av Elias skulpturer. Behövs bara när en modell eller dess målning ändras:
+
+```bash
+pip install trimesh fast-simplification rtree playwright
+python3 tools/models/dump_fbx.py Boss1.fbx:boss1 ...   # FBX → tools/models/src/*.ply (en gång per ny FBX)
+python3 tools/models/build_models.py                    # → models/pack.bin
+python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
+```
+
+## Vad är nytt i 0.13: ett nytt utseende
+
+Elias skickade sina egna 3D-modeller (FBX från Blender), och nu används de i spelet. Modellerna saknade färger, texturer och skelett, så de förenklas, målas i delar och får ett skelett med mjuka leder (se `tools/models`).
+
+| Del | Vad som händer |
+| --- | --- |
+| **Cello** | Hjälteskulpturen (huvudkaraktär.fbx) är nu Cello i spelet, med pannband, bröstpansar, skölden på armen och skulpturens svärd i handen. Han springer, hugger, blockerar och rullar som förut. Benen är nybyggda (skulpturen slutar vid låren), och ögonen är målade i ögonhålorna. Svärdet kortas när det går sönder |
+| **Byborna** | Bybo-modellen bär nu Hollis, Odo, Fenwick, Hamid och Tarek, var och en i sina egna färger (luva, skägg, tröja) |
+| **Seren** | En ny person: en vandrande svärdsflicka (Love_interest.fbx) som håller vakt med Doran vid Willowmeres västra port. Hon har egna frågor, ett dumt svar som gör henne sur och ett tips om nästa relik |
+| **Hrungnir** | Bossen i fästningen är nu dvärgen (Boss1.fbx) med sin stenhammare. Glasögonen lyser när han vaknar, och stenhjärtat sitter som en runsten i bältesspännet |
+| **Apophis** | Bossen i pyramiden är nu hydran (ormar.fbx): fem huvuden som reser sig ur hålen, vajar och hugger. Mittenhuvudet bär ädelstenen och slår ner när ljuset bränner det |
+| **Ljus och färger** | En lugn dag är nu varm och disig: gyllene himmel, mjukt solljus och dimma i guld. Stormar, regn och natt behåller sina mörka färger |
+| **Mark och gräs** | Gräsmarken har olivgröna och mossiga fläckar, torra strån och jord. Gräset är högre och tätare, i små klungor, och vajar i vinden (mer i regn och åska) |
+
+Hajmannen (WaterbBoss.fbx) och spindelgolemen (Boss4.fbx) är förberedda i `tools/models/src` och sparas till kommande dungeons.
+
+Nytt i koden: `src/skinned.js` (läser modellpaketet och bygger figurer med skelett), `src/heroRig.js` (Cello som skulptur), `src/peopleRig.js` (byborna, Seren, dvärgen och hydran), `models/pack.bin` och verktygen i `tools/models` (`dump_fbx.py`, `meshkit.py`, `hero.py`, `people.py`, `build_models.py`).
+
+## Vad var nytt i 0.12: The Sunken Necropolis
 
 Fas 9 i planen. Under sanden söder om pyramiden ligger en begravd gravstad. Den öppnar sig när pyramiden är klar: sanden framför mastabans dörr har sjunkit undan. Arkitekturen följer reliken, och rummen växlar mellan trånga gravgångar och väldiga, höga salar.
 
@@ -295,6 +324,9 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/weather.js` | Vädret (0.11): lugnt, regn, åska, dimma och sanddis, regnet, och blixten som slår ner i metall |
 | `src/talk.js` | Dialogträd (0.11): frågor i valfri ordning, det dumma svaret, humör och ikoner över huvudet |
 | `src/songs.js` | Flöjten (0.11): spelläget, sångerna, lektionerna och sångstenarna |
+| `src/skinned.js` | Modellpaketet (0.13): läser models/pack.bin och bygger figurer med skelett, färger per region |
+| `src/heroRig.js` | Cello som Elias skulptur (0.13): skelettet, benen, svärdet och ögonen |
+| `src/peopleRig.js` | Byborna, Seren, dvärgen (Hrungnir) och hydran (Apophis) som skulpturer (0.13) |
 | `src/realm.js` | De dödas värld (0.12): växlingen med vågskålarna, andesaker, falska väggar och andar |
 | `src/necrokit.js` | Byggdelar för nekropolen (0.12): vattennivåer, slussar, flytande kistor, Schakalväktaren och Ammit |
 | `src/necropolis.js` | The Sunken Necropolis (0.12): gravgångarna, vägningssalen, Duat och tronsalen |

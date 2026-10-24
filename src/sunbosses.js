@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { ring } from './titan.js';
 import { mergeRigid } from './geom.js';
+import { sculptHydra, sculptAvailable, HYDRA_H } from './peopleRig.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const approach = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
@@ -376,7 +377,10 @@ export class Apophis {
     this.holes = holes; // [Vector3] på golvet
     this.groundAt = groundAt;
     this.N = 16;
-    this.model = buildSerpent(this.N);
+    // 0.13: Apophis är hydran från Elias skulptur (fem huvuden), när modellpaketet finns
+    this.hydra = sculptAvailable('hydra');
+    this.model = this.hydra ? sculptHydra() : buildSerpent(this.N);
+    this.yaw = 0;
     scene.add(this.model.root);
     this.pos = new THREE.Vector3(); // huvudets punkt (för lock-on och strålen)
     this.headPos = new THREE.Vector3();
@@ -434,6 +438,11 @@ export class Apophis {
 
   // Ljuset bränner ormen var det än träffar: huvudet eller kroppen som reser sig ur hålet
   beamPoints() {
+    if (this.hydra) {
+      const out = [this.headPos];
+      for (const n of this.model.necks) out.push(n.head.getWorldPosition(new THREE.Vector3()), n.b.getWorldPosition(new THREE.Vector3()));
+      return out;
+    }
     const out = [this.headPos];
     for (const s of this.model.segs) if (s.visible) out.push(s.position);
     return out;
@@ -502,7 +511,48 @@ export class Apophis {
   slamHit() {}
 
   // Placerar kroppen: från hålet upp till huvudet i en S-kurva
+  // Hydran: kroppen reser sig ur hålet, halsarna vajar, mittenhuvudet hugger och slår ner i golvet
+  placeHydra(dt) {
+    const m = this.model, h = this.holes[this.hole] ?? this.center;
+    const rise = this.rise;
+    const toC = new THREE.Vector3().subVectors(this.center, h).setY(0).normalize();
+    // Vänd kroppen mot Cello (mot mitten när hon ligger nere)
+    const want = this.state === 'stunned' || this.state === 'recoil' ? Math.atan2(toC.x, toC.z) : Math.atan2(this.lookX ?? toC.x, this.lookZ ?? toC.z);
+    const base = Math.atan2(toC.x, toC.z);
+    const rel = Math.max(-1.1, Math.min(1.1, Math.atan2(Math.sin(want - base), Math.cos(want - base))));
+    this.yaw += (base + rel - this.yaw) * (1 - Math.exp(-4 * Math.max(dt, 0.001)));
+    if (!dt) this.yaw = base;
+    m.root.position.set(h.x, h.y - HYDRA_H * 0.95 * (1 - rise), h.z);
+    m.root.rotation.set(0, this.yaw, 0);
+    m.root.visible = rise > 0.02 && this.state !== 'gone' && this.state !== 'dormant' && this.state !== 'travel';
+    const down = this.state === 'stunned' ? Math.min(1, this.st / 0.45) : this.state === 'recoil' && this.st < 0.5 ? 1 - this.st / 0.5 : 0;
+    const strike = Math.max(0, this.lunge), wind = Math.max(0, -this.lunge) / 0.15;
+    const open = this.state === 'strike' || this.state === 'spit' ? 1 : 0;
+    m.necks.forEach((n, i) => {
+      const k = i - 2;
+      const ph = this.sway * (1 + 0.15 * i) + i * 1.3;
+      const sw = Math.sin(ph) * 0.1 * rise;
+      let ax = Math.sin(ph * 0.7) * 0.05, bx = Math.sin(ph * 0.9 + 1) * 0.06, cx = Math.sin(ph + 2) * 0.05;
+      if (i === 2) {
+        // mittenhuvudet: drar sig bakåt och hugger framåt-nedåt
+        ax += -0.25 * wind + 0.55 * strike; bx += -0.2 * wind + 0.5 * strike; cx += 0.35 * strike;
+        ax += 0.7 * down; bx += 0.55 * down; cx += 0.25 * down;
+      } else {
+        // de andra huvudena: höjer sig när det hugger, sjunker åt sidan när mittenhuvudet ligger nere
+        ax += -0.1 * open + 0.45 * down; bx += 0.35 * down;
+      }
+      n.a.rotation.set(ax, 0, sw * 0.6 - k * 0.12 * down);
+      n.b.rotation.set(bx, 0, sw * 0.8);
+      n.c.rotation.set(cx, 0, sw);
+      n.head.rotation.set(-0.1 * open, Math.sin(ph * 1.7) * 0.15, 0);
+    });
+    m.root.updateMatrixWorld(true);
+    m.head.getWorldPosition(this.headPos);
+    this.pos.copy(this.headPos);
+  }
+
   place(dt) {
+    if (this.hydra) { this.placeHydra(dt); return; }
     const m = this.model, h = this.holes[this.hole] ?? this.center;
     const rise = this.rise;
     const toC = new THREE.Vector3().subVectors(this.center, h).setY(0).normalize();

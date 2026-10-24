@@ -25,6 +25,8 @@ import { Weather } from './weather.js';
 import { Chats } from './talk.js';
 import { Songs } from './songs.js';
 import { Realm } from './realm.js';
+import { loadPack } from './skinned.js';
+import { WIND } from './build.js';
 
 const PIXEL_LINES = 360; // retroläge: spelet ritas i ungefär så här många rader
 const FLASH = new THREE.Color(0x8d98b4);
@@ -51,6 +53,8 @@ function start(saved = {}) {
   const moon = new THREE.DirectionalLight(0xc6d0e6, 1.25);
   moon.position.set(-40, 60, 25);
   scene.add(moon);
+  // 0.13: ljuset en lugn dag (klassiska äventyrsspel): varmt, disigt solljus och dämpade gröna och bruna toner
+  const TP = { sky: new THREE.Color(0xe0d2b0), ground: new THREE.Color(0x5a4630), sun: new THREE.Color(0xffd8a4), fog: new THREE.Color(0xa89878) };
   const base = { hemi: 1.5, moon: 1.25, flash: 1, sky: new THREE.Color(0x9aa7bd), ground: new THREE.Color(0x3a3029), moonColor: new THREE.Color(0xc6d0e6), near: 34, far: 260 };
   // 0.11: dygnet och vädret
   const ENV = {
@@ -162,7 +166,7 @@ function start(saved = {}) {
   // Andar ute i världen: de döda i Hollowbrook och vid karavanen
   realm.addSpirit({
     id: 'hollowElder', area: 'village', pos: new THREE.Vector3(2.5, 0, 4), face: Math.PI, name: 'Spirit of Hollowbrook',
-    look: { skin: 0xffffff, hairStyle: 'bald', beard: 0xffffff, top: 0xffffff, robe: true, scale: 0.95 },
+    look: { sculpt: 'bybo', skin: 0xffffff, hairStyle: 'bald', beard: 0xffffff, top: 0xffffff, robe: true, scale: 0.95 },
     lines: [
       'Cello... little Cello, with ash on your boots. You can see us?',
       'Do not grieve so much for us. We are not angry. Not at you.',
@@ -705,6 +709,9 @@ function start(saved = {}) {
     const flash = sky.update(dt, t, camera) * base.flash;
     applyEnv(flash);
     world.update(t, dt);
+    // 0.13: gräset vajar, mer i regn och åska
+    WIND.time.value = t;
+    WIND.strength.value = 1 + (weather.cur?.over ?? 0) * 1.4;
     cull(dt);
     lights.update(dt, t, hud.started ? player.feet : camera.position);
     fx.airAsh.update(dt, camera.position);
@@ -727,10 +734,18 @@ function start(saved = {}) {
     moon.color.copy(base.moonColor).lerp(ENV.nightMoon, n * 0.8).lerp(ENV.duskMoon, dusk * 0.6);
     _c.copy(fogBase).lerp(ENV.nightFog, n * 0.78).lerp(ENV.duskFog, dusk * 0.35);
     if (fog > 0) _c.lerp(haze > 0.5 ? ENV.haze : ENV.fogGrey, fog * (0.25 + 0.3 * day));
+    // Lugnt dagsljus: allt glider mot de varma färgerna (stormar och natt behåller sina)
+    const warm = out ? Math.max(0, day * 1.15 - 0.15) * (1 - dusk * 0.7) * (1 - over) * (1 - fog * 0.8) : 0;
+    hemi.color.lerp(TP.sky, warm * 0.65);
+    hemi.groundColor.copy(base.ground).lerp(TP.ground, warm);
+    moon.color.lerp(TP.sun, warm * 0.85);
+    hemi.intensity *= 1 + 0.12 * warm;
+    moon.intensity *= 1 + 0.55 * warm;
+    _c.lerp(TP.fog, warm * 0.75);
     scene.fog.color.copy(_c).lerp(FLASH, flash * 0.22);
-    scene.fog.near = base.near * (1 - 0.8 * fog);
-    scene.fog.far = base.far * (1 - 0.68 * fog) * (1 - n * 0.25);
-    sky.setEnv(day, dusk, Math.max(over, fog * 0.6));
+    scene.fog.near = base.near * (1 - 0.8 * fog) * (1 - 0.35 * warm);
+    scene.fog.far = base.far * (1 - 0.68 * fog) * (1 - n * 0.25) * (1 - 0.15 * warm);
+    sky.setEnv(day, dusk, Math.max(over, fog * 0.6), warm);
     // Klockan och vädret uppe till vänster
     clockT -= 1;
     if (clockT <= 0) {
@@ -750,5 +765,6 @@ function start(saved = {}) {
 }
 
 const hot = window.claude?.hot;
-if (hot?.ready) hot.ready(start);
-else start(hot?.data ?? {});
+// 0.13: modellpaketet (Elias skulpturer) läses innan spelet startar
+if (hot?.ready) hot.ready((d) => loadPack().then(() => start(d)));
+else loadPack().then(() => start(hot?.data ?? {}));

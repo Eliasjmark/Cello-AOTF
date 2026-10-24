@@ -2,6 +2,7 @@
 // enkla rörelser och huvuden som vänder sig mot Cello.
 import * as THREE from 'three';
 import { mergeRigid } from './geom.js';
+import { sculptPerson, sculptAvailable } from './peopleRig.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const approach = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
@@ -176,7 +177,9 @@ export class Npc {
     this.name = def.name;
     this.voice = def.voice;
     this.pose = def.pose ?? 'stand';
-    this.model = buildPerson(def.look ?? {});
+    // 0.13: look.sculpt = 'bybo' / 'maiden' ger en figur av Elias skulpturer (om modellpaketet finns)
+    const sc = def.look?.sculpt;
+    this.model = sc && sculptAvailable(sc) ? sculptPerson(sc, def.look) : buildPerson(def.look ?? {});
     mergeRigid(this.model.root);
     scene.add(this.model.root);
     this.parentGroup = scene;
@@ -322,5 +325,6 @@ export class Npc {
 
     m.root.position.copy(this.pos);
     m.root.rotation.y = this.facing;
+    m.sync?.();
   }
 }

@@ -25,6 +25,7 @@ export const VOICES = {
   odo: { f: 128, wave: 'triangle', form: [[540, 3], [1000, 4]], breath: 0.3 },
   nell: { f: 300, wave: 'triangle', form: [[780, 4], [1500, 5]] },
   wren: { f: 315, wave: 'triangle', form: [[800, 4], [1600, 5]] },
+  seren: { f: 270, wave: 'triangle', form: [[720, 4], [1450, 5]], wobble: 0.6 },
   // 0.7: öknen och pyramiden
   nefret: { f: 240, wave: 'triangle', form: [[680, 3], [1250, 4]], breath: 0.3 },
   hamid: { f: 122, wave: 'sawtooth', form: [[540, 4], [1080, 5]], wobble: 0.3 },

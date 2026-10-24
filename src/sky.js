@@ -146,14 +146,16 @@ export function createSky(scene) {
   const NIGHT = { zenith: new THREE.Color(0x020309), horizon: new THREE.Color(0x0c1019), below: new THREE.Color(0x06070b), glow: new THREE.Color(0x141c33), dark: new THREE.Color(0x07080d), mid: new THREE.Color(0x13151f) };
   const DUSK = { horizon: new THREE.Color(0x7a3e26), glow: new THREE.Color(0xe0702c), mid: new THREE.Color(0x4a3030) };
   const GREY = new THREE.Color(0x2a2e34);
+  // 0.13: lugna dagar: disig, varm himmel och ett molnhav i guld och grått
+  const WARM = { zenith: new THREE.Color(0x5a6a7c), horizon: new THREE.Color(0xc9b28a), below: new THREE.Color(0x8a7a62), glow: new THREE.Color(0xffd29a), dark: new THREE.Color(0x5a544e), mid: new THREE.Color(0x9c8e76) };
   const glowStorm = new THREE.Vector3(-0.55, 0, -0.83).normalize(), glowSun = new THREE.Vector3(0.8, 0, -0.6).normalize();
   const api = {
     onBolt: null,
     boltRate: 1, // vädret: fler blixtar i åskväder, färre när det är lugnt
     // day: 0–1 dagsljus · dusk: 0–1 gryning/skymning · over: 0–1 mulet (regn och dimma)
-    setEnv(day, dusk, over = 0) {
+    setEnv(day, dusk, over = 0, warm = 0) {
       const n = 1 - day;
-      for (const k of ['zenith', 'horizon', 'below', 'glow']) u[`u${k[0].toUpperCase()}${k.slice(1)}`].value.copy(DAY[k]).lerp(NIGHT[k], n);
+      for (const k of ['zenith', 'horizon', 'below', 'glow']) u[`u${k[0].toUpperCase()}${k.slice(1)}`].value.copy(DAY[k]).lerp(WARM[k], warm).lerp(NIGHT[k], n);
       u.uHorizon.value.lerp(DUSK.horizon, dusk * 0.55);
       u.uGlow.value.lerp(DUSK.glow, dusk * 0.8);
       u.uGlowDir.value.copy(glowStorm).lerp(glowSun, dusk).normalize();
@@ -163,8 +165,8 @@ export function createSky(scene) {
         u.uGlow.value.multiplyScalar(1 - over * 0.7);
       }
       u.uNight.value = Math.max(0, n * n * (1 - over * 0.8));
-      su.uDark.value.copy(DAY.dark).lerp(NIGHT.dark, n);
-      su.uMid.value.copy(DAY.mid).lerp(NIGHT.mid, n).lerp(DUSK.mid, dusk * 0.5);
+      su.uDark.value.copy(DAY.dark).lerp(WARM.dark, warm).lerp(NIGHT.dark, n);
+      su.uMid.value.copy(DAY.mid).lerp(WARM.mid, warm).lerp(NIGHT.mid, n).lerp(DUSK.mid, dusk * 0.5);
     },
     // Inomhus och i grottor syns varken himlen, molnhavet eller blixtarna
     // En blixt just nu (ett nedslag nära Cello)

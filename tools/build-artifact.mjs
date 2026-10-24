@@ -40,7 +40,9 @@ const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/)[1]
 
 // Hjältemodellen till startmenyn bakas in som base64 (artifacts serverar inga binärfiler)
 const hero = (await readFile(path.join(root, 'models/cello-hero.bin'))).toString('base64');
-const out = `${head.trim()}\n${body.trim()}\n<script>window.CELLO_HERO_B64="${hero}";</script>\n<script type="module">${js}</script>\n`;
+// 0.13: modellpaketet (Elias skulpturer med skelett) bakas också in
+const pack = (await readFile(path.join(root, 'models/pack.bin'))).toString('base64');
+const out = `${head.trim()}\n${body.trim()}\n<script>window.CELLO_HERO_B64="${hero}";window.CELLO_PACK_B64="${pack}";</script>\n<script type="module">${js}</script>\n`;
 await mkdir(path.join(root, 'build'), { recursive: true });
 await writeFile(path.join(root, 'build/play.html'), out);
 console.log(`build/play.html  ${(out.length / 1024).toFixed(0)} kB`);

@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { buildTitan, ring } from './titan.js';
 import { mergeRigid } from './geom.js';
+import { sculptTitanDwarf, sculptAvailable } from './peopleRig.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const approach = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
@@ -374,20 +375,24 @@ export class Hrungnir {
     this.center = center.clone();
     this.home = home.clone();
     this.groundAt = groundAt;
-    const t = buildTitan({ stone: 0x5d574f, dark: 0x3a352f });
+    // 0.13: Hrungnir är dvärgen från Elias skulptur (Boss1), med sin stenhammare
+    const dwarf = sculptAvailable('dwarf');
+    const t = dwarf ? sculptTitanDwarf() : buildTitan({ stone: 0x5d574f, dark: 0x3a352f });
     this.model = t;
     t.root.scale.setScalar(1.15);
     scene.add(t.root);
-    // Stenhjärtat i bröstet
+    // Stenhjärtat: i bröstet på titanen, som en glödande runsten i bältesspännet på dvärgen
     this.heartMat = new THREE.MeshBasicMaterial({ color: 0x5a2a12 });
-    const heart = B(0.9, 0.9, 0.3, this.heartMat, 0, 1.25, 0.95);
+    const heart = dwarf ? B(0.62, 0.5, 0.22, this.heartMat, 0, -0.2, 1.78) : B(0.9, 0.9, 0.3, this.heartMat, 0, 1.25, 0.95);
     t.torso.add(heart);
     this.heartMesh = heart;
-    // Brynet – Hrungnirs vapen av sten
-    const whet = B(0.55, 3.0, 0.9, t.M.stone, 0, -4.6, 0.2);
-    t.armR.add(whet);
+    // Brynet – Hrungnirs vapen av sten (dvärgen har hammaren)
+    if (!dwarf) {
+      const whet = B(0.55, 3.0, 0.9, t.M.stone, 0, -4.6, 0.2);
+      t.armR.add(whet);
+    }
     mergeRigid(t.root, [heart]);
-    this.mats = [t.M.stone, t.M.dark];
+    this.mats = t.mats ?? [t.M.stone, t.M.dark];
     this.pos = home.clone();
     this.chestPos = new THREE.Vector3();
     this.heartPos = new THREE.Vector3();
@@ -706,6 +711,12 @@ export class Hrungnir {
       const c = ((a.t - a.wind + 0.75) % 0.75) / 0.75;
       armL = -2.6 + c * 2.2; torsoX = -0.1 + c * 0.4; rate = 20;
     }
+    // 0.13: dvärgen är en skulptur i en rock, så benen rör sig mindre (annars spricker rocken)
+    if (m.sculpt === 'dwarf') {
+      legL *= 0.45; legR *= 0.45;
+      hipsY = 2.4 - (2.4 - hipsY) * 0.55;
+      armLz *= 0.6; armRz *= 0.6;
+    }
     const ap = (o, k, v, r = rate) => { o[k] = approach(o[k], v, r, dt); };
     ap(m.armL.rotation, 'x', armL);
     ap(m.armR.rotation, 'x', armR);
@@ -725,6 +736,7 @@ export class Hrungnir {
     for (const mat of this.mats) mat.emissive.setRGB(f, f * 0.95, f);
     m.root.position.copy(this.pos);
     m.root.rotation.y = this.facing;
+    m.sync?.();
     if (this.waveT >= 0) {
       this.waveT += dt;
       const k = this.waveT / 0.45;
