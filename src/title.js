@@ -176,6 +176,7 @@ const fmtDate = (ms) => {
 const ICONS = {
   hammer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h11v6H4z M8.5 11h2v9h-2z" fill="currentColor"/><path d="M15 6l4-2v8l-4-2z" fill="currentColor" opacity=".7"/></svg>',
   prism: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 16H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9l3 7H9z" fill="currentColor"/></svg>',
+  scales: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v15h-2z M7 20h10v2H7z M3 7h18v1.6H3z" fill="currentColor"/><path d="M3 9l-2 5h6z M21 9l-2 5h6z" fill="currentColor" opacity=".75"/></svg>',
   horn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16c4 0 9-3 12-9l3 1c-2 7-8 12-15 12z" fill="currentColor"/></svg>',
   shard: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l5 8-5 12-5-12z" fill="currentColor"/></svg>',
   clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
@@ -613,7 +614,7 @@ export class TitleScreen {
     const s = save.state;
     const hearts = (6 + (s.amulet ? 2 : 0) + 2 * (s.hearts || 0)) / 2;
     const heartRow = Array.from({ length: hearts }, (_, i) => `<span class="heart">${heartSvg(`f${n}${i}`)}</span>`).join('');
-    const relics = [s.items?.hammer && ['hammer', "Mjölnir's Shard"], s.items?.prism && ['prism', "Ra's Shattered Prism"], s.goat?.have && ['horn', 'Grumble']]
+    const relics = [s.items?.hammer && ['hammer', "Mjölnir's Shard"], s.items?.prism && ['prism', "Ra's Shattered Prism"], s.items?.scales && ['scales', "Anubis' Broken Scales"], s.goat?.have && ['horn', 'Grumble']]
       .filter(Boolean).map(([k, name]) => `<span class="relic" title="${name}">${ICONS[k]}<span class="sr">${name}</span></span>`).join('');
     return `<span class="file-num">File ${n}</span>
       <span class="file-where">${this.where(save)}</span>

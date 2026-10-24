@@ -105,6 +105,8 @@ const freshState = () => ({
   goat: null,
   // 0.11: en levande värld
   clock: 8, day: 1, weather: null, mood: {}, asked: {}, flute: false, songs: [], songStones: {},
+  // 0.12: nekropolen
+  necropolis: null, necropolisDone: false,
 });
 
 export class Story {
@@ -112,7 +114,14 @@ export class Story {
     Object.assign(this, ctx); // scene, world, player, enemies, combat, rig, hud, dialog, sfx, fx, groundAt, lights
     this.bastion = this.world.bastion;
     this.pyramid = this.world.pyramid;
+    this.necropolis = this.world.necropolis;
     this.areas = this.world.areas;
+    // Porten till nekropolen är full av sand tills ormen i pyramiden har fallit
+    const necroExit = this.areas.get('desert')?.exits.find((e) => e.necro);
+    if (necroExit) {
+      necroExit.ok = () => !!this.state.pyramidDone;
+      necroExit.blocked = 'Sand has buried the doorway. Something stirs far below... but the way is not open yet.';
+    }
     // Bron till öknen går inte att nå förrän den gyllene porten har öppnats
     const desertExit = this.areas.get('field').exits.find((e) => e.to === 'desert');
     if (desertExit) {
@@ -316,6 +325,9 @@ export class Story {
     this.state.bastion = this.bastion.state;
     this.pyramid.applyState(null);
     this.state.pyramid = this.pyramid.state;
+    this.necropolis.applyState(null);
+    this.state.necropolis = this.necropolis.state;
+    this.realm?.reset();
     this.world.setSunGate(false, true);
     this.goat?.load(this.state);
     this.enemies.resetAll();
@@ -357,6 +369,9 @@ export class Story {
     s.bastion = this.bastion.state;
     this.pyramid.applyState(s.pyramid);
     s.pyramid = this.pyramid.state;
+    this.necropolis.applyState(s.necropolis);
+    s.necropolis = this.necropolis.state;
+    this.realm?.reset();
     this.setupFree();
     this.enemies.resetAll();
     this.resetAreaThings();
@@ -440,6 +455,7 @@ export class Story {
     const s = this.state;
     s.bastion = this.bastion.state;
     s.pyramid = this.pyramid.state;
+    s.necropolis = this.necropolis.state;
     s.spawnAt = this.world.inBastion() ? 'bastion' : 'aetheria';
     s.area = this.areas.id;
     if (entry) s.entry = entry;
@@ -563,7 +579,9 @@ export class Story {
     const pool = [
       [L('Every heart that stops makes them stronger... I keep thinking about it.'), L('Then every person in Aetheria is a wall against them. Every one of us who lives.')],
       [L('The third titan spoke of others. Of fewer of us every day.'), L('We will not make it easy for them.')],
-      [L('Nefret sent word from the oasis. Something stirs in the south of the Wastes, where the old necropolis sank into the sand.'), L('The way there is not open yet. Rest while you can.')],
+      s.necropolisDone
+        ? [L('Anubis... the god of the dead, speaking to you. And the dead speak to you still, through his scales.'), L('Listen to them, Cello. The stones were scratched out. The dead were not.')]
+        : [L('Nefret sent word from the oasis. Since the serpent fell, the sand south of the Wastes has moved. An old doorway has opened, where the necropolis sank.'), L('Follow the road south from the Sunwell. Whatever waits down there has waited a long time.')],
     ];
     s.talked.lyraP = ((s.talked.lyraP || 0) + 1) % pool.length;
     this.talk(n, pool[s.talked.lyraP]);
@@ -1118,6 +1136,12 @@ export class Story {
       this.inventory?.gotHorn();
     } else if (kind === 'pmap' || kind === 'pkey' || kind === 'sunkey') {
       this.pyramid.grant(kind);
+    } else if (kind === 'nmap' || kind === 'nkey' || kind === 'ankhkey') {
+      this.necropolis.grant(kind);
+    } else if (kind === 'scales') {
+      s.items.scales = true;
+      this.inventory?.autoSlot('scales');
+      this.inventory?.refresh(true);
     } else if (kind === 'heart') {
       s.hearts = (s.hearts || 0) + 1;
       (this.world.dungeonAt(this.areas.id) ?? this.bastion).grant('heart');
@@ -1319,6 +1343,82 @@ export class Story {
         this.cinematic = false;
         lyra.pose = 'read';
         lyra.facing = this.lyraStoneFace;
+        this.hud.toast('More of the realm opens in the next version of the game.', 4200);
+        this.save(true);
+      });
+    });
+  }
+
+  // ---------- 0.12: nekropolen ----------
+  ammitFalls() {
+    const s = this.state, L = (t) => ({ who: 'Ammit', voice: 'ammit', text: t });
+    this.after(1.0, () => {
+      this.combat.unlock(true);
+      this.dialog.start([
+        L('The hearts... you are letting them go... All my hearts...'),
+        L('Little ember. Do you know how long I fed here? Every soul that came to be weighed, I kept.'),
+        L('Every heart was a little more strength for my brothers and sisters, sleeping under the world.'),
+        L('Apophis is gone. Hrungnir is gone. And now you open my larder and let the dead walk free...'),
+        L('It does not matter. The living still die. On every road, in every burning village... and every death feeds us.'),
+        L('One of us waits where the wind never stops. Another under the sea. You will not reach them in time.'),
+      ], {
+        onEnd: () => {
+          this.hud.toast('The hearts Ammit stole drift up like sparks...', 4000);
+          this.save(true);
+        },
+      });
+    });
+  }
+
+  necropolisBossDefeated() {
+    this.hud.card('Ammit has fallen', 'The dead of the necropolis are free', 4200);
+    this.sfx.play('secret');
+    // Anubis visar sig i de dödas värld
+    this.after(4.6, () => {
+      this.realm?.set(true);
+      const L = (t) => ({ who: 'Anubis', voice: 'anubis', text: t });
+      this.dialog.start([
+        L('...So. The Devourer is gone, and the hearts are going home.'),
+        L('I am Anubis. What is left of him. She broke my scales and my body, but not this.'),
+        L('Keep the scales, child of ash. They are cracked, but they weigh true. With them, the dead will speak to you anywhere.'),
+        L('Listen to them. They see what the living have forgotten. Even the gods who scratched the truth from the stones.'),
+        L('The titans grow strong on every death. Then let every life you save be a feather on the other pan.'),
+        L('Take what lies before my throne. Then walk into the light. It will carry you to the Sunwell.'),
+      ], { onEnd: () => this.save(true) });
+    });
+    this.save(true);
+  }
+
+  // Ljuset bär Cello till oasen Sunwell, där Nefret väntar
+  leaveNecropolis() {
+    if (this.leaving) return;
+    this.leaving = true;
+    const P = this.player, s = this.state;
+    this.cinematic = true;
+    this.combat.unlock(true);
+    this.sfx.play('portal');
+    this.holdMusic('dawn', 30);
+    this.realm?.set(false, true);
+    this.startFade(2.6, 'The light of the dead carries Cello up through the sand...', () => {
+      s.necropolisDone = true;
+      this.enterArea('desert', 'rest', { walk: false });
+      P.hp = P.maxHp;
+      this.hud.setHearts(P.hp, P.maxHp);
+      this.rig.snap(P);
+      this.save(true);
+    }, () => {
+      this.leaving = false;
+      const n = this.npcs.nefret;
+      if (!n) { this.cinematic = false; return; }
+      const L = (t) => this.line(n, t);
+      this.talk(n, [
+        L('Cello! The sand at the old necropolis burst open, and a pillar of green light rose into the sky!'),
+        { who: '', text: 'Cello tells Nefret about Ammit, and the hearts, and Anubis.' },
+        L('The Devourer... the old texts said she was only a story to frighten children.'),
+        L('One of them waits where the wind never stops, she said? The Windbound Spire... the spire in the north where no bird can land.'),
+        L('Rest here tonight. When the road opens, the Wastes will remember you.'),
+      ], () => {
+        this.cinematic = false;
         this.hud.toast('More of the realm opens in the next version of the game.', 4200);
         this.save(true);
       });

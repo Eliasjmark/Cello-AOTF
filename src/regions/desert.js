@@ -27,7 +27,10 @@ export function buildDesert(B, areas) {
   const westRoad = R([[-198, 0], [-160, 6], [-120, -4], [-84, 10], [-62, 22]]);
   const eastRoad = R([[-18, 22], [10, 8], [40, -12], [70, -20], [105, -16], [140, -4], [170, 0], [199, 0]]);
   const templeRoad = R([[-84, 10], [-88, -30], [-90, -62]]);
-  const roads = [westRoad, eastRoad, templeRoad].map((pts) => ({ pts, w: 3.4 }));
+  // 0.12: vägen söderut till trappan ner i nekropolen
+  const NECRO = { x: X0 + 40, z: 164 };
+  const southRoad = R([[10, 8], [18, 40], [30, 90], [38, 130], [40, 154]]);
+  const roads = [westRoad, eastRoad, templeRoad, southRoad].map((pts) => ({ pts, w: 3.4 }));
   const isl = B.island({
     cx: X0, cz: 0, baseR: 200, rNoise: 16, seed: 801, amp: 0.9, hills: 9, hillFreq: 0.013,
     keepAngles: [Math.PI, 0], depth: 80, rings: 62, segs: 190, label: 'The Ember Wastes',
@@ -37,6 +40,7 @@ export function buildDesert(B, areas) {
       { x: OASIS.x, z: OASIS.z, r: 26, h: 0.4 }, { x: CARAVAN.x, z: CARAVAN.z, r: 10, h: 0.3 },
       { x: X0 - 90, z: -72, r: 14, h: 0.6 }, { x: X0 + 22, z: 44, r: 9, h: 0.6 }, { x: X0 - 120, z: 52, r: 8, h: 0.5 },
       { x: X0 + 60, z: 62, r: 12, h: 0.4 }, { x: X0 + 180, z: 0, r: 14, h: 0.2 },
+      { x: NECRO.x, z: NECRO.z, r: 12, h: 0.3 },
       // Oasens damm: en skål i sanden (läggs sist så att den vinner över oasens platta mark)
       { x: POND.x, z: POND.z, r: 19, h: -1.7 },
     ],
@@ -366,6 +370,53 @@ export function buildDesert(B, areas) {
   }
   for (const [x, z, r, y] of [[-260, -160, 30, 14], [300, 160, 26, -12], [-200, 220, 30, 8]]) B.backdrop(X0 + x, z, r, y, 860 + x);
 
+  // ---------- 0.12: porten ner i den sjunkna nekropolen ----------
+  // En gravbyggnad av svart sten (en mastaba) med en mörk port mot norr, där trappan går ner.
+  // Tills ormen i pyramiden har fallit är porten igensatt av sand.
+  const necroY = H(NECRO.x, NECRO.z);
+  {
+    const x = NECRO.x, z = NECRO.z, y = necroY;
+    const ND = new THREE.MeshLambertMaterial({ color: 0x23282a, flatShading: true });
+    B.solid(place(new THREE.Mesh(box(9, 3.6, 7, 2), ND), x, y + 1.6, z + 1.5));
+    B.solid(place(new THREE.Mesh(box(7.6, 1.2, 5.6, 2), ND), x, y + 4.0, z + 1.5));
+    const dark = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 3.0), new THREE.MeshBasicMaterial({ color: 0x030505, fog: false }));
+    dark.rotation.y = Math.PI;
+    dark.position.set(x, y + 1.5, z - 2.02);
+    B.add(dark);
+    for (const s of [-1, 1]) B.deco(new THREE.Mesh(box(0.5, 3.4, 0.5, 1), M.obsidian), x + s * 1.5, y + 1.7, z - 2.2);
+    B.deco(new THREE.Mesh(box(3.6, 0.5, 0.6, 1), M.goldPlate), x, y + 3.4, z - 2.2);
+    const glow = new THREE.Mesh(new THREE.CircleGeometry(0.4, 10), new THREE.MeshBasicMaterial({ color: 0x6af0d4 }));
+    glow.rotation.y = Math.PI;
+    glow.position.set(x, y + 4.0, z - 2.25);
+    B.add(glow);
+    B.lights.add({ x, y: y + 2.5, z: z - 3.5, color: 0x6ae0c8, power: 8, range: 9, flicker: 0.4 });
+    for (let i = 0; i < 7; i++) {
+      const ang = (i / 7) * Math.PI * 2 + 0.3, r = 9;
+      if (Math.sin(ang) < -0.55) continue; // inga pelare framför porten
+      const px = x + Math.cos(ang) * r, pz = z + 1.5 + Math.sin(ang) * r, h = 3 + hash2(i, 41) * 4;
+      B.solid(place(new THREE.Mesh(breakTop(cyl(0.6, 0.7, h, 8), h, 0.6), ND), px, H(px, pz) + h / 2 - 0.2, pz));
+    }
+    // Två schakaler som vaktar porten
+    for (const s of [-1, 1]) {
+      const g = B.groupAt(x + s * 3.6, y, z - 4.2, Math.PI);
+      B.put(g, new THREE.Mesh(box(1.2, 0.5, 1.8, 1), ND), 0, 0.25, 0, true);
+      B.put(g, new THREE.Mesh(box(0.7, 1.4, 0.8, 1), M.obsidian), 0, 1.2, 0.2, true);
+      B.put(g, new THREE.Mesh(box(0.45, 0.4, 0.55, 1), M.obsidian), 0, 2.1, 0.35);
+      for (const e of [-1, 1]) {
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.4, 4), M.obsidian);
+        ear.position.set(e * 0.13, 2.5, 0.3);
+        g.add(ear);
+      }
+    }
+    B.sign(x - 4.2, H(x - 4.2, z - 6), z - 6, Math.PI, ['Carved into black stone, half buried:', '"Below lies the house of Anubis, where hearts were weighed. Let none descend who fear the dead."']);
+    a.map.pois.push({ x, z, label: 'The Sunken Necropolis', icon: 'ruin' });
+  }
+  // Sanden som fyller porten (försvinner när pyramiden är besegrad)
+  const necroSand = new THREE.Mesh(new THREE.SphereGeometry(2.2, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), M.sand);
+  necroSand.scale.set(1.2, 1.4, 0.8);
+  necroSand.position.set(NECRO.x, necroY - 0.1, NECRO.z - 2.4);
+  a.root.add(necroSand);
+
   // ---------- fiender ----------
   const VV = (x, z) => V3(X0 + x, H(X0 + x, z), z);
   const pack = (cx, cz, n, opts = {}) => {
@@ -387,10 +438,12 @@ export function buildDesert(B, areas) {
     west: { pos: V3(X0 - 216, DECK, 0), facing: Math.PI / 2 },
     pyramid: { pos: V3(PX - HALF - 3.5, LEDGE_Y, 0), facing: -Math.PI / 2 },
     rest: { pos: V3(fire.x + 1.8, H(fire.x + 1.8, fire.z + 1.4), fire.z + 1.4), facing: -2.3 },
+    necropolis: { pos: V3(NECRO.x, necroY + 0.1, NECRO.z - 5.5), facing: Math.PI },
   };
   a.exits = [
     { x0: X0 - 270, x1: X0 - 233, z0: -3, z1: 3, to: 'field', entry: 'sunGate' },
     { x0: PX - HALF + 0.5, x1: PX - HALF + 6, z0: -1.6, z1: 1.6, y: LEDGE_Y, dy: 3, to: 'pyramid', entry: 'south' },
+    { x0: NECRO.x - 1.3, x1: NECRO.x + 1.3, z0: NECRO.z - 3.0, z1: NECRO.z - 1.5, to: 'ncrypts', entry: 'entrance', necro: true, text: 'The stair winds down into the dark...' },
   ];
   a.map.exits = [{ x: X0 - 233, z: 0, label: 'The Stormvale', to: 'field' }, { x: PX - HALF, z: 0, label: 'The Pyramid', to: 'pyramid' }];
   // Sanna om punkten ligger i oasen (där fiender inte går)
@@ -406,6 +459,11 @@ export function buildDesert(B, areas) {
     },
     tarekOasis: { pos: VV(-40 + 4.4, 30 + 7.6), face: -2.2 },
     caravan: VV(70, -24),
+    // Trappan till nekropolen är full av sand tills Apophis har fallit
+    onEnter(id, state) {
+      if (id !== 'desert') return;
+      necroSand.visible = !state?.pyramidDone;
+    },
     satchel,
     animals: [0, 1].map((i) => ({ kind: 'camel', area: 'desert', pos: VV(-40 + 18 + i * 3, 30 - 2 + i * 2), center: VV(-40 + 19, 30), radius: 3.5, H })),
     H,

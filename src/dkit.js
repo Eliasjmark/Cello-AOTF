@@ -560,7 +560,7 @@ export class Wing {
     const y = o.y ?? 0;
     this.enemySpots.push({
       kind, home: this.V(x, y, z), path: path ? path.map(([px, pz]) => this.V(px, y, pz)) : null, room: group,
-      bounds: this.rooms[o.room ?? group] ?? null, dormant: !!o.dormant, area: this.id,
+      bounds: this.rooms[o.room ?? group] ?? null, dormant: !!o.dormant, area: this.id, doze: !!o.doze,
     });
   }
 

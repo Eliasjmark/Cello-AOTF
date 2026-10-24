@@ -60,8 +60,8 @@ export function buildPrism() {
 export function buildItem(kind) {
   const M = ITEM_MATS;
   const g = new THREE.Group();
-  if (kind === 'pmap') kind = 'map';
-  else if (kind === 'pkey') kind = 'key';
+  if (kind === 'pmap' || kind === 'nmap') kind = 'map';
+  else if (kind === 'pkey' || kind === 'nkey') kind = 'key';
   if (kind === 'prism') {
     g.add(buildPrism());
   } else if (kind === 'sunkey') {
@@ -127,6 +127,34 @@ export function buildItem(kind) {
     tip.position.set(0.2, 0.0, 0);
     g.add(tip);
     g.add(B(0.3, 0.03, 0.03, ITEM_MATS.ribbon, -0.02, -0.12, 0.05));
+  } else if (kind === 'scales') {
+    // Anubis vågskål: en stång av svart sten, en bom av guld och två pannor – den ena bruten
+    const gold = M.gold, dark = lam(0x15151a);
+    g.add(B(0.07, 0.8, 0.07, dark, 0, 0, 0));
+    g.add(B(0.25, 0.08, 0.25, dark, 0, -0.42, 0));
+    g.add(B(0.16, 0.16, 0.16, gold, 0, 0.42, 0));
+    const beam = B(0.9, 0.05, 0.05, gold, 0, 0.32, 0);
+    beam.rotation.z = 0.18;
+    g.add(beam);
+    for (const s of [-1, 1]) {
+      const x = s * 0.42, y = 0.32 + s * -0.08;
+      g.add(B(0.02, 0.3, 0.02, gold, x, y - 0.15, 0));
+      const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.12, 0.05, 10), gold);
+      pan.position.set(x, y - 0.32, 0);
+      if (s > 0) { pan.scale.set(1, 1, 0.55); pan.rotation.z = 0.4; }
+      g.add(pan);
+    }
+    g.add(B(0.12, 0.12, 0.02, new THREE.MeshBasicMaterial({ color: 0x6af0d4 }), 0, 0.42, 0.09));
+  } else if (kind === 'ankhkey') {
+    // Ankhnyckeln: livets tecken i guld
+    const gold = M.gold;
+    const loop = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.05, 6, 12), gold);
+    loop.position.y = 0.3;
+    loop.scale.set(0.85, 1.15, 1);
+    g.add(loop);
+    g.add(B(0.4, 0.08, 0.06, gold, 0, 0.08, 0));
+    g.add(B(0.08, 0.5, 0.06, gold, 0, -0.2, 0));
+    g.add(B(0.07, 0.07, 0.08, new THREE.MeshBasicMaterial({ color: 0x6af0d4 }), 0, 0.08, 0.03));
   } else if (kind === 'flute') {
     // Pilgrimens flöjt: ett rör av vass med hål och ett rött snöre
     const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.8, 8), lam(0xb8925a));
@@ -179,6 +207,15 @@ export const ITEM_TEXT = {
     'Hollis carved it from one of Grumble\'s old horns. Blow it outdoors, and the big ram will come running.',
     'Press E next to Grumble to climb into the saddle. He runs twice as fast as Cello, and jumps further. Press E again to climb down.',
     'He will not follow you into caves, houses or dungeons. He waits outside.',
+  ],
+  nmap: ['You found the Necropolis Map!', 'Press K to view it. The rooms you have not visited are on it now.'],
+  nkey: ['You got a Iron Key!', 'It opens a locked door somewhere in the necropolis.'],
+  ankhkey: ['You got the Ankh Key!', 'The key of life. It opens the great door behind which the Devourer waits.'],
+  scales: [
+    "You got Anubis' Broken Scales!",
+    'The scales on which the god of the dead weighed every heart. One pan is cracked, but they still weigh true.',
+    'Put them on F, G or V (Tab) and press that button to tip them: Cello steps between the realm of the living and the realm of the dead.',
+    'In the realm of the dead, spirits speak and hidden bridges appear. False stone fades away. But the dead have their own dangers.',
   ],
   flute: [
     "You got the Pilgrim's Flute!",

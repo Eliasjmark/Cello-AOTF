@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.11 · A Living World (fas 8 i utvecklingsplanen: dygn, väder, dialogträd, flöjten och smartare fiender)
+**Version:** prototyp 0.12 · The Sunken Necropolis (fas 9 i utvecklingsplanen: den tredje dungeonen, Anubis' Broken Scales och de dödas värld)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -23,7 +23,23 @@ npm install          # en gång, hämtar esbuild
 npm run build:artifact   # → build/play.html
 ```
 
-## Vad är nytt i 0.11: en levande värld
+## Vad är nytt i 0.12: The Sunken Necropolis
+
+Fas 9 i planen. Under sanden söder om pyramiden ligger en begravd gravstad. Den öppnar sig när pyramiden är klar: sanden framför mastabans dörr har sjunkit undan. Arkitekturen följer reliken, och rummen växlar mellan trånga gravgångar och väldiga, höga salar.
+
+| Del | Vad som händer |
+| --- | --- |
+| **Anubis' Broken Scales** | Den tredje reliken. Med en knapptryckning växlar Cello mellan **de levandes och de dödas värld**. I de dödas värld blir bilden blek och grön, andebroar och andeplattformar syns och bär, och andar går att prata med. Det som bara finns bland de levande (falska väggar, bronsplattformar) bleknar och går att gå igenom. Vålnader finns bara i de dödas värld |
+| **The Narrow Crypts** | Trånga gravgångar med benfyllda nischer där mumier slumrar (de är långsamma men tåliga). Hall of Jackals med en falsk vägg, ett översvämmat benhus där en sluss tömmer vattnet, och **Wepwawet, Schakalväktaren** i balsameringshuset: han tar sats och rusar, och kör han in i en vägg eller en sarkofag sitter han fast en stund. Efter honom ligger vågskålarna |
+| **The Hall of Weighing** | En sal som är över tjugo meter hög, med vatten i tre nivåer. Två slussar höjer och sänker vattnet, och en flytande kista bär Cello upp mot gallerierna. Andebroar binder ihop gallerierna högt uppe, och vid botten av salen leder en låst dörr vidare |
+| **The Paths of the Duat** | De dödas väg: en lång gång där marken växlar mellan andestenar och bronsplattformar, så att Cello hela tiden måste byta värld. Fjäderns kammare är en fälla med mumier och vålnader, och i den ligger **Ankh Key**, nyckeln till tronsalen |
+| **Ammit, Devourer of hearts** | Bossen i The Hall of Two Truths. Hon är pansrad i de levandes värld: Cello lockar henne att rusa in i en pelare, och medan hon är bedövad syns hjärtat **bara i de dödas värld**. Tre hugg per gång. I andra fasen stiger vattnet och hon dyker och bryter upp under Cello, i den tredje kallar hon på vålnader. Efter striden visar sig Anubis själv |
+
+Den som drunknar (Cello kan inte simma) börjar om vid kanten. Andar finns även utanför dungeonen: en i byn och en vid karavanen i öknen.
+
+Nytt i koden: `src/realm.js` (de dödas värld), `src/necrokit.js` (vatten, slussar, flytande kistor, andebroar, Schakalväktaren och Ammit) och `src/necropolis.js` (dungeonens fyra delar). `enemies.js` har fått mumier och vålnader.
+
+## Vad var nytt i 0.11: en levande värld
 
 Fas 8 i planen. Världen reagerar nu på Cello, och den lever även när han står still.
 
@@ -279,6 +295,9 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/weather.js` | Vädret (0.11): lugnt, regn, åska, dimma och sanddis, regnet, och blixten som slår ner i metall |
 | `src/talk.js` | Dialogträd (0.11): frågor i valfri ordning, det dumma svaret, humör och ikoner över huvudet |
 | `src/songs.js` | Flöjten (0.11): spelläget, sångerna, lektionerna och sångstenarna |
+| `src/realm.js` | De dödas värld (0.12): växlingen med vågskålarna, andesaker, falska väggar och andar |
+| `src/necrokit.js` | Byggdelar för nekropolen (0.12): vattennivåer, slussar, flytande kistor, Schakalväktaren och Ammit |
+| `src/necropolis.js` | The Sunken Necropolis (0.12): gravgångarna, vägningssalen, Duat och tronsalen |
 | `src/pyramidwings.js` | Pyramidens fyra nya delar (0.10): djupet, solbåten, uppstigningen och toppen |
 | `src/sunkit.js` | Pyramidens verktygslåda: solljus, kristaller, spegelblock, solvisaren, sandfall, stenkulor, timglaset och Solväktaren |
 | `src/bastionwings.js` | Fästningens fyra nya delar (0.8): cisternerna, smedjan, tornet och kronan |

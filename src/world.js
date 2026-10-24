@@ -20,6 +20,7 @@ import { buildPass } from './regions/pass.js';
 import { buildField } from './regions/field.js';
 import { buildWillowmere } from './regions/willowmere.js';
 import { defineSongStones } from './songs.js';
+import { Necropolis, buildNecropolis } from './necropolis.js';
 import { buildStormreach } from './regions/stormreach.js';
 import { buildInteriors } from './regions/interiors.js';
 import { buildDesert } from './regions/desert.js';
@@ -907,6 +908,14 @@ export function buildWorld(scene, lights) {
   pyramid.bossKeyName = 'Sun Key';
   const PYRAMID_IDS = new Set(['pyramid', ...pyramidWings.map((w) => w.id)]);
 
+  // =====================================================================
+  // The Sunken Necropolis (x 14000–16000), 0.12
+  // =====================================================================
+  const necropolis = new Necropolis();
+  necropolis.areas = areas;
+  const necroWings = buildNecropolis(B, areas, necropolis);
+  const NECRO_IDS = new Set(necroWings.map((w) => w.id));
+
   const world = {
     areas,
     builder: B,
@@ -944,12 +953,14 @@ export function buildWorld(scene, lights) {
     songStones: defineSongStones({ pass: pass?.H, field: field?.H, desert: desert?.H }, B.chests),
     bastion,
     pyramid,
+    necropolis,
     // Fängelsehålorna: samma gränssnitt (state, interactions, trap, update, combatTargets ...)
-    dungeons: { bastion, pyramid },
-    dungeonAt: (id) => (BASTION_IDS.has(id) ? bastion : PYRAMID_IDS.has(id) ? pyramid : null),
+    dungeons: { bastion, pyramid, necropolis },
+    dungeonAt: (id) => (BASTION_IDS.has(id) ? bastion : PYRAMID_IDS.has(id) ? pyramid : NECRO_IDS.has(id) ? necropolis : null),
+    necroIds: NECRO_IDS,
     pyramidIds: PYRAMID_IDS,
     bastionIds: BASTION_IDS,
-    wingAt: (id) => bastion.wingAt(id) ?? pyramid.wingAt(id),
+    wingAt: (id) => bastion.wingAt(id) ?? pyramid.wingAt(id) ?? necropolis.wingAt(id),
     inPyramid: () => PYRAMID_IDS.has(areas.id),
     slamGate: field.slamGate,
     setSunGate: field.setSunGate,
@@ -968,15 +979,17 @@ export function buildWorld(scene, lights) {
     inVillage: (x, z) => areas.id === 'village' && Math.hypot(x, z) < 36,
     // Ett område laddas: delarna som beror på sparat läge (dörrar, lyktan i butiken)
     onEnterArea(id, state) {
-      for (const r of [reach, interiors, field]) r?.onEnter?.(id, state);
+      for (const r of [reach, interiors, field, desert]) r?.onEnter?.(id, state);
       bastion.wingAt(id)?.enter();
       pyramid.wingAt(id)?.enter();
+      necropolis.wingAt(id)?.enter();
     },
     // Ett eldfat har tänts
     onTorch(id, story) {
       for (const r of [reach, field]) if (r?.onTorch?.(id, story)) return true;
       if (bastion.onTorch(id)) return true;
       if (pyramid.onTorch(id)) return true;
+      if (necropolis.onTorch(id)) return true;
       return false;
     },
     connect(collider) {
@@ -989,6 +1002,7 @@ export function buildWorld(scene, lights) {
       // Fästningens interaktioner samlas från alla dess delar
       for (const w of bastionWings) bastion.interactions.push(...w.interactions);
       for (const w of pyramidWings) pyramid.interactions.push(...w.interactions);
+      for (const w of necroWings) necropolis.interactions.push(...w.interactions);
     },
     slamEast: field.slamEast,
     lightEast: field.lightEast,

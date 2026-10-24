@@ -31,6 +31,10 @@ export const VOICES = {
   sabi: { f: 470, wave: 'square', form: [[960, 4], [1900, 5]] },
   tarek: { f: 152, wave: 'sawtooth', form: [[590, 4], [1150, 5]], breath: 0.4 },
   apophis: { f: 58, wave: 'sawtooth', form: [[280, 3], [640, 3]], wobble: 1.6, breath: 0.9 },
+  // 0.12: nekropolen
+  spirit: { f: 260, wave: 'sine', form: [[620, 3], [1240, 4]], wobble: 1.4, breath: 1.0 },
+  ammit: { f: 72, wave: 'sawtooth', form: [[340, 3], [760, 3]], wobble: 1.0, breath: 0.7 },
+  anubis: { f: 96, wave: 'triangle', form: [[420, 3], [900, 4]], breath: 0.6 },
 };
 const STEPS = [1, 9 / 8, 5 / 4, 4 / 3, 3 / 2];
 const FANFARE = [[523.25, 0], [659.25, 0.13], [783.99, 0.26], [1046.5, 0.39], [987.77, 0.62], [1046.5, 0.78]];
@@ -618,6 +622,20 @@ export class Sfx {
         this.noiseThrough('lowpass', 500, 300, 1, t + 0.7, 0.3, this.gain(t + 0.7, 0.02, 0.12 * v, 0.3));
         break;
       }
+      // ---------- 0.12: de dödas värld och vattnet ----------
+      case 'realmdown': // vågskålen tippar ner i de dödas värld: ett djupt sus och en sjunkande ton
+        this.noiseThrough('lowpass', 1600, 200, 0.7, t, 0.9, this.gain(t, 0.08, 0.3 * v, 0.85), this.brown);
+        this.osc('sine', 330, 110, t, 0.9, this.gain(t, 0.05, 0.16 * v, 0.9));
+        this.osc('triangle', 660, 220, t + 0.05, 0.7, this.gain(t + 0.05, 0.05, 0.05 * v, 0.7));
+        break;
+      case 'realmup': // tillbaka bland de levande: en stigande, ljus ton
+        this.osc('sine', 220, 660, t, 0.6, this.gain(t, 0.04, 0.14 * v, 0.6));
+        this.osc('triangle', 880, 1320, t + 0.1, 0.4, this.gain(t + 0.1, 0.02, 0.05 * v, 0.4));
+        break;
+      case 'splash': // något faller i vattnet
+        this.noiseThrough('bandpass', 1400, 400, 0.8, t, 0.5, this.gain(t, 0.01, 0.4 * v, 0.48));
+        this.osc('sine', 180, 60, t, 0.25, this.gain(t, 0.005, 0.2 * v, 0.25));
+        break;
       // ---------- 0.11: flöjten ----------
       case 'note': { // en flöjtton: sinus med lite vibrato, en svag oktav och andning
         const f = opt.f ?? 440, dur = 0.6;

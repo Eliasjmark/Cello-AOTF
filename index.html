@@ -147,6 +147,11 @@
   .clock-t small { opacity: .7; font-weight: 500; margin-left: 4px; }
   .clock-wx:empty { display: none; }
   .dialog-choices li.asked { color: var(--dim); opacity: .6; }
+  /* De dödas värld (0.12): ett grönt dok i kanterna */
+  .realm-veil {
+    position: absolute; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, rgba(40, 160, 140, 0) 45%, rgba(8, 50, 46, 0.55) 100%);
+  }
   /* Flöjten (0.11) */
   .songs {
     position: absolute; left: 50%; bottom: calc(max(18px, env(safe-area-inset-bottom, 0px)) + 64px); transform: translateX(-50%); z-index: 6;
@@ -559,7 +564,7 @@
   <div class="topright">
     <div class="badge">
       <span class="badge-name">Cello: Ashes of the Fallen</span>
-      <span class="badge-sub">Prototype 0.11 · A Living World</span>
+      <span class="badge-sub">Prototype 0.12 · The Sunken Necropolis</span>
     </div>
     <div class="items" id="items" hidden></div>
     <pre class="info" id="info" hidden></pre>
@@ -619,7 +624,7 @@
       <div class="title-panel" id="title-panel" hidden></div>
       <p class="title-press" id="title-press"><span class="press-key">Press any key</span><span class="press-touch">Tap to begin</span></p>
     </div>
-    <p class="title-foot"><span>Prototype 0.11</span><span>Music by Treblo</span></p>
+    <p class="title-foot"><span>Prototype 0.12</span><span>Music by Treblo</span></p>
     <p class="sr" id="title-live" aria-live="polite"></p>
   </section>
   <div class="map" id="map" hidden role="dialog" aria-label="Map">

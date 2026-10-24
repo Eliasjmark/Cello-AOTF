@@ -394,6 +394,7 @@ export class Player {
   }
 
   respawn() {
+    this.drowning = false;
     this.teleport(this.safe);
     this.facing = this.safeFacing;
     this.setState('move');
@@ -401,6 +402,7 @@ export class Player {
   }
 
   revive(p, facing) {
+    this.drowning = false;
     this.hp = this.maxHp;
     this.heavy = false;
     this.wind.set(0, 0, 0);
@@ -477,7 +479,8 @@ export class Player {
   }
 
   fellOut() {
-    return this.feet.y < this.safe.y - 20 || this.feet.y < -60;
+    // drowning: Cello har hamnat i djupt vatten (nekropolen, 0.12)
+    return this.drowning || this.feet.y < this.safe.y - 20 || this.feet.y < -60;
   }
 
   // ---------- skada ----------

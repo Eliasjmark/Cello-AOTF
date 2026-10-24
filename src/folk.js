@@ -838,6 +838,7 @@ export class Folk {
     if (!s.sunGate) return 'gate';
     if (!s.items.prism) return 'desert';
     if (!s.pyramidDone) return 'pyramid';
+    if (!s.necropolisDone) return 'necropolis';
     return 'later';
   }
   goalText(key = this.story.state.hint) {
@@ -850,7 +851,8 @@ export class Folk {
       gate: 'The golden gate sleeps, as the Storm Stone slept. Thunder woke the stone. Let thunder wake the gate: strike the copper before it.',
       desert: "Beyond the golden gate, the Ember Wastes. The sun god's pyramid waits at their far edge. Nefret, the priestess at the Sunwell oasis, keeps its secrets.",
       pyramid: 'A serpent of endless night coils in the heart of the pyramid. Steel cannot touch it. Only sunlight, caught and thrown, can bring it low.',
-      later: 'The threads end at the sand... The rest of your road is not yet woven. Rest, child.',
+      necropolis: 'South of the Sunwell, the sand has opened a door of black stone. The dead below cannot rest; something devours their hearts. Find the scales of the jackal god, and walk where the dead walk.',
+      later: 'The threads end in the wind... The rest of your road is not yet woven. Rest, child.',
     }[key] ?? null;
   }
 
@@ -1088,10 +1090,13 @@ export class Folk {
       return;
     }
     if (s.pyramidDone) {
-      this.say(n, this.rotate('nefretD', [
-        ['The night is thinner over the Wastes since you came back. Ra thanks you, even if he cannot say it.'],
-        ['South of here, the old necropolis sank into the sand long ago. Lately... the sand there has started to move.'],
-      ]));
+      this.say(n, this.rotate('nefretD', s.necropolisDone
+        ? [['The dead of the necropolis are at rest. I lit a lamp for each of them. I ran out of lamps.'], ['The Windbound Spire... I will search the old texts for it. Come back when the road opens.']]
+        : [
+          ['The night is thinner over the Wastes since you came back. Ra thanks you, even if he cannot say it.'],
+          ['South of here, the old necropolis sank into the sand long ago. Since the serpent fell, the sand has moved, and a black doorway stands open. Follow the road south.'],
+          ['The necropolis was the house of Anubis, who weighed the hearts of the dead. If anything still guards it, it will not be kind to the living.'],
+        ]));
       return;
     }
     if (s.items.prism) {

@@ -248,6 +248,10 @@ class Askling {
     this.chestPos = new THREE.Vector3();
     if (this.kind === 'shield') this.addShield();
     if (this.kind === 'shade') this.makeShade();
+    // 0.12: nekropolen
+    if (this.kind === 'mummy') this.makeMummy();
+    if (this.kind === 'wraith') this.makeWraith();
+    this.dozing = !!opts.doze; // sover tills Cello kommer nära (mumierna i nischerna)
     this.lightT = 0;
     this.blindT = 0;
     // 0.11: dygnet, avväpning och flykt
@@ -272,6 +276,31 @@ class Askling {
     set(this.model.mats[2], 0x3a2a4a);
     M.glow.color.set(0x9a5aff);
     M.eye.color.set(0xd8a0ff);
+  }
+
+  // Mumie: lindad i linne, med gröna ögon. Tålig men långsam.
+  makeMummy() {
+    const set = (mat, c) => mat?.color?.set(c);
+    const [ash, dark, bone, stone] = this.model.mats;
+    set(ash, 0xb8ab88);
+    set(dark, 0x7a6c50);
+    set(bone, 0x3a3226);
+    set(stone, 0x4a6a60);
+    this.model.M.glow.color.set(0x5ae0b0);
+    this.model.M.eye.color.set(0x8affd8);
+  }
+
+  // Vålnad: genomskinlig och grön. Finns bara i de dödas värld.
+  makeWraith() {
+    for (const mat of this.model.mats) {
+      mat.color.set(0x2a6a64);
+      mat.transparent = true;
+      mat.opacity = 0.62;
+      mat.depthWrite = false;
+    }
+    this.model.mats[1].color.set(0x123a36);
+    this.model.M.glow.color.set(0x9af8e4);
+    this.model.M.eye.color.set(0xd8fff4);
   }
 
   // Solljuset från prisman (eller en stråle): bländar vanliga asklingar och bränner skuggvarelser
@@ -324,7 +353,7 @@ class Askling {
     this.pos.copy(this.home);
     this.vel.set(0, 0, 0);
     this.push.set(0, 0, 0);
-    this.hp = MAX_HP;
+    this.hp = this.kind === 'mummy' ? 5 : MAX_HP;
     this.facing = this.index * 1.7;
     this.state = 'patrol';
     this.st = 0;
@@ -358,6 +387,7 @@ class Askling {
     this.fetchT = 0;
     this.holdRock = false;
     if (this.zzz) this.zzz.visible = false;
+    if (this.dozing && !this.dormant) this.state = 'sleep';
     if (this.dormant) this.sleep();
     if (this.reserve && !this.called) {
       this.state = 'dead';
@@ -418,7 +448,7 @@ class Askling {
   }
 
   get targetable() {
-    return this.state !== 'dead' && this.state !== 'spawn' && this.state !== 'dormant' && this.state !== 'buried' && this.state !== 'burrow';
+    return this.state !== 'dead' && this.state !== 'spawn' && this.state !== 'dormant' && this.state !== 'buried' && this.state !== 'burrow' && !this.realmHidden;
   }
 
   get alive() {
@@ -643,6 +673,22 @@ class Askling {
   update(dt, w) {
     const { player, director } = w;
     const env = director.env;
+    // Vålnader finns bara i de dödas värld: bland de levande syns de inte och gör ingenting
+    if (this.kind === 'wraith') {
+      const hide = !env?.dead && this.state !== 'dead';
+      if (hide !== this.realmHidden) {
+        this.realmHidden = hide;
+        if (!hide && this.state !== 'dormant') w.fx.burst('ash', this.chest, 10);
+      }
+      if (hide) {
+        this.model.root.visible = false;
+        this.excl.visible = false;
+        if (this.zzz) this.zzz.visible = false;
+        director.release(this);
+        return;
+      }
+      if (this.state !== 'dormant' && this.state !== 'dead') this.model.root.visible = true;
+    }
     this.st += dt;
     this.updateDrop(dt);
     this.lightT = Math.max(0, this.lightT - dt);
@@ -664,7 +710,7 @@ class Askling {
       return this.seen;
     };
     // Regn gör askan tung: de rör sig långsammare
-    const slow = env?.rain ? 1 - 0.18 * Math.min(1, env.rain) : 1;
+    const slow = (env?.rain ? 1 - 0.18 * Math.min(1, env.rain) : 1) * (this.kind === 'mummy' ? 0.8 : 1);
     const toward = (x, z, speed) => {
       speed *= slow;
       const ddx = x - this.pos.x, ddz = z - this.pos.z, d = Math.hypot(ddx, ddz) || 1;
@@ -1277,7 +1323,7 @@ export class Enemies {
     this.cleared = new Set();
     this.area = null;
     // 0.11: dygnet och vädret (sätts av main.js varje bildruta), stenar i luften
-    this.env = { night: false, fog: 0, rain: 0, lantern: false };
+    this.env = { night: false, fog: 0, rain: 0, lantern: false, dead: false };
     this.rocks = [];
     this.timeT = 0;
     this.hints = new Set();

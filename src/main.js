@@ -24,6 +24,7 @@ import { Clock } from './clock.js';
 import { Weather } from './weather.js';
 import { Chats } from './talk.js';
 import { Songs } from './songs.js';
+import { Realm } from './realm.js';
 
 const PIXEL_LINES = 360; // retroläge: spelet ritas i ungefär så här många rader
 const FLASH = new THREE.Color(0x8d98b4);
@@ -100,7 +101,7 @@ function start(saved = {}) {
   }
   for (const [id, spots] of spotLists) {
     for (const s of spots) {
-      const e = enemies.add(s.home, s.path, { kind: s.kind, room: s.room, dormant: s.dormant, respawn: false, bounds: s.bounds, group: id, area: s.area ?? id });
+      const e = enemies.add(s.home, s.path, { kind: s.kind, room: s.room, dormant: s.dormant, respawn: false, bounds: s.bounds, group: id, area: s.area ?? id, doze: s.doze });
       if (s.kind === 'shield') e.blockHint = 'The shield stops the sword. Strike the ground with the hammer to shatter it!';
       if (s.kind === 'shade') e.immuneHint = 'The blade passes through the shadow. Only sunlight can make it solid!';
     }
@@ -150,10 +151,41 @@ function start(saved = {}) {
   // Flöjten och sångerna (0.11)
   const songs = new Songs({ story, player, hud, sfx, clock, weather, world, areas, fx, lights, music, rig });
   story.songs = songs;
+  // De dödas värld (0.12): vågskålen växlar; andebroar, falska väggar och andar registreras här
+  const realm = new Realm({ story, player, hud, sfx, fx, scene, areas, canvas });
+  story.realm = realm;
+  for (const dg of Object.values(world.dungeons)) if (dg.game) dg.game.realm = realm;
+  for (const w of world.necropolis.wings) {
+    for (const gh of w.ghosts) realm.add({ ...gh, area: w.id });
+    for (const sd of w.spiritDefs) realm.addSpirit(sd);
+  }
+  // Andar ute i världen: de döda i Hollowbrook och vid karavanen
+  realm.addSpirit({
+    id: 'hollowElder', area: 'village', pos: new THREE.Vector3(2.5, 0, 4), face: Math.PI, name: 'Spirit of Hollowbrook',
+    look: { skin: 0xffffff, hairStyle: 'bald', beard: 0xffffff, top: 0xffffff, robe: true, scale: 0.95 },
+    lines: [
+      'Cello... little Cello, with ash on your boots. You can see us?',
+      'Do not grieve so much for us. We are not angry. Not at you.',
+      'The titan took our hearts the night the village burned. We felt them go... down, under the world.',
+      'If the Devourer is gone, perhaps we can rest at last. Go on, child. The living need you more than we do.',
+    ],
+  });
+  if (world.desert?.caravan) {
+    const c = world.desert.caravan;
+    realm.addSpirit({
+      id: 'caravanGuard', area: 'desert', pos: new THREE.Vector3(c.x + 2.5, c.y, c.z - 2), face: 2.2, name: 'Spirit of a Caravan Guard',
+      look: { skin: 0xffffff, hairStyle: 'hood', hood: 0xffffff, top: 0xffffff, scale: 0.95, item: 'spear' },
+      lines: () => [
+        'Four of us guarded Tarek\'s caravan. The Ashlings came out of the dunes at dusk.',
+        story.state.tarek === 'saved' ? 'You lifted the cart. You saved him. Tell him... tell him we did not suffer long.' : story.state.tarek === 'robbed' ? 'You took the satchel and left him. ...The dead remember, traveler.' : 'Tarek is still under the cart. Help him. Please.',
+      ],
+    });
+  }
+  player.onKnockedOff = (g) => g.dismount({ thrown: true });
   player.onKnockedOff = (g) => g.dismount({ thrown: true });
   player.onHoof = (k) => sfx.play('hoof', { vol: 0.45 + k * 0.5 });
   hud.onItems = () => inventory.refresh(true);
-  for (const dg of Object.values(world.dungeons)) dg.game = { player, enemies, sfx, fx, hud, rig, dialog, story, lights };
+  for (const dg of Object.values(world.dungeons)) dg.game = { player, enemies, sfx, fx, hud, rig, dialog, story, lights, realm };
   const world2 = { player, fx, sfx, onBlocked() {}, onPlayerHit() {} };
 
   // ---------- skärvor, hjärtan och vad fiender och krukor lämnar efter sig ----------
@@ -471,11 +503,12 @@ function start(saved = {}) {
       return { id: 'march' };
     }
     // Fästningens och pyramidens nya delar
-    const wing = bastion.wingAt(here) ?? pyramid.wingAt(here);
+    const wing = bastion.wingAt(here) ?? pyramid.wingAt(here) ?? world.necropolis.wingAt(here);
     if (wing) {
       if (wing.bossFight) return { id: 'warlord', now: true };
       if (wing.trap) return { id: 'march', now: true };
-      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull', pdepths: 'whispers', pbarque: 'skull', pascent: 'march', papex: 'skull' }[here] };
+      if (here === 'nthrone' && world.necropolis.state.cleared.ammit) return { id: 'dawn' };
+      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull', pdepths: 'whispers', pbarque: 'skull', pascent: 'march', papex: 'skull', ncrypts: 'whispers', nhall: 'skull', nduat: 'whispers', nthrone: 'skull' }[here] };
     }
     // Natten (0.11): byarna somnar och fälten blir kusliga
     if (clock.isNight && outdoorArea(areas.cur)) {
@@ -603,6 +636,7 @@ function start(saved = {}) {
         enemies.env.fog = outNow ? weather.cur.fog : 0;
         enemies.env.rain = outNow ? weather.cur.rain : 0;
         enemies.env.lantern = inventory.lit;
+        enemies.env.dead = realm.dead;
         player.update(sim, pin, rig.yaw);
         goat.update(sim);
         if (!talking && !story.shown) enemies.update(sim, world2);
@@ -621,7 +655,7 @@ function start(saved = {}) {
 
       if (!respawn && player.fellOut()) {
         respawn = { t: 0, kind: 'fall' };
-        hud.fade(true, 'Cello fell into the storm');
+        hud.fade(true, player.drowning ? 'Cello cannot swim...' : 'Cello fell into the storm');
       }
       if (!respawn && player.state === 'dead' && player.stateT > 1.4) {
         respawn = { t: 0, kind: 'death' };
@@ -667,6 +701,7 @@ function start(saved = {}) {
     const freePlay = hud.started && story.phase === 'free' && !window.__realm?.calm;
     clock.update(sim, freePlay && !dialog.active && !story.cinematic && !story.fade);
     weather.update(dt, { camera, now: clock.day * 24 + clock.hour, running: freePlay });
+    realm.update(dt);
     const flash = sky.update(dt, t, camera) * base.flash;
     applyEnv(flash);
     world.update(t, dt);
@@ -700,7 +735,7 @@ function start(saved = {}) {
     clockT -= 1;
     if (clockT <= 0) {
       clockT = 15;
-      hud.setClock?.(hud.started && story.phase === 'free' ? { label: clock.label, text: clock.text, night: clock.isNight, weather: weather.local, day: clock.day } : null);
+      hud.setClock?.(hud.started && story.phase === 'free' && !dungeon() ? { label: clock.label, text: clock.text, night: clock.isNight, weather: weather.local, day: clock.day } : null);
     }
   }
   let clockT = 0;
@@ -708,7 +743,7 @@ function start(saved = {}) {
   // Handtag för felsökning i webbläsarens konsol
   window.__realm = {
     player, rig, world, areas, input, hud, scene, camera, enemies, combat, fx, sfx, story, dialog, bastion, pyramid, lights, collider, renderer,
-    culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs,
+    culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs, realm, necropolis: world.necropolis,
     tick: (dt, inp) => update(dt, { ...input.empty, ...inp }),
   };
   requestAnimationFrame(frame);
