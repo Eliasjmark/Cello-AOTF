@@ -972,6 +972,18 @@ export class Player {
       P.headX = P.headX * (1 - k) + 0.05 * k;
     }
 
+    // Flöjten (0.11): båda händerna vid munnen, huvudet gungar lite med tonerna
+    if (this.playing && this.state === 'move') {
+      const bob = (this.noteT ?? 0) > 0 ? Math.sin(a.t * 18) * 0.03 : 0;
+      P.armLx = -1.25; P.armRx = -1.15;
+      P.armLz = 0.5; P.armRz = -0.3;
+      P.elbowL = -1.75; P.elbowR = -1.55;
+      P.headX = -0.06 + bob; P.torsoY = 0.12; P.torsoX = -0.04;
+      P.swordX = -0.2;
+      rate = 14;
+      this.noteT = Math.max(0, (this.noteT ?? 0) - dt);
+    }
+
     // På Grumbles rygg: grensle över sadeln, händerna på hornen, framåtlutad i galopp
     if (this.mount && (this.state === 'move' || this.state === 'hurt')) {
       const gal = Math.min(1, this.speed / RIDE_SPEED);
@@ -1144,7 +1156,7 @@ export class Player {
     // Svärdet eller hammaren i handen, hammaren på ryggen
     const inHand = this.hasHammer && (this.state === 'slam' || (this.heavy && this.state !== 'attack'));
     const holding = this.state === 'itemget';
-    m.sword.visible = !inHand && !holding && !this.prismUp && !this.mount;
+    m.sword.visible = !inHand && !holding && !this.prismUp && !this.mount && !this.playing;
     m.prism.visible = this.prismUp && this.state === 'move';
     if (m.prism.visible) {
       m.prism.rotation.y += dt * 2.5;

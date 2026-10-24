@@ -103,6 +103,8 @@ const freshState = () => ({
   // 0.7: öknen och pyramiden
   sunGate: false, pyramid: null, pyramidDone: false, tarek: null, whetstone: false, lore: false,
   goat: null,
+  // 0.11: en levande värld
+  clock: 8, day: 1, weather: null, mood: {}, asked: {}, flute: false, songs: [], songStones: {},
 });
 
 export class Story {
@@ -297,6 +299,10 @@ export class Story {
     P.autoWalk = null;
     P.setSword(SWORD_MAX);
     this.inventory?.reset();
+    this.clock?.load(this.state);
+    this.weather?.load(this.state);
+    this.songs?.stop();
+    this.songs?.load();
     // Startskärmen visar den brinnande byn; ett nytt spel börjar vid Cellos hus
     const start = silent ? this.areas.get('village') : this.areas.get('home');
     this.areas.activate(start.id);
@@ -371,6 +377,10 @@ export class Story {
     P.revive(e.pos, e.facing);
     P.setSword(s.sword ?? SWORD_MAX);
     this.inventory?.load(s);
+    this.clock?.load(s);
+    this.weather?.load(s);
+    this.chats?.load(s);
+    this.songs?.load();
     this.hud.toast(`Welcome back to ${a.name}.`, 3000);
     this.hud.setHearts(P.hp, P.maxHp);
   }
@@ -437,6 +447,8 @@ export class Story {
     s.sword = this.player.sword.dur;
     this.goat?.store(s);
     this.inventory?.store(s);
+    this.clock?.store(s);
+    this.weather?.store(s);
     const ok = writeSave(this.slot ?? 1, { v: 2, state: s, savedAt: Date.now() });
     if (!silent) {
       this.hud.toast(ok ? 'Game saved' : 'Could not save in this browser', 2600);
@@ -588,49 +600,58 @@ export class Story {
   }
 
   talkEdda() {
-    const s = this.state, n = this.npcs.edda, L = (t) => this.line(n, t);
-    if (s.bastionDone) {
-      this.talk(n, [s.choice1 === 'saved'
-        ? L('The storm has calmed a little since you came back. I can feel it in my joints. Thank you, boy.')
-        : L('The thunder has gone quiet in the north. People say it was you. Maybe I was wrong about you.')]);
-      return;
-    }
-    const rumor = L('Lightning never used to strike without reason. Now it never stops. People say the storm gathers around the Tempest Bastion.');
-    if (s.choice1 === 'saved') {
-      this.talk(n, [L("So you're the boy who carried Maren here. There is still hope in you, Cello."), rumor, L("Warm yourself by the fire a while. It's the only thing that's still warm.")]);
-    } else {
-      this.talk(n, [L('Keep your distance... I have heard what you did.'), L('Did you really leave that girl behind to chase a titan?'), rumor]);
-    }
+    const s = this.state, n = this.npcs.edda;
+    const saved = s.choice1 === 'saved';
+    const greet = s.bastionDone
+      ? (saved ? 'The storm has calmed a little since you came back. I can feel it in my joints. Thank you, boy.' : 'The thunder has gone quiet in the north. People say it was you. Maybe I was wrong about you.')
+      : (saved ? "So you're the boy who carried Maren here. There is still hope in you, Cello." : 'Keep your distance... I have heard what you did. Did you really leave that girl behind to chase a titan?');
+    this.chats.chat(n, {
+      greet: [greet],
+      topics: [
+        { id: 'storm', q: 'Has the storm always been like this?', a: ['Lightning never used to strike without reason. Now it never stops. People say the storm gathers around the Tempest Bastion.', 'When I was a girl we had summers. Can you imagine? Whole days without thunder.'] },
+        { id: 'camp', q: 'How does the camp get by?', a: ["Vane keeps the iron hot, Bram keeps the bridge, and I keep everyone's spirits up. Mostly by complaining.", "Warm yourself by the fire a while. It's the only thing that's still warm."] },
+        { id: 'night', q: 'Do you ever sleep?', a: ['At my age? An hour here, an hour there. I watch the fire so the young ones can sleep.', 'Ilo snores like a goat. Do not tell him I said so.'] },
+      ],
+      rude: { q: 'Old people talk too much.', a: ['...Do they now.', 'Then this old woman will stop talking. To you, at least.'] },
+      bye: saved ? 'Mind yourself, boy.' : 'Hmph. Go on, then.',
+      forgive: "I slept on it, and decided you're young and foolish. That's no crime. Sit.",
+    });
   }
 
   talkIlo() {
-    const s = this.state, n = this.npcs.ilo, L = (t) => this.line(n, t);
-    if (s.items.hammer) {
-      this.talk(n, [
-        L("Is that Thor's hammer?! For real?"),
-        L(s.choice1 === 'saved' ? 'Can I hold it? Just for a bit? ...Okay. Later, then!' : "Edda says I'm not allowed to talk to you. But... can I look at it?"),
-      ]);
+    const s = this.state, n = this.npcs.ilo;
+    // Ilo sover vid elden på natten (0.11)
+    if (n.pose === 'lie') {
+      this.read(['Ilo is curled up by the fire, fast asleep.', '"...five Ashlings... with one hand..." he mumbles.']);
       return;
     }
-    if (s.choice1 === 'saved') {
-      this.talk(n, [
-        L("Is it true you've fought Ashlings? I saw one from the bridge! It had glowing eyes!"),
-        L('Lyra says they are made of ash. From people the titans have killed. Is that true?'),
-      ]);
-    } else {
-      this.talk(n, [L("Edda said I shouldn't talk to you."), L('...but did you really fight a titan? Was it big?')]);
-    }
+    const saved = s.choice1 === 'saved';
+    this.chats.chat(n, {
+      greet: [s.items.hammer ? "Is that Thor's hammer?! For real?" : saved ? "Is it true you've fought Ashlings? I saw one from the bridge! It had glowing eyes!" : "Edda said I shouldn't talk to you. ...but did you really fight a titan? Was it big?"],
+      topics: [
+        { id: 'ash', q: 'What are Ashlings made of?', a: ['Lyra says they are made of ash. From people the titans have killed. Is that true?', "...I don't like that. I'm going to think about goats instead."] },
+        { id: 'hammer', q: 'Want to see the hammer?', when: () => !!s.items.hammer, a: [saved ? 'Can I hold it? Just for a bit? ...Okay. Later, then!' : "Edda says I'm not allowed. But... can I look at it? Whoa. It hums!"] },
+        { id: 'bridge', q: 'What do you see from the bridge?', a: ['At night you can see fires out on the Stormvale. Bram says those are Ashlings. Their eyes glow like coals.', 'In the daytime they sleep in the grass. I threw a pebble at one once. Bram yelled at me.'] },
+      ],
+      rude: { q: 'Go play somewhere else, kid.', mood: 'sad', a: ['...okay.', "*sniff* I wasn't even bothering you."] },
+      bye: 'Bye, Cello!',
+      forgive: "Edda says you're probably sorry. Are you? Okay! We're friends again.",
+    });
   }
 
   talkBram() {
-    const s = this.state, n = this.npcs.bram, L = (t) => this.line(n, t);
-    if (s.bastionDone) {
-      this.talk(n, [L('I heard the thunder all the way here while you were gone. Then it went quiet.'), L("Good work, Cello. I'll hold the bridge in the meantime.")]);
-      return;
-    }
-    const lines = [L('No Ashling has made it across the bridge. Yet.'), L('If you go back to the village, be careful. The titan left its servants behind in the ashes.')];
-    if (s.choice1 === 'fought') lines.push(L("And I'm keeping an eye on you, Cello. People here are scared enough as it is."));
-    this.talk(n, lines);
+    const s = this.state, n = this.npcs.bram;
+    this.chats.chat(n, {
+      greet: [s.bastionDone ? 'I heard the thunder all the way here while you were gone. Then it went quiet. Good work, Cello.' : s.choice1 === 'fought' ? "I'm keeping an eye on you, Cello. People here are scared enough as it is." : 'No Ashling has made it across the bridge. Yet.'],
+      topics: [
+        { id: 'village', q: 'Is Hollowbrook safe?', a: ['If you go back to the village, be careful. The titan left its servants behind in the ashes.', 'They are worse at night. In daylight half of them lie in the ash like they are dead. Do not trust it.'] },
+        { id: 'bridge', q: 'How do you guard the bridge alone?', a: ['One spear, one bridge, one stubborn man. The Ashlings do not like narrow places. Neither do I, but here I am.'] },
+        { id: 'fear', q: 'Have you ever seen a titan up close?', a: ['Once. From the bridge, the night it came. It looked at me, and it walked on. As if I was not worth the trouble.', 'Some days I am angry about that. Most days I am grateful.'] },
+      ],
+      rude: { q: 'The bridge looks unguarded to me.', a: ['Unguarded? I have stood here every night since the fire.', 'Get off my bridge.'] },
+      bye: "I'll hold the bridge.",
+      forgive: "We're all tired, Cello. Forget it. The bridge still stands.",
+    });
   }
 
   talkKael() {
@@ -718,18 +739,37 @@ export class Story {
   }
 
   askRest(entry, prompt = 'The fire crackles warmly. Rest a while?', text = 'Cello rests by the fire...') {
-    this.dialog.start([{
-      who: '', prompt,
-      choices: [{ text: 'Rest and save', id: 'rest' }, { text: 'Not now', id: 'no' }],
-      onChoose: (id) => { if (id === 'rest') this.rest(entry, text); },
-    }]);
+    this.dialog.start([this.restStep(entry, prompt, text)]);
   }
 
-  rest(entry = null, text = 'Cello rests by the fire...') {
+  // Valet vid en viloplats (0.11): på kvällen och natten sover Cello till morgonen,
+  // på dagen kan han vila en stund eller vänta tills det blir natt
+  restStep(entry, prompt, text) {
+    const c = this.clock, late = !c || c.hour >= 17 || c.hour < 5;
+    const choices = [{ text: late ? 'Sleep until morning' : 'Rest a while', id: 'rest' }];
+    if (!late) choices.push({ text: 'Rest until nightfall', id: 'night' });
+    choices.push({ text: 'Not now', id: 'no' });
+    return {
+      who: '', prompt, choices,
+      onChoose: (id) => {
+        if (id === 'rest') this.rest(entry, text, late ? 7 : null);
+        else if (id === 'night') this.rest(entry, text, 20);
+        return [];
+      },
+    };
+  }
+
+  // until: timmen Cello vaknar (null = en timme senare)
+  rest(entry = null, text = 'Cello rests by the fire...', until = null) {
     this.startFade(1.6, text, () => {
       const P = this.player;
       P.hp = P.maxHp;
       this.hud.setHearts(P.hp, P.maxHp);
+      if (this.clock) {
+        if (until === null) this.clock.addHours(1);
+        else this.clock.skipTo(until);
+      }
+      this.folk?.schedule?.(true);
       this.save(false, entry);
     });
   }
@@ -921,6 +961,10 @@ export class Story {
     s.choice1 = choice;
     s.karma += choice === 'saved' ? 1 : -1;
     s.entry = 'aetheria'; // efter prologen börjar Cello om vid lägerelden i Aetheria
+    // Cello vaknar i Aetheria nästa förmiddag
+    s.clock = 9.5;
+    s.day = 2;
+    this.clock?.load(s);
     this.phase = 'free';
     this.setupFree(false);
     this.hud.setHearts(this.player.hp, this.player.maxHp);
@@ -980,7 +1024,7 @@ export class Story {
   }
 
   // ---------- föremål ----------
-  itemGet(kind) {
+  itemGet(kind, onDone = null) {
     const P = this.player;
     this.combat.unlock(true);
     P.holdUp(true);
@@ -1009,6 +1053,7 @@ export class Story {
           this.hud.toast(key ? `The horn lies on ${key}. Grumble is right here: walk up to him and press E to ride.` : 'Press Tab to put the horn on a button. Grumble is right here: walk up to him and press E to ride.', 5600);
         }
         if (kind === 'hammer') this.hud.toast('The shard lies on F (ground strike) and G (heavy weight). The copper plate in the floor... try striking it!', 5200);
+        onDone?.();
         if (kind === 'prism') {
           const key = this.inventory?.keyFor?.('prism');
           this.hud.toast(key ? `The prism lies on ${key}. Stand in the light, raise it, and lock on (Q) to aim.` : 'Press Tab and put the prism on a button. Then stand in the light, raise it, and lock on (Q) to aim.', 5600);
@@ -1080,6 +1125,10 @@ export class Story {
       P.hp = P.maxHp;
       this.hud.setHearts(P.hp, P.maxHp);
     } else if (kind === 'lantern') {
+      this.inventory?.refresh(true);
+    } else if (kind === 'flute') {
+      s.flute = true;
+      this.inventory?.autoSlot('flute');
       this.inventory?.refresh(true);
     } else this.bastion.grant(kind);
   }
@@ -1393,7 +1442,7 @@ export class Story {
 
     // Vem eller vad går att prata med just nu?
     this.prompt = null;
-    if (!this.dialog.active && !this.fade && !this.cinematic && P.state === 'move' && P.grounded && !P.carried && !this.combat.lock) {
+    if (!this.dialog.active && !this.fade && !this.cinematic && P.state === 'move' && P.grounded && !P.carried && !this.combat.lock && !this.songs?.active) {
       let best = null, bd = Infinity;
       const dg = this.world.dungeonAt(here);
       // I fängelsehålorna: deras egna saker, plus eldfaten och annat som hör till just det området

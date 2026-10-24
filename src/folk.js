@@ -238,7 +238,7 @@ export class Folk {
       const ch = { ...c, g, lid, lidT: 0, box: null };
       this.chests.push(ch);
       const front = V(c.x + Math.sin(c.ry) * 1.1, c.y, c.z + Math.cos(c.ry) * 1.1);
-      const there = () => !c.hidden && (!c.reveal || !!story.state.torches?.[c.reveal]);
+      const there = () => !c.hidden && (!c.reveal || !!story.state.torches?.[c.reveal]) && (!c.song || !!story.state.songStones?.[c.song]);
       ch.there = there;
       story.interactions.push({
         label: 'Open the chest', area: c.area, pos: () => front, radius: 1.5,
@@ -330,6 +330,103 @@ export class Folk {
       };
       this.dummy = dummy;
     }
+    this.setupSchedule();
+  }
+
+  // ---------- dygnet (0.11) ----------
+  // Vissa går hem när det mörknar och kommer ut igen på morgonen. Andra somnar där de är.
+  setupSchedule() {
+    const story = this.story, W = this.world;
+    const wd = W.willow?.homeDoors ?? [], farm = W.ranch?.farmDoor;
+    this.sched = [];
+    const add = (id, door, house) => {
+      const n = this.npcs[id];
+      if (!n || !door) return;
+      this.sched.push({ n, id, house, door: door.clone(), day: n.pos.clone(), dayFace: n.facing, dayPose: n.pose, wander: n.wander, inside: false, going: false });
+    };
+    add('hollis', farm, 'farm');
+    add('tilly', farm, 'farm');
+    add('mira', wd[0], 'wm0');
+    add('tob', wd[2], 'wm2');
+    // Fenwick fiskar kvar på bryggan hela natten (han går inte hem över vattnet)
+    // De som sover ute: pilgrimen på bron och Ilo vid lägerelden i Aetheria
+    this.sleepers = [];
+    if (this.npcs.odo) this.sleepers.push({ n: this.npcs.odo, pos: this.npcs.odo.pos.clone(), face: this.npcs.odo.facing, pose: this.npcs.odo.pose });
+    const ilo = story.npcs.ilo, camp = W.aetheria?.camp;
+    if (ilo && camp) this.sleepers.push({ n: ilo, pos: new THREE.Vector3(camp.x + 1.6, camp.y ?? ilo.pos.y, camp.z + 1.2), face: -2.2, pose: 'stand', wander: ilo.wander, lie: true });
+    // Knacka på dörren när någon är hemma på natten
+    const KNOCK = {
+      farm: ['Someone stirs inside the farmhouse.', 'Hollis, from inside: "Whoever that is, the goats are asleep and so am I! Come back in the morning!"'],
+      wm0: ['A sleepy voice answers from inside.', '"Mira is in bed, and so should you be! Come back tomorrow, dear."'],
+      wm2: ['Something thumps inside, then whispers.', 'Tob, from inside: "...Is it a monster? ...Grandma says I can\'t open the door at night."'],
+    };
+    for (const house of Object.keys(KNOCK)) {
+      const list = this.sched.filter((e) => e.house === house);
+      if (!list.length) continue;
+      const e0 = list[0];
+      story.interactions.push({
+        label: 'Knock on the door', area: e0.n.area, pos: () => e0.door, radius: 1.7,
+        ok: () => story.phase === 'free' && list.some((e) => e.inside),
+        run: () => {
+          this.sfx.play('door', { vol: 0.35 });
+          this.sfx.speak(e0.id, 5);
+          story.read(KNOCK[house]);
+        },
+      });
+    }
+  }
+
+  // night: från halv nio på kvällen till sex på morgonen
+  get bedtime() {
+    const c = this.story.clock;
+    return !!c && (c.hour >= 20.5 || c.hour < 6);
+  }
+
+  // instant: hoppa direkt till rätt läge (laddning, nytt område, vila)
+  schedule(instant = false) {
+    const night = this.bedtime && this.story.phase === 'free';
+    const here = this.areas.id, P = this.story.player;
+    for (const e of this.sched) {
+      const n = e.n, seen = n.area === here && !instant && n.pos.distanceTo(P.feet) < 45;
+      if (night && !e.inside) {
+        if (!seen) {
+          e.inside = true;
+          e.going = false;
+          n.walkTarget = null;
+          n.pos.copy(e.door);
+          n.setVisible(false);
+        } else if (!e.going) {
+          e.going = true;
+          n.wander = null;
+          n.walkTo(e.door, 2.4, () => {
+            e.going = false;
+            e.inside = true;
+            n.setVisible(false);
+            if (n.area === this.areas.id) this.sfx.play('door', { vol: 0.4 });
+          });
+        }
+      } else if (!night && (e.inside || e.going)) {
+        e.inside = false;
+        e.going = false;
+        n.setVisible(true);
+        if (!seen) {
+          n.place(e.day, e.dayFace, e.dayPose);
+          n.wander = e.wander;
+        } else {
+          n.pos.copy(e.door);
+          n.walkTo(e.day, 2.2, () => { n.facing = e.dayFace; n.pose = e.dayPose; n.wander = e.wander; });
+        }
+      }
+    }
+    for (const sl of this.sleepers) {
+      const n = sl.n;
+      const sleeping = n.pose === 'lie';
+      if (night && !sleeping && !n.talking) {
+        if (sl.lie) { n.wander = null; n.place(sl.pos, sl.face, 'lie'); } else n.pose = 'lie';
+      } else if (!night && sleeping) {
+        if (sl.lie) { n.place(sl.pos, sl.face, 'stand'); n.wander = sl.wander; } else { n.place(sl.pos, sl.face, sl.pose); }
+      }
+    }
   }
 
   combatTargets() {
@@ -338,6 +435,7 @@ export class Folk {
 
   enterArea(id) {
     if (id === 'desert') this.placeTarek();
+    this.schedule(true);
     // Eldfaten i området: tända om de har tänts förut
     for (const t of this.torches) {
       if (t.area !== id) continue;
@@ -489,6 +587,9 @@ export class Folk {
   }
 
   // ---------- samtal ----------
+  get chats() { return this.story.chats; }
+  get night() { return !!this.story.clock?.isNight; }
+  get raining() { const w = this.story.weather?.local; return w === 'rain' || w === 'storm'; }
   say(n, lines, onEnd) {
     this.story.talk(n, lines.map((t) => (typeof t === 'string' ? this.story.line(n, t) : t)), onEnd);
   }
@@ -525,15 +626,21 @@ export class Folk {
       this.say(n, ["I've been thinking about what you did for Brindle, lad.", ...this.grumbleLines()], () => this.giveGrumble());
       return;
     }
-    if (s.bastionDone) {
-      this.say(n, ['They say the thunder in the north went quiet. That was you? ...Hah! Thistledown owes you, lad.']);
-      return;
-    }
-    this.say(n, this.rotate('hollisN', [
-      ['My mare Brindle bolted when the storm broke. Last I saw, she was running for the Stormvale.', 'Brown, with a white blaze. If you ever see her, tell her Hollis has apples.'],
-      ['The Ashlings came for the goats last month. Nell chased them off with a pitchfork.', "Don't tell her I told you. She'll want a medal."],
-      ["Short on shards? Cut the tall grass. Funny how they turn up there, like the storm sows them.", 'And break a pot or two. Not mine.'],
-    ]));
+    // 0.11: frågor i valfri ordning, och ett dumt svar som gör Hollis arg
+    this.chats.chat(n, {
+      greet: [s.bastionDone ? 'They say the thunder in the north went quiet. That was you? ...Hah! Thistledown owes you, lad.' : 'Back again, lad? Pull up a fence post.'],
+      topics: [
+        { id: 'brindle', q: 'About Brindle...', a: () => (s.brindleTold
+          ? ['Brindle comes and goes as she pleases. Out on the Stormvale by day, back at the barn some nights.', "She won't let anyone near her but Tilly. Can't blame her."]
+          : ['My mare Brindle bolted when the storm broke. Last I saw, she was running for the Stormvale.', 'Brown, with a white blaze. If you ever see her, tell her Hollis has apples.']) },
+        { id: 'ashlings', q: 'Do Ashlings come here?', a: ['The Ashlings came for the goats last month. Nell chased them off with a pitchfork.', "Lately they come at night. Something about the dark makes them bold. I keep the lamps lit."] },
+        { id: 'tips', q: 'Any advice for the road?', a: ["Short on shards? Cut the tall grass. Funny how they turn up there, like the storm sows them.", "And sleep when you can. Folk who walk the Stormvale at night don't always walk back."] },
+        { id: 'grumble', q: 'How do I handle Grumble?', when: () => !!s.goat?.have, a: ["Is he behaving? No? Good. That means he likes you.", 'He led the herd until Brindle bolted. Since then he has been looking for someone to boss around. Looks like he found you.'] },
+      ],
+      rude: { q: 'Your ranch smells like goat.', a: ["...It's a GOAT ranch, lad. What did you expect it to smell like? Roses?", "Off with you. I've got work to do."] },
+      bye: 'Mind the road, lad.',
+      forgive: "About yesterday... I've smelled worse things than goat. Myself, mostly. No hard feelings.",
+    });
   }
 
   grumbleLines() {
@@ -552,13 +659,21 @@ export class Folk {
 
   talkNell(n) {
     const s = this.story.state;
-    this.say(n, s.talked.nell
-      ? this.rotate('nellN', [
-        ["Tilly talks of nothing but the goats. Now she'll talk of nothing but you."],
-        ['Rest by the hearth whenever you pass. The fire never goes out in this house.'],
-      ])
-      : ['You look half frozen, love. Sit by the hearth a while; you are welcome here.', 'Any friend of the road is a friend of Thistledown.'],
-    () => { s.talked.nell = true; });
+    if (!s.talked.nell) {
+      this.say(n, ['You look half frozen, love. Sit by the hearth a while; you are welcome here.', 'Any friend of the road is a friend of Thistledown.'], () => { s.talked.nell = true; });
+      return;
+    }
+    this.chats.chat(n, {
+      greet: [this.night ? "Can't sleep either, love? Sit. The fire's warm." : "Sit a while, love. The kettle's always on."],
+      topics: [
+        { id: 'hearth', q: 'Does the fire really never go out?', a: ['Not once since the storm came. My grandmother lit it, and her mother before her.', 'When the night is long and the Ashlings howl, a fire is the best friend a farm can have. Rest by it whenever you pass.'] },
+        { id: 'tilly', q: 'How is Tilly?', a: ["Tilly talks of nothing but the goats. Now she'll talk of nothing but you.", 'She wants to be a knight. I told her knights eat their greens. That slowed her down.'] },
+        { id: 'home', q: 'Hollowbrook burned...', a: ['I know, love. We saw the smoke from the hill.', 'You can stay here as long as you like. Thistledown has room for one more.'] },
+      ],
+      rude: { q: 'Is the soup always this thin?', a: ['...', 'I made that soup with the last of the onions. For you.', 'Well. You can make your own supper tonight.'] },
+      bye: 'Come back before dark, love.',
+      forgive: "I'm not one to hold a grudge over soup. Sit down, I made more.",
+    });
   }
 
   talkTilly(n) {
@@ -568,12 +683,20 @@ export class Folk {
       this.say(n, ["Dad gave you Grumble?! He only bites people he likes. ...He bit Dad twice."]);
       return;
     }
-    if (s.bastionDone) { this.say(n, ['Is it true you fought a giant made of stone?! I knew you were a knight!']); return; }
-    this.say(n, this.rotate('tillyN', [
-      ['Are you a knight? You have a sword! And a shield!'],
-      ["The big goat is called Grumble. Don't stand behind him. Trust me."],
-      ["Dad says the shards in the grass are the sky's tears. I think they're just shiny."],
-    ]));
+    this.chats.chat(n, {
+      greet: [s.bastionDone ? 'Is it true you fought a giant made of stone?! I knew you were a knight!' : 'Hi! Are you a knight? You have a sword! And a shield!'],
+      topics: [
+        { id: 'knight', q: 'Do you want to be a knight?', a: ["Yes! I've been practicing! I hit the scarecrow eleven times yesterday!", 'It hit me back once. Well. It fell on me.'] },
+        { id: 'grumble', q: 'Tell me about Grumble.', a: ["The big goat is called Grumble. Don't stand behind him. Trust me.", 'He likes it when you hum to him. Low and slow, like a sleepy cow. Then he comes running!'] },
+        { id: 'shards', q: 'What are the shiny things in the grass?', a: ["Dad says the shards in the grass are the sky's tears. I think they're just shiny.", "I keep mine in a jar. I have nine! You can't have them."] },
+        { id: 'hum', q: "Can you teach me Grumble's hum?", when: () => !!s.flute && !!s.goat?.have && !this.story.songs?.knows('ram'),
+          a: ['You have a flute? Then play it like this!', 'Low, then lower, low, lower... then up, and down again! Like a sleepy cow!'],
+          then: () => this.story.songs.teach('ram', n, () => this.story.after(1.2, () => this.say(n, ['Yay! Now Grumble will come whenever you play it. Even from far, far away!']))) },
+      ],
+      rude: { q: "Knights aren't real, you know.", mood: 'sad', a: ['...yes they are.', "*sniff* You're not a knight. You're just mean!"] },
+      bye: 'Bye! Watch out for dragons!',
+      forgive: "I'm not sad anymore. Mom says knights forgive people. So I forgive you!",
+    });
   }
 
   talkGarrick(n) {
@@ -591,15 +714,27 @@ export class Folk {
       this.say(n, ["That blade's seen better days. Willowmere's shop sells new ones, east across the Stormvale. Or go back to your smith."]);
       return;
     }
-    this.say(n, this.rotate('garrickN', [
-      ["The Long Bridge has held for three hundred years. I don't intend to be on it the day it doesn't."],
-      ['Willowmere lies east across the Stormvale. Good folk. Ask for Ysolde, if you want your fortune told... or your way found.'],
-      ['North of the Stormvale the land climbs into Stormreach. That is where the storm comes from. I would not go there without a light.'],
-    ]));
+    this.chats.chat(n, {
+      greet: [this.night ? "Who goes there? ...Oh, it's you. Long night." : 'Back again? The gate is open, and the bridge still stands.'],
+      topics: [
+        { id: 'bridge', q: 'Tell me about the Long Bridge.', a: ["The Long Bridge has held for three hundred years. I don't intend to be on it the day it doesn't.", 'Storm bats nest underneath. Keep your shield up.'] },
+        { id: 'east', q: "What's east of the Stormvale?", a: ['Willowmere lies east across the Stormvale. Good folk. Ask for Ysolde, if you want your fortune told... or your way found.'] },
+        { id: 'north', q: "What's north?", a: ['North of the Stormvale the land climbs into Stormreach. That is where the storm comes from. I would not go there without a light.'] },
+        { id: 'night', q: "Don't you ever sleep?", when: () => this.night, a: ['A guard sleeps when the sun is up. Ashlings walk at night. Hear them out there?', 'Stay on the road after dark, Cello. And keep a light handy. In the dark they see a lantern from far off, mind.'] },
+      ],
+      rude: { q: 'Some guard. I walked right up to you.', a: ['Is that so? Then walk right back down, smart mouth.', "I don't have to talk to you."] },
+      bye: 'Mind the bridge.',
+      forgive: "Ah, you. I've had worse said to me by Ashlings. Forget it.",
+    });
   }
 
   talkOdo(n) {
-    const s = this.story.state;
+    const story = this.story, s = story.state, songs = story.songs;
+    // På natten sover pilgrimen på bänken (0.11)
+    if (n.pose === 'lie') {
+      story.read(['Odo is fast asleep on the bench, snoring softly.', 'Better let the old pilgrim sleep. Come back in the morning.']);
+      return;
+    }
     if (!s.talked.odo) {
       this.say(n, [
         "Oh! A fellow traveler. Sit, sit. I'm Odo. I walk from one Storm Stone to the next, to pray.",
@@ -607,12 +742,39 @@ export class Folk {
       ], () => { s.talked.odo = true; });
       return;
     }
-    this.say(n, s.eastPath
-      ? ['You woke the Storm Stone! I felt it in my bones, all the way out here. Bless you, child.']
-      : this.rotate('odoN', [
-        ['The view from here... you can see the whole world falling apart. It is beautiful, in a sad way.'],
-        ['The old songs say the gods walked this bridge. They must have had better knees than mine.'],
-      ]));
+    this.chats.chat(n, {
+      greet: [s.eastPath ? 'You woke the Storm Stone! I felt it in my bones, all the way out here. Bless you, child.' : 'Ah, my fellow traveler. Sit, sit.'],
+      topics: [
+        { id: 'stones', q: 'What are the Storm Stones?', a: ['Stones the gods set out to hold the storm in place, the old songs say. There is one on the Stormvale\'s eastern edge.', 'Asleep, like all the others. Waiting for thunder.'] },
+        { id: 'view', q: 'Why do you sit here?', a: ['The view from here... you can see the whole world falling apart. It is beautiful, in a sad way.', 'The old songs say the gods walked this bridge. They must have had better knees than mine.'] },
+        { id: 'songs', q: 'What do you sing to the stones?', when: () => !s.flute,
+          a: ['The old songs, child. Before the storm, pilgrims sang to the stones, and the stones answered.', 'My voice is too old for it now. But my flute still remembers.', 'Here. You have young lungs and a long road. Take it.'],
+          then: () => this.giveFlute(n) },
+        { id: 'lesson', q: 'Teach me the Waking Chant again.', when: () => !!s.flute && !songs?.knows('opening'), a: ['Of course. Listen closely.'], then: () => this.teachOpening(n) },
+        { id: 'birds', q: 'Where are the singing-bird stones?', when: () => !!songs?.knows('opening'),
+          a: () => [s.songStones?.passStone ? 'You opened the one on this bridge! I have walked past it for forty years.' : 'One sleeps right here on this bridge. Play the song beside it.',
+            'Wren the mapmaker has drawn others: one by the fallen god on the Stormvale, and one among the columns in the far desert, they say.'] },
+      ],
+      rude: { q: 'Praying to rocks? Really?', a: ['...', 'The rocks have been kinder company than you, child.'] },
+      bye: 'Walk in the light, child.',
+      forgive: 'Ah, you again. The old songs teach forgiveness, too. Sit.',
+    });
+  }
+
+  // Odo ger Cello sin flöjt och lär honom den första sången (0.11)
+  giveFlute(n) {
+    const story = this.story, L = (t) => story.line(n, t);
+    story.itemGet('flute', () => {
+      story.talk(n, [L('Now, the first song every pilgrim learns: the Waking Chant.'), L('Listen, then play it back to me.')], () => this.teachOpening(n));
+    });
+  }
+
+  teachOpening(n) {
+    const story = this.story, L = (t) => story.line(n, t);
+    story.songs.teach('opening', n, () => story.after(1.4, () => story.talk(n, [
+      L('Beautiful! The stones with the singing bird will hear that.'),
+      L('One sleeps right here on this bridge. Go on, play it beside it.'),
+    ])));
   }
 
   talkMags(n) {
@@ -661,11 +823,7 @@ export class Folk {
     const L = (t) => story.line(n, t);
     story.talk(n, [
       L(s.talked.rosa ? 'Back again? The bed is still warm.' : "Welcome to the Willow & Wick! A boy who walked the Long Bridge sleeps here for free."),
-      {
-        who: '', prompt: 'Rest at the inn?',
-        choices: [{ text: 'Rest and save', id: 'rest' }, { text: 'Not now', id: 'no' }],
-        onChoose: (id) => { if (id === 'rest') story.rest('inn', 'Cello sleeps at the Willow & Wick...'); return []; },
-      },
+      story.restStep('inn', 'Rest at the inn?', 'Cello sleeps at the Willow & Wick...'),
     ], () => { s.talked.rosa = true; });
   }
 
@@ -698,6 +856,11 @@ export class Folk {
 
   talkYsolde(n) {
     const story = this.story, s = story.state;
+    if (s.talked.ysolde && s.flute && story.songs && !story.songs.knows('storm')) {
+      this.say(n, ['Back again? ...And carrying a flute, I see.', 'The storm has a song too, child. I have heard it in the thunder for fifty years. Listen...'],
+        () => story.songs.teach('storm', n, () => story.after(1.4, () => this.say(n, ['Play it under the open sky, and the clouds will gather... or scatter.', 'Use it wisely. The storm remembers who calls it.']))));
+      return;
+    }
     const key = this.goalKey();
     const first = !s.talked.ysolde;
     const lines = first
@@ -714,25 +877,60 @@ export class Folk {
   }
 
   talkDoran(n) {
-    this.say(n, this.rotate('doranN', [
-      ["Willowmere stands because we keep watch. Ashlings don't like the water; the mere keeps them off."],
-      ['North of the Stormvale the land rises into Stormreach. Nothing good comes from there. Except the wind, maybe.'],
-      ["Brindle? Hollis' mare? Saw a brown horse running wild on the Stormvale, west of the crossroads. Fast as lightning."],
-    ]));
+    this.chats.chat(n, {
+      greet: [this.night ? 'Quiet night. Too quiet. Speak up, traveler.' : "Willowmere's under watch. Speak up."],
+      topics: [
+        { id: 'mere', q: 'How do you keep the Ashlings out?', a: ["Willowmere stands because we keep watch. Ashlings don't like the water; the mere keeps them off.", 'At night they come right up to the far shore. Their eyes glow like coals. They never cross.'] },
+        { id: 'north', q: 'What lies north?', a: ['North of the Stormvale the land rises into Stormreach. Nothing good comes from there. Except the wind, maybe.'] },
+        { id: 'horse', q: 'Seen anything strange?', a: ["Brindle? Hollis' mare? Saw a brown horse running wild on the Stormvale, west of the crossroads. Fast as lightning.", 'And a pilgrim on the Long Bridge, singing to the stones. Takes all kinds.'] },
+      ],
+      rude: { q: 'Do you ever do anything but stand there?', a: ['Standing here IS the job. Standing here is why you can sleep at the inn.', 'Move along.'] },
+      bye: 'Stay out of trouble.',
+      forgive: "No hard feelings about yesterday. Standing here makes a man grumpy too.",
+    });
   }
 
   talkFenwick(n) {
-    this.say(n, this.rotate('fenwickN', [
-      ["Fish don't bite in a storm. I sit here anyway. It's the sitting I like."],
-      ["Pell's got lanterns. You'll want one if you're going north. Caves up there are darker than a titan's heart."],
-      ['They say the mere has no bottom. I say it has plenty of bottom, just no fish.'],
-    ]));
+    this.chats.chat(n, {
+      greet: [this.raining ? "Rain's good for fishing, they say. They lie." : 'Shh. You will scare the fish. ...What fish, you ask? Exactly.'],
+      topics: [
+        { id: 'fish', q: 'Caught anything?', a: ["Fish don't bite in a storm. I sit here anyway. It's the sitting I like."] },
+        { id: 'north', q: 'Going north. Any advice?', a: ["Pell's got lanterns. You'll want one if you're going north. Caves up there are darker than a titan's heart."] },
+        { id: 'mere', q: 'How deep is the mere?', a: ['They say the mere has no bottom. I say it has plenty of bottom, just no fish.'] },
+        { id: 'night', q: "Don't you ever go home?", when: () => this.night, a: ['Fish bite better at night, they say. They don\'t. But the stars come out between the clouds, and nobody talks to me. Except you.'] },
+      ],
+      rude: { q: "You've caught nothing all day.", a: ['...I was being patient.', "Now look, you scared them all away. Go on, shoo."] },
+      bye: 'Tight lines.',
+      forgive: "You again. ...Sit, if you like. The fish didn't come back anyway.",
+    });
   }
 
   talkKid(n, id) {
-    this.say(n, this.rotate(`${id}N`, id === 'mira'
-      ? [["Tag! You're it! ...Hey, you can't tag with a sword!"], ['Tob says the windmill is haunted. It is NOT. It is just the wind. Probably.']]
-      : [['Are you from the Stormvale? Did you see any monsters? Did you hit them?'], ["Mira's scared of the windmill. I'm not. I'm not scared of anything. Except Grandma Ysolde."]]));
+    if (id === 'mira') {
+      this.chats.chat(n, {
+        greet: ["Tag! You're it! ...Hey, you can't tag with a sword!"],
+        topics: [
+          { id: 'windmill', q: 'Is the windmill haunted?', a: ['Tob says the windmill is haunted. It is NOT. It is just the wind. Probably.'] },
+          { id: 'grandma', q: 'Who is Grandma Ysolde?', a: ["She's not really my grandma. She's everybody's grandma. She knows what's going to happen before it happens.", 'She says the storm talks to her. I think she just likes thunder.'] },
+          { id: 'night', q: 'Do you go out at night?', a: ["No! Mama makes us go in when the lamps are lit. That's when the Ashlings come to the shore."] },
+        ],
+        rude: { q: 'Tag is a baby game.', mood: 'sad', a: ['It is NOT!', "*sniff* I'm telling Grandma Ysolde!"] },
+        bye: "Bye! You're still it!",
+        forgive: "I'm not sad anymore! Want to play tag? You're it!",
+      });
+      return;
+    }
+    this.chats.chat(n, {
+      greet: ['Are you from the Stormvale? Did you see any monsters? Did you hit them?'],
+      topics: [
+        { id: 'monsters', q: 'I fought some Ashlings.', a: ['WHOA. Did they explode? Mira says they explode into ash.', "When I grow up I'm going to fight them too. With a big stick."] },
+        { id: 'mira', q: 'Is Mira scared of the windmill?', a: ["Mira's scared of the windmill. I'm not. I'm not scared of anything. Except Grandma Ysolde."] },
+        { id: 'secret', q: 'Know any secrets?', a: ['The old pilgrim on the bridge plays a flute to the stones. Doran says it is just noise.', 'But I saw a stone glow once when he played. I SAW it.'] },
+      ],
+      rude: { q: "You'd run from an Ashling.", mood: 'sad', a: ['...would not.', '*sniff* Go away.'] },
+      bye: 'Hit one for me!',
+      forgive: "I wasn't really sad. I had dust in my eye. Okay, bye!",
+    });
   }
 
   // Kartritaren på fältet: hon vet hur stort riket är
@@ -748,14 +946,18 @@ export class Folk {
       ], () => { s.talked.wren = true; });
       return;
     }
-    this.say(n, this.rotate('wrenN', [
-      ['The Stormvale is bigger than three villages put together. People get lost out here. Follow the roads.'],
-      ['There is a chest under the old watchtower by the north road. Nobody can see it. The old rangers only opened it by firelight.'],
-      ['A brown mare runs wild west of the crossroads. Fast as a rumor. I tried to draw her once.'],
-      ["Mags at the crossroads sells oil, if your lantern's thirsty. Robbery, but convenient robbery."],
-      ["Hollis at Thistledown keeps a ram the size of a pony. Grumble. If anyone ever crossed the Stormvale on a goat, it'd be on him."],
-      [s.sunGate ? 'You opened the golden gate! I added a whole new edge to my map. Then I ran out of paper.' : 'The golden gate in the east has a copper plate in front of it. Like the Storm Stone. Funny, that.'],
-    ]));
+    this.chats.chat(n, {
+      greet: [this.night ? "I map by starlight when the clouds allow. Tonight they don't." : "Mind the map. What do you need?"],
+      topics: [
+        { id: 'secrets', q: 'Any secrets on your map?', a: ['There is a chest under the old watchtower by the north road. Nobody can see it. The old rangers only opened it by firelight.', 'And there are standing stones with a strange mark, like a bird singing. I drew three of them. Nobody knows what they are for.'] },
+        { id: 'roads', q: 'Which roads should I take?', a: ['The Stormvale is bigger than three villages put together. People get lost out here. Follow the roads.', "Mags at the crossroads sells oil, if your lantern's thirsty. Robbery, but convenient robbery."] },
+        { id: 'creatures', q: 'Seen anything strange out here?', a: ['A brown mare runs wild west of the crossroads. Fast as a rumor. I tried to draw her once.', "And the Ashlings sleep through the day, curled in the grass like ash heaps. Don't step on one."] },
+        { id: 'east', q: 'What about the far east?', a: () => [s.sunGate ? 'You opened the golden gate! I added a whole new edge to my map. Then I ran out of paper.' : 'The golden gate in the east has a copper plate in front of it. Like the Storm Stone. Funny, that.'] },
+      ],
+      rude: { q: "Your map is wrong. That river's in the wrong place.", a: ['WRONG? I walked every step of that river!', '...Go draw your own map, then.'] },
+      bye: 'Follow the roads!',
+      forgive: "I checked the river. It's in the right place. ...I forgive you anyway.",
+    });
   }
 
   talkFenn(n) {
@@ -771,9 +973,25 @@ export class Folk {
       ], () => { s.talked.fenn = true; });
       return;
     }
-    story.talk(n, [L(s.lantern
+    // Det som behövs för att komma vidare sägs alltid, även när Fenn är sur
+    const tip = s.lantern
       ? (s.caveOpen ? "You got through! I heard the stone grind open from out here." : 'Light both braziers inside. The stone door will feel the heat.')
-      : 'No lantern, no way through. Willowmere is east across the Stormvale.')]);
+      : 'No lantern, no way through. Willowmere is east across the Stormvale.';
+    if (this.chats.mood(n.id)) {
+      story.talk(n, [...this.chats.grudge(n), L(tip)]);
+      return;
+    }
+    this.chats.chat(n, {
+      greet: [tip],
+      topics: [
+        { id: 'bastion', q: 'What do you know about the Bastion?', a: ['Iron walls, burned black. Thunder never stops over it. I got as far as the cave and turned back.', 'Some scout, I know.'] },
+        { id: 'storm', q: 'Is it always this stormy here?', a: ['Up here? The storm is born here. Thunder comes over those peaks three times a day.', 'If your sword starts to crackle, move. Lightning looks for metal.'] },
+        { id: 'fire', q: 'Can I rest by your fire?', a: ['Of course. It is the last warm place before the storm.'] },
+      ],
+      rude: { q: 'Some scout, hiding by a fire.', a: ['Hiding? I am WATCHING. There is a difference.', 'Go freeze in the cave, then.'] },
+      bye: 'Keep your oil dry.',
+      forgive: "Still alive, I see. Good. I wasn't really mad.",
+    });
   }
 
   // ---------- öknen: Nefret, Hamid, Sabi och Tarek ----------
@@ -803,11 +1021,17 @@ export class Folk {
         ], () => story.save(true));
         return;
       }
-      this.say(n, this.rotate('tarekN', [
-        ['My leg will heal. My caravan will not. Still, I am alive to complain about it.'],
-        ['Hamid is my cousin. He says you are a fool for lifting that cart. He says it the way people say "friend".'],
-        ['The pyramid? My grandfather said it was built to hold the sun in. Or to hold something out of it.'],
-      ]));
+      this.chats.chat(n, {
+        greet: ['Ah, my cart-lifting friend.'],
+        topics: [
+          { id: 'leg', q: 'How is your leg?', a: ['My leg will heal. My caravan will not. Still, I am alive to complain about it.'] },
+          { id: 'hamid', q: 'You and Hamid are family?', a: ['Hamid is my cousin. He says you are a fool for lifting that cart. He says it the way people say "friend".'] },
+          { id: 'pyramid', q: 'What do you know of the pyramid?', a: ['My grandfather said it was built to hold the sun in. Or to hold something out of it.', 'At night the sand around it hums. Nobody goes near it after dark.'] },
+        ],
+        rude: { q: 'You should have guarded your caravan better.', a: ['...I lost four friends out there.', 'Leave me be.'] },
+        bye: 'May the sun keep your back warm.',
+        forgive: "I have thought about what you said. You were rude. You were also right. Sit.",
+      });
       return;
     }
     story.talk(n, [
@@ -856,6 +1080,11 @@ export class Folk {
         'Inside, the light of Ra still falls through cracks and windows. Mirrors turn it. Eyes of gold wake when it touches them.',
         "Somewhere in its heart lies Ra's own crystal. Find it, and the light will answer to you.",
       ], () => { s.talked.nefret = true; });
+      return;
+    }
+    if (s.flute && story.songs && !story.songs.knows('sun')) {
+      this.say(n, ['A flute? Then you should know the hymn.', 'Every morning, the priests of Ra played the sun up over the dunes. And every evening, they sang it to rest. Listen...'],
+        () => story.songs.teach('sun', n, () => story.after(1.4, () => this.say(n, ['Ra still listens. Play it under the open sky, and night will turn to day, or day to night.']))));
       return;
     }
     if (s.pyramidDone) {
@@ -925,19 +1154,25 @@ export class Folk {
 
   talkSabi(n) {
     const s = this.story.state;
-    this.say(n, this.rotate('sabiN', s.pyramidDone
-      ? [['You fought a snake as big as a river?! Was it slimy?'], ['Mama says the sun feels warmer since you came back. I think so too!']]
-      : [
-        ['Are you going to the pyramid? Mama says the sun lives inside it!'],
-        ["The camels are called Dust and Other Dust. I named them. Don't laugh."],
-        ['Nefret says not to play near the pyramid because the shadows bite. I think shadows are scared of me.'],
-        [s.tarek === 'saved' ? 'Uncle Tarek says you lifted a whole cart! Can you lift me?' : s.tarek === 'robbed' ? "Uncle Hamid is angry. He says someone hurt Uncle Tarek. Was it Ashlings?" : 'Uncle Tarek was supposed to come home with the caravan. He is late.'],
-      ]));
+    this.chats.chat(n, {
+      greet: [s.pyramidDone ? 'You fought a snake as big as a river?! Was it slimy?' : 'Are you going to the pyramid? Mama says the sun lives inside it!'],
+      topics: [
+        { id: 'camels', q: 'What are the camels called?', a: ["The camels are called Dust and Other Dust. I named them. Don't laugh."] },
+        { id: 'shadows', q: 'Are you scared of the pyramid?', a: ['Nefret says not to play near the pyramid because the shadows bite. I think shadows are scared of me.'] },
+        { id: 'uncle', q: 'Where is your uncle?', a: () => [s.tarek === 'saved' ? 'Uncle Tarek says you lifted a whole cart! Can you lift me?' : s.tarek === 'robbed' ? "Uncle Hamid is angry. He says someone hurt Uncle Tarek. Was it Ashlings?" : 'Uncle Tarek was supposed to come home with the caravan. He is late.'] },
+      ],
+      rude: { q: 'Your camels look silly.', mood: 'sad', a: ['They do NOT. Dust is very handsome!', "*sniff* I'm going to tell Mama."] },
+      bye: 'Bye! Say hi to the sun!',
+      forgive: "Dust says he forgives you. Other Dust is still thinking about it.",
+    });
   }
 
   // ---------- varje bildruta ----------
   update(dt) {
     const here = this.areas.id, P = this.story.player;
+    this.schedT = (this.schedT ?? 0) - dt;
+    if (this.schedT <= 0) { this.schedT = 1; this.schedule(false); }
+    this.story.chats?.update(dt, Object.values(this.story.npcs), P, here);
     // Övningsdockan gungar när den blir slagen
     const d = this.dummy;
     if (d && d.wobble > 0) {

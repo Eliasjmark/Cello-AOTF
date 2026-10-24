@@ -19,6 +19,7 @@ import { buildRanch } from './regions/ranch.js';
 import { buildPass } from './regions/pass.js';
 import { buildField } from './regions/field.js';
 import { buildWillowmere } from './regions/willowmere.js';
+import { defineSongStones } from './songs.js';
 import { buildStormreach } from './regions/stormreach.js';
 import { buildInteriors } from './regions/interiors.js';
 import { buildDesert } from './regions/desert.js';
@@ -939,6 +940,8 @@ export function buildWorld(scene, lights) {
     east: field.east,
     paths: { north: paths.north, east: field.eastPath },
     ranch, pass, field, willow, reach, interiors, desert,
+    // 0.11: stenarna som öppnas med Waking Chant (kistorna under dem registreras nu)
+    songStones: defineSongStones({ pass: pass?.H, field: field?.H, desert: desert?.H }, B.chests),
     bastion,
     pyramid,
     // Fängelsehålorna: samma gränssnitt (state, interactions, trap, update, combatTargets ...)

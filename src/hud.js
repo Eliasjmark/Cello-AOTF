@@ -15,6 +15,16 @@ export function heartSvg(id) {
   </svg>`;
 }
 
+const px8 = (r) => `<svg viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">${r}</svg>`;
+export const CLOCK_ICONS = {
+  sun: px8('<rect x="3" y="0" width="2" height="1" fill="#ffd27a"/><rect x="3" y="7" width="2" height="1" fill="#ffd27a"/><rect x="0" y="3" width="1" height="2" fill="#ffd27a"/><rect x="7" y="3" width="1" height="2" fill="#ffd27a"/><rect x="2" y="2" width="4" height="4" fill="#ffc040"/><rect x="2" y="2" width="1" height="1" fill="#fff0b0"/><rect x="1" y="1" width="1" height="1" fill="#e0a030"/><rect x="6" y="1" width="1" height="1" fill="#e0a030"/><rect x="1" y="6" width="1" height="1" fill="#e0a030"/><rect x="6" y="6" width="1" height="1" fill="#e0a030"/>'),
+  moon: px8('<rect x="3" y="1" width="3" height="1" fill="#dfe6f4"/><rect x="2" y="2" width="2" height="4" fill="#dfe6f4"/><rect x="3" y="6" width="3" height="1" fill="#dfe6f4"/><rect x="4" y="2" width="1" height="1" fill="#a8b4cc"/><rect x="4" y="5" width="1" height="1" fill="#a8b4cc"/><rect x="6" y="0" width="1" height="1" fill="#fff"/>'),
+  rain: px8('<rect x="2" y="1" width="4" height="1" fill="#9aa4b4"/><rect x="1" y="2" width="6" height="2" fill="#9aa4b4"/><rect x="2" y="5" width="1" height="2" fill="#7ab4ff"/><rect x="4" y="5" width="1" height="2" fill="#7ab4ff"/><rect x="6" y="5" width="1" height="2" fill="#7ab4ff"/>'),
+  storm: px8('<rect x="2" y="0" width="4" height="1" fill="#6a7284"/><rect x="1" y="1" width="6" height="2" fill="#6a7284"/><rect x="4" y="3" width="2" height="1" fill="#ffe46a"/><rect x="3" y="4" width="2" height="1" fill="#ffe46a"/><rect x="4" y="5" width="2" height="1" fill="#ffe46a"/><rect x="3" y="6" width="2" height="1" fill="#ffe46a"/><rect x="1" y="4" width="1" height="2" fill="#7ab4ff"/>'),
+  fog: px8('<rect x="0" y="1" width="6" height="1" fill="#b8bec8"/><rect x="2" y="3" width="6" height="1" fill="#9aa2ae"/><rect x="0" y="5" width="7" height="1" fill="#b8bec8"/><rect x="3" y="7" width="4" height="1" fill="#9aa2ae"/>'),
+  haze: px8('<rect x="0" y="1" width="6" height="1" fill="#d8b47a"/><rect x="2" y="3" width="6" height="1" fill="#b8925a"/><rect x="0" y="5" width="7" height="1" fill="#d8b47a"/><rect x="3" y="7" width="4" height="1" fill="#b8925a"/>'),
+};
+
 export class Hud {
   constructor(input) {
     const $ = (id) => document.getElementById(id);
@@ -71,6 +81,24 @@ export class Hud {
     this.input.inGame = true;
     if (!fromSave) this.input.requestLock();
     this.onBegin?.(mode, slot);
+  }
+
+  // Klockan uppe till vänster (0.11): sol eller måne, tiden och vädret
+  setClock(c) {
+    const el = this.clockEl ??= {
+      root: document.getElementById('clock'), ico: document.getElementById('clock-ico'),
+      t: document.getElementById('clock-t'), wx: document.getElementById('clock-wx'),
+    };
+    if (!el.root) return;
+    const key = c ? `${c.night}|${c.text}|${c.weather}|${c.label}` : '';
+    if (key === this.clockKey) return;
+    this.clockKey = key;
+    el.root.hidden = !c;
+    if (!c) return;
+    el.ico.innerHTML = c.night ? CLOCK_ICONS.moon : CLOCK_ICONS.sun;
+    el.t.innerHTML = `${c.text}<small>${c.label}</small>`;
+    el.wx.innerHTML = CLOCK_ICONS[c.weather] ?? '';
+    el.root.title = `Day ${c.day} · ${c.label}`;
   }
 
   setPrompt(text) {

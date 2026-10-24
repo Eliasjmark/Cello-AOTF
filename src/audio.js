@@ -91,6 +91,32 @@ export class Sfx {
     }
   }
 
+  // Regnet (0.11): brus genom ett bandpassfilter som sorlar, starkare ju mer det regnar
+  setRain(level) {
+    if (!this.ctx) return;
+    const c = this.ctx;
+    if (!this.rainGain) {
+      if (level <= 0.001) return;
+      const src = c.createBufferSource();
+      src.buffer = this.noise;
+      src.loop = true;
+      const hp = c.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 700;
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 5200;
+      this.rainGain = c.createGain();
+      this.rainGain.gain.value = 0;
+      src.connect(hp);
+      hp.connect(lp);
+      lp.connect(this.rainGain);
+      this.rainGain.connect(this.fx);
+      src.start();
+    }
+    this.rainGain.gain.setTargetAtTime(level * 0.16, c.currentTime, 0.8);
+  }
+
   // Ljudeffekternas volym, 0–1 (startmenyns inställningar)
   setFxLevel(v) {
     this.fxLevel = v;
@@ -592,6 +618,44 @@ export class Sfx {
         this.noiseThrough('lowpass', 500, 300, 1, t + 0.7, 0.3, this.gain(t + 0.7, 0.02, 0.12 * v, 0.3));
         break;
       }
+      // ---------- 0.11: flöjten ----------
+      case 'note': { // en flöjtton: sinus med lite vibrato, en svag oktav och andning
+        const f = opt.f ?? 440, dur = 0.6;
+        const g = this.gain(t, 0.04, 0.2 * v, dur);
+        const o = this.ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(f, t);
+        const lfo = this.ctx.createOscillator(), lg = this.ctx.createGain();
+        lfo.frequency.value = 5.2;
+        lg.gain.setValueAtTime(0, t);
+        lg.gain.linearRampToValueAtTime(f * 0.012, t + 0.25);
+        lfo.connect(lg);
+        lg.connect(o.frequency);
+        o.connect(g);
+        o.start(t); lfo.start(t);
+        o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+        this.osc('triangle', f * 2, f * 2, t, dur * 0.8, this.gain(t, 0.05, 0.035 * v, dur * 0.8));
+        this.noiseThrough('bandpass', f * 3, f * 2.5, 2, t, 0.16, this.gain(t, 0.01, 0.05 * v, 0.15));
+        break;
+      }
+      case 'songok': // rätt melodi: ett glittrande ackord
+        [784, 988, 1175, 1568, 1976].forEach((f, i) => {
+          const ti = t + i * 0.05;
+          this.osc('triangle', f, f, ti, 0.7, this.gain(ti, 0.005, 0.07 * v, 0.7));
+        });
+        break;
+      case 'songbad': // fel ton i en lektion
+        this.osc('square', 220, 160, t, 0.22, this.lowpass(this.gain(t, 0.005, 0.12 * v, 0.22), 1200));
+        break;
+      // ---------- 0.11: humör ----------
+      case 'huff': // någon fnyser argt
+        this.noiseThrough('bandpass', 900, 500, 1.2, t, 0.28, this.gain(t, 0.02, 0.28 * v, 0.26));
+        this.voice(150 * r, 95 * r, 0.22, 0.32 * v, [[480, 4], [950, 5]], t + 0.02);
+        break;
+      case 'sniff': // ett barn snörvlar
+        for (let i = 0; i < 2; i++) this.noiseThrough('bandpass', 2600, 3400, 2.5, t + i * 0.16, 0.1, this.gain(t + i * 0.16, 0.01, 0.16 * v, 0.1));
+        this.voice(520 * r, 380 * r, 0.25, 0.15 * v, [[1000, 4], [2000, 5]], t + 0.36);
+        break;
       // ---------- 0.7: Grumble ----------
       case 'hoof': // hovslag när Cello rider
         this.noiseThrough('bandpass', 900 * r, 700, 3, t, 0.06, this.gain(t, 0.002, 0.22 * v, 0.06));

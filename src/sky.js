@@ -23,6 +23,9 @@ export function createSky(scene) {
     uBelow: { value: new THREE.Color(0x15181f) },
     uGlow: { value: new THREE.Color(0x8a5a2c) },
     uGlowDir: { value: new THREE.Vector3(-0.55, 0, -0.83).normalize() },
+    // 0.11: natten (stjärnor och måne syns där molnen glesnar)
+    uNight: { value: 0 },
+    uMoonDir: { value: new THREE.Vector3(0.45, 0.62, -0.64).normalize() },
   };
   const skyMat = new THREE.ShaderMaterial({
     uniforms: u,
@@ -32,7 +35,7 @@ export function createSky(scene) {
       varying vec3 vDir;
       void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
     fragmentShader: /* glsl */ `
-      uniform float uTime, uFlash; uniform vec3 uFlashDir, uZenith, uHorizon, uBelow, uGlow, uGlowDir;
+      uniform float uTime, uFlash, uNight; uniform vec3 uFlashDir, uZenith, uHorizon, uBelow, uGlow, uGlowDir, uMoonDir;
       varying vec3 vDir;
       ${NOISE}
       void main(){
@@ -40,7 +43,7 @@ export function createSky(scene) {
         float h = d.y;
         vec3 col = mix(uHorizon, uZenith, smoothstep(0.0, 0.55, h));
         col = mix(col, uBelow, smoothstep(0.0, -0.35, h));
-        // Ett sjukligt sken långt bort, där stormens öga ligger
+        // Ett sjukligt sken långt bort, där stormens öga ligger (i skymningen blir det solnedgång)
         float g = max(dot(normalize(vec3(d.x, 0., d.z)), uGlowDir), 0.);
         col += uGlow * pow(g, 6.) * smoothstep(0.4, -0.08, h) * 0.6;
         if (h > -0.1) {
@@ -48,6 +51,18 @@ export function createSky(scene) {
           float c = fbm(p + vec2(uTime * 0.012, uTime * 0.004));
           float c2 = fbm(p * 2.1 - vec2(uTime * 0.02, 0.));
           float cloud = smoothstep(0.35, 0.85, c * 0.7 + c2 * 0.4);
+          // Natten: stjärnor och en blek måne i glipor mellan molnen
+          if (uNight > 0.01 && h > 0.02) {
+            vec2 sp = d.xz / (h + 0.5) * 90.;
+            vec2 cell = floor(sp);
+            float r = hash(cell);
+            float star = step(0.982, r) * smoothstep(0.32, 0.0, length(fract(sp) - 0.5)) * (0.65 + 0.35 * sin(uTime * 2.3 + r * 60.));
+            float clear = (1. - cloud) * smoothstep(0.02, 0.25, h) * uNight;
+            col += vec3(0.82, 0.88, 1.0) * star * clear * 1.4;
+            float md = dot(d, uMoonDir);
+            col += vec3(0.86, 0.9, 1.0) * smoothstep(0.9990, 0.9994, md) * uNight * (1. - cloud * 0.75);
+            col += vec3(0.2, 0.26, 0.42) * pow(max(md, 0.), 40.) * uNight * 0.7;
+          }
           vec3 cloudCol = mix(uZenith * 1.5, uHorizon * 1.1, c2);
           col = mix(col, cloudCol, cloud * smoothstep(-0.1, 0.25, h) * 0.85);
           float fd = max(dot(d, uFlashDir), 0.);
@@ -126,9 +141,38 @@ export function createSky(scene) {
   }
 
   let next = 2.5, ft = -1, flash = 0, indoor = false;
+  // Dagens färger (stormhimlen) och nattens; setEnv blandar dem varje bildruta
+  const DAY = { zenith: new THREE.Color(0x0b0e15), horizon: new THREE.Color(0x3a414d), below: new THREE.Color(0x15181f), glow: new THREE.Color(0x8a5a2c), dark: new THREE.Color(0x14151c), mid: new THREE.Color(0x32323e) };
+  const NIGHT = { zenith: new THREE.Color(0x020309), horizon: new THREE.Color(0x0c1019), below: new THREE.Color(0x06070b), glow: new THREE.Color(0x141c33), dark: new THREE.Color(0x07080d), mid: new THREE.Color(0x13151f) };
+  const DUSK = { horizon: new THREE.Color(0x7a3e26), glow: new THREE.Color(0xe0702c), mid: new THREE.Color(0x4a3030) };
+  const GREY = new THREE.Color(0x2a2e34);
+  const glowStorm = new THREE.Vector3(-0.55, 0, -0.83).normalize(), glowSun = new THREE.Vector3(0.8, 0, -0.6).normalize();
   const api = {
     onBolt: null,
+    boltRate: 1, // vädret: fler blixtar i åskväder, färre när det är lugnt
+    // day: 0–1 dagsljus · dusk: 0–1 gryning/skymning · over: 0–1 mulet (regn och dimma)
+    setEnv(day, dusk, over = 0) {
+      const n = 1 - day;
+      for (const k of ['zenith', 'horizon', 'below', 'glow']) u[`u${k[0].toUpperCase()}${k.slice(1)}`].value.copy(DAY[k]).lerp(NIGHT[k], n);
+      u.uHorizon.value.lerp(DUSK.horizon, dusk * 0.55);
+      u.uGlow.value.lerp(DUSK.glow, dusk * 0.8);
+      u.uGlowDir.value.copy(glowStorm).lerp(glowSun, dusk).normalize();
+      if (over > 0) {
+        u.uHorizon.value.lerp(GREY, over * 0.45 * day);
+        u.uZenith.value.lerp(GREY, over * 0.25 * day);
+        u.uGlow.value.multiplyScalar(1 - over * 0.7);
+      }
+      u.uNight.value = Math.max(0, n * n * (1 - over * 0.8));
+      su.uDark.value.copy(DAY.dark).lerp(NIGHT.dark, n);
+      su.uMid.value.copy(DAY.mid).lerp(NIGHT.mid, n).lerp(DUSK.mid, dusk * 0.5);
+    },
     // Inomhus och i grottor syns varken himlen, molnhavet eller blixtarna
+    // En blixt just nu (ett nedslag nära Cello)
+    flashNow(pt) {
+      if (indoor) return;
+      ft = 0;
+      if (pt) su.uFlashPos.value.set(pt.x, pt.z);
+    },
     setIndoor(on) {
       indoor = on;
       dome.visible = !on;
@@ -145,7 +189,7 @@ export function createSky(scene) {
       if (next <= 0 && ft < 0) {
         ft = 0;
         api.onBolt?.(makeBolt(camera));
-        next = 5 + Math.random() * 10;
+        next = (5 + Math.random() * 10) / Math.max(0.05, api.boltRate);
       }
       if (ft >= 0) {
         ft += dt;

@@ -127,6 +127,19 @@ export function buildItem(kind) {
     tip.position.set(0.2, 0.0, 0);
     g.add(tip);
     g.add(B(0.3, 0.03, 0.03, ITEM_MATS.ribbon, -0.02, -0.12, 0.05));
+  } else if (kind === 'flute') {
+    // Pilgrimens flöjt: ett rör av vass med hål och ett rött snöre
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.8, 8), lam(0xb8925a));
+    tube.rotation.z = Math.PI / 2 - 0.5;
+    g.add(tube);
+    for (let i = 0; i < 4; i++) {
+      const h = B(0.05, 0.05, 0.04, M.dark, -0.12 + i * 0.1, -0.06 + i * 0.055, 0.05);
+      g.add(h);
+    }
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.05, 8), ITEM_MATS.ribbon);
+    band.rotation.z = Math.PI / 2 - 0.5;
+    band.position.set(-0.28, -0.15, 0);
+    g.add(band);
   } else if (kind === 'lantern') {
     // Mässingslykta med glas och ett varmt sken
     g.add(B(0.3, 0.05, 0.3, M.brass, 0, 0.2, 0));
@@ -166,6 +179,12 @@ export const ITEM_TEXT = {
     'Hollis carved it from one of Grumble\'s old horns. Blow it outdoors, and the big ram will come running.',
     'Press E next to Grumble to climb into the saddle. He runs twice as fast as Cello, and jumps further. Press E again to climb down.',
     'He will not follow you into caves, houses or dungeons. He waits outside.',
+  ],
+  flute: [
+    "You got the Pilgrim's Flute!",
+    'A reed flute, worn smooth by a lifetime of songs.',
+    'Put it on F, G or V in the item menu (Tab) and press that button to play. Each of ↑ ← → ↓ and Space plays a note. Esc stops playing.',
+    'Some melodies have power. The songs you learn are written in your item menu.',
   ],
   lantern: [
     'You got the Lantern!',

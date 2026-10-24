@@ -137,6 +137,51 @@
     text-shadow: 0 1px 0 #000, 0 0 8px rgba(0,0,0,.7);
   }
   .wallet svg { width: 16px; height: 16px; filter: drop-shadow(0 1px 0 #000); }
+  /* Klockan och vädret (0.11) */
+  .clock {
+    position: absolute; left: calc(max(16px, env(safe-area-inset-left, 0px)) + 78px); top: calc(max(14px, env(safe-area-inset-top, 0px)) + 32px);
+    display: flex; align-items: center; gap: 5px; font: 600 .82rem var(--font-ui); font-variant-numeric: tabular-nums; color: var(--ink);
+    text-shadow: 0 1px 0 #000, 0 0 8px rgba(0,0,0,.7); opacity: .92;
+  }
+  .clock svg { width: 16px; height: 16px; filter: drop-shadow(0 1px 0 #000); display: block; }
+  .clock-t small { opacity: .7; font-weight: 500; margin-left: 4px; }
+  .clock-wx:empty { display: none; }
+  .dialog-choices li.asked { color: var(--dim); opacity: .6; }
+  /* Flöjten (0.11) */
+  .songs {
+    position: absolute; left: 50%; bottom: calc(max(18px, env(safe-area-inset-bottom, 0px)) + 64px); transform: translateX(-50%); z-index: 6;
+    width: min(560px, calc(100% - 32px)); box-sizing: border-box; background: rgba(12, 15, 21, 0.94); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 10px 14px 12px; pointer-events: auto; box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  }
+  .songs-title { margin: 0 0 6px; text-align: center; font: 600 1rem var(--font-display); color: var(--gold); letter-spacing: .04em; }
+  .songs-staff {
+    position: relative; height: 84px; width: 300px; max-width: 100%; margin: 0 auto; border-radius: 6px;
+    background: repeating-linear-gradient(to top, transparent 0 14px, rgba(235,230,216,.22) 14px 15px);
+  }
+  .songs-ghost, .songs-notes { position: absolute; inset: 0; }
+  .songs .note {
+    position: absolute; width: 24px; text-align: center; font-size: 18px; line-height: 18px;
+    text-shadow: 0 1px 0 #000, 0 0 8px currentColor; animation: notepop .22s ease-out;
+  }
+  .songs .note.ghost { opacity: .28; animation: none; text-shadow: none; }
+  .songs .note.ghost.hide { opacity: 0; }
+  @keyframes notepop { from { transform: translateY(5px) scale(1.35); opacity: .55; } to { transform: none; opacity: 1; } }
+  .songs-hint { text-align: center; margin: 6px 0 0; font: .78rem var(--font-ui); color: var(--dim); }
+  .songs-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 2px 14px; font: .78rem var(--font-ui); }
+  .songs-list:empty { display: none; }
+  .songs-list li { display: flex; justify-content: space-between; gap: 6px; }
+  .songs-list i { font-style: normal; margin-left: 2px; }
+  .songs-pad { display: flex; gap: 6px; justify-content: center; margin-top: 8px; }
+  .songs-pad button { min-width: 44px; min-height: 44px; border-radius: 8px; border: 1px solid var(--rule); background: rgba(255,255,255,.06); font-size: 18px; }
+  .songs-pad button[data-note="stop"] { color: var(--ink); font: 600 .85rem var(--font-ui); }
+  .songs .touchonly { display: none; }
+  .touch-device .songs .touchonly { display: flex; }
+  .touch-device .songs .desk { display: none; }
+  .bag-songs ul { list-style: none; margin: 0; padding: 0; }
+  .bag-songs li { margin: 6px 0; font: .9rem var(--font-ui); }
+  .bag-songs .notes { margin-left: 8px; letter-spacing: 2px; color: var(--gold); }
+  .bag-songs small { display: block; color: var(--dim); font-size: .8rem; }
+  .dialog-choices li.asked.sel { opacity: .85; }
   .wallet + .dungeon, .dungeon { top: calc(max(14px, env(safe-area-inset-top, 0px)) + 60px); }
 
   /* Föremålsmenyn */
@@ -510,10 +555,11 @@
 <div class="hud">
   <div class="hearts" id="hearts" role="img" hidden></div>
   <div class="wallet" id="wallet" hidden title="Shards"><svg viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="3" y="0" width="2" height="1" fill="#7af09a"/><rect x="2" y="1" width="4" height="6" fill="#4ad06a"/><rect x="3" y="7" width="2" height="1" fill="#2a9a4a"/><rect x="3" y="2" width="1" height="4" fill="#b8ffd0"/></svg><span id="wallet-n">0</span></div>
+  <div class="clock" id="clock" hidden aria-live="off"><span class="clock-ico" id="clock-ico"></span><span class="clock-t" id="clock-t"></span><span class="clock-wx" id="clock-wx"></span></div>
   <div class="topright">
     <div class="badge">
       <span class="badge-name">Cello: Ashes of the Fallen</span>
-      <span class="badge-sub">Prototype 0.10 · The Deepening Pyramid</span>
+      <span class="badge-sub">Prototype 0.11 · A Living World</span>
     </div>
     <div class="items" id="items" hidden></div>
     <pre class="info" id="info" hidden></pre>
@@ -573,7 +619,7 @@
       <div class="title-panel" id="title-panel" hidden></div>
       <p class="title-press" id="title-press"><span class="press-key">Press any key</span><span class="press-touch">Tap to begin</span></p>
     </div>
-    <p class="title-foot"><span>Prototype 0.10</span><span>Music by Treblo</span></p>
+    <p class="title-foot"><span>Prototype 0.11</span><span>Music by Treblo</span></p>
     <p class="sr" id="title-live" aria-live="polite"></p>
   </section>
   <div class="map" id="map" hidden role="dialog" aria-label="Map">

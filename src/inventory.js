@@ -3,6 +3,7 @@
 // röda drycker och rutorna uppe till höger som visar svärdets skick och knapparnas föremål.
 import * as THREE from 'three';
 import { SWORD_MAX } from './player.js';
+import { SONGS, GLYPH } from './songs.js';
 
 const OIL_MAX = 100;
 const OIL_BURN = 0.55; // per sekund när lyktan lyser (en full lykta räcker ungefär tre minuter)
@@ -26,6 +27,7 @@ export const ICONS = {
   prism: px('<rect x="3" y="0" width="2" height="1" fill="#ffe8a8"/><rect x="2" y="1" width="4" height="2" fill="#ffd27a"/><rect x="1" y="3" width="6" height="2" fill="#ffc040"/><rect x="2" y="5" width="4" height="1" fill="#e0a030"/><rect x="3" y="6" width="2" height="1" fill="#c08020"/><rect x="3" y="2" width="1" height="3" fill="#fff6d8"/><rect x="0" y="3" width="1" height="1" fill="#c9a24f"/><rect x="7" y="3" width="1" height="1" fill="#c9a24f"/><rect x="3.5" y="7" width="1" height="1" fill="#c9a24f"/>'),
   whetstone: px('<rect x="1" y="3" width="6" height="2" fill="#8a8c94"/><rect x="2" y="2" width="4" height="1" fill="#a8aab2"/><rect x="1" y="5" width="6" height="1" fill="#5a5c66"/><rect x="5" y="1" width="1" height="2" fill="#dfe6ee"/>'),
   horn: px('<rect x="1" y="1" width="3" height="2" fill="#d8c8a4"/><rect x="4" y="2" width="2" height="2" fill="#c8b48c"/><rect x="5" y="4" width="2" height="2" fill="#b09c74"/><rect x="4" y="6" width="2" height="1" fill="#9a8460"/><rect x="2" y="3" width="2" height="1" fill="#8c2a27"/><rect x="1" y="1" width="1" height="1" fill="#f0e6cc"/>'),
+  flute: px('<rect x="6" y="0" width="2" height="1" fill="#8c2a27"/><rect x="5" y="1" width="2" height="1" fill="#c8a06a"/><rect x="4" y="2" width="2" height="1" fill="#b8925a"/><rect x="3" y="3" width="2" height="1" fill="#c8a06a"/><rect x="2" y="4" width="2" height="1" fill="#b8925a"/><rect x="1" y="5" width="2" height="1" fill="#c8a06a"/><rect x="0" y="6" width="2" height="1" fill="#9a7444"/><rect x="4" y="2" width="1" height="1" fill="#3a2a1a"/><rect x="2" y="4" width="1" height="1" fill="#3a2a1a"/><rect x="0" y="7" width="1" height="1" fill="#6a4a2a"/>'),
   heart: px('<rect x="1" y="1" width="2" height="1" fill="#d8382f"/><rect x="5" y="1" width="2" height="1" fill="#d8382f"/><rect x="0" y="2" width="8" height="2" fill="#d8382f"/><rect x="1" y="4" width="6" height="1" fill="#d8382f"/><rect x="2" y="5" width="4" height="1" fill="#d8382f"/><rect x="3" y="6" width="2" height="1" fill="#d8382f"/><rect x="1" y="2" width="1" height="1" fill="#f4a196"/>'),
 };
 
@@ -36,8 +38,9 @@ export const ITEMS = {
   potion: { name: 'Healing Draught', desc: 'Restores four hearts. Bitter, but it works.', icon: 'potion' },
   prism: { name: "Ra's Shattered Prism", desc: 'Raise it to catch sunlight and throw it where Cello faces. Lock on to aim. Sunlight burns shadow and wakes sun eyes.', icon: 'prism' },
   horn: { name: "Grumble's Horn", desc: 'Blow it outdoors and Grumble comes running. Press E next to him to ride; he is twice as fast as Cello.', icon: 'horn' },
+  flute: { name: "Pilgrim's Flute", desc: 'Press its button to play. Play notes with ↑ ← → ↓ and Space; Esc stops. Songs you learn are listed below.', icon: 'flute' },
 };
-const ORDER = ['strike', 'weight', 'prism', 'lantern', 'horn', 'potion'];
+const ORDER = ['strike', 'weight', 'prism', 'lantern', 'horn', 'flute', 'potion'];
 
 export class Inventory {
   constructor(ctx) {
@@ -83,7 +86,7 @@ export class Inventory {
   owned() {
     const s = this.s;
     return ORDER.filter((id) => (id === 'strike' || id === 'weight' ? s.items?.hammer : id === 'prism' ? s.items?.prism : id === 'lantern' ? s.lantern
-      : id === 'horn' ? !!s.goat?.have : id === 'potion' ? s.potions > 0 : false));
+      : id === 'horn' ? !!s.goat?.have : id === 'flute' ? !!s.flute : id === 'potion' ? s.potions > 0 : false));
   }
 
   // ---------- skärvor ----------
@@ -162,6 +165,7 @@ export class Inventory {
       }
       if (P.carried) return;
       if (P.mount && id !== 'horn' && id !== 'potion' && id !== 'lantern') {
+        if (id === 'flute') { this.hud.toast('Climb down from Grumble to play the flute (E).', 2200); return; }
         this.hud.toast('Climb down from Grumble first (E).', 2200);
         return;
       }
@@ -192,6 +196,8 @@ export class Inventory {
       else this.setLit(true);
     } else if (id === 'horn') {
       this.story.goat?.call();
+    } else if (id === 'flute') {
+      this.story.songs?.start();
     } else if (id === 'potion') {
       if (!this.s.potions) return;
       if (P.hp >= P.maxHp) {
@@ -322,6 +328,7 @@ export class Inventory {
         <div class="bag-assign" id="bag-assign"></div>
         <h3 class="bag-sub">Gear</h3>
         <div class="bag-gear" id="bag-gear"></div>
+        <div class="bag-songs" id="bag-songs" hidden></div>
         <p class="bag-goal" id="bag-goal" hidden></p>
         <p class="bag-hint"><span class="desk">Choose an item, then press <kbd>F</kbd> <kbd>G</kbd> or <kbd>V</kbd> to put it on that button. <kbd>Tab</kbd> closes.</span><span class="touchonly">Tap an item, then tap a button to put it there.</span></p>
         <button class="bag-close" id="bag-close" type="button">Close</button>
@@ -330,7 +337,7 @@ export class Inventory {
     const $ = (id) => document.getElementById(id);
     this.el = {
       bag, items: $('bag-items'), name: $('bag-name'), desc: $('bag-desc'), assign: $('bag-assign'), gear: $('bag-gear'),
-      goal: $('bag-goal'), shards: $('bag-shards'),
+      goal: $('bag-goal'), shards: $('bag-shards'), songs: $('bag-songs'),
       hudItems: $('items'), wallet: $('wallet'), walletN: $('wallet-n'), oil: null,
     };
     $('bag-close').addEventListener('click', () => this.toggle(false));
@@ -392,6 +399,14 @@ export class Inventory {
     if (s.kaelLetter && !s.letterGiven) gear.push({ icon: 'letter', name: 'Letter to Kael', info: '' });
     this.el.gear.innerHTML = gear.map((g) => `<div class="gear"><span class="ico">${ICONS[g.icon]}</span><span class="gear-text"><b>${g.name}</b>${g.info ? `<small>${g.info}</small>` : ''}${g.bar !== undefined ? `<span class="bar"><i style="width:${g.bar}%"></i></span>` : ''}</span></div>`).join('');
     this.el.shards.textContent = s.shards || 0;
+    // Sångerna Cello kan (0.11)
+    const known = this.story.songs ? Object.keys(SONGS).filter((k) => s.songs?.includes(k)) : [];
+    this.el.songs.hidden = !s.flute;
+    if (s.flute) {
+      this.el.songs.innerHTML = `<h3 class="bag-sub">Songs</h3>${known.length
+        ? `<ul>${known.map((k) => `<li><b>${SONGS[k].name}</b><span class="notes">${SONGS[k].notes.map((n) => GLYPH[n]).join(' ')}</span><small>${SONGS[k].desc}</small></li>`).join('')}</ul>`
+        : '<p class="bag-empty">No songs yet. Someone who knows the old songs might teach you.</p>'}`;
+    }
     const goal = this.story.folk?.goalText();
     this.el.goal.hidden = !goal;
     if (goal) this.el.goal.textContent = `Ysolde's words: ${goal}`;

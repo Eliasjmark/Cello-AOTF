@@ -158,7 +158,8 @@ export function buildWillowmere(B, areas) {
     [-24, 13, Math.PI - 0.2, M.roofBrown, M.clothGreen],
     [-10, 22, Math.PI + 0.15, M.roofRed, M.clothOchre],
   ];
-  for (const [x, z, ry, roof, sh] of homes) B.house(X0 + x, H(X0 + x, z), z, ry, { w: 5.6, d: 4.8, h: 2.6, wall: M.plaster, roof, shutter: sh });
+  // 0.11: dörrarna behövs när folket går hem för natten
+  const homeDoors = homes.map(([x, z, ry, roof, sh]) => B.house(X0 + x, H(X0 + x, z), z, ry, { w: 5.6, d: 4.8, h: 2.6, wall: M.plaster, roof, shutter: sh }).door);
   // Trädgårdar bakom husen
   for (let row = 0; row < 3; row++) {
     for (let i = 0; i < 6; i++) {
@@ -337,6 +338,7 @@ export function buildWillowmere(B, areas) {
     },
     animals: [0, 1, 2, 3, 4].map((i) => ({ kind: 'chicken', area: 'willowmere', pos: VV(-6 + (i - 2) * 1.1, -34 + (i % 2) * 1.4), center: VV(-5, -34), radius: 3.2, H })),
     hut: V3(hut.x, H(hut.x, hut.z), hut.z),
+    homeDoors,
     H,
   };
 }

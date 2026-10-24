@@ -45,7 +45,7 @@ export class Combat {
     const camFwd = Math.atan2(-Math.sin(this.rig.yaw), -Math.cos(this.rig.yaw));
     let best = null, bestScore = Infinity;
     for (const e of [...this.enemies.list, ...this.extra]) {
-      if (!e.targetable) continue;
+      if (!e.targetable || e.noLock) continue;
       const dx = e.pos.x - p.x, dz = e.pos.z - p.z, d = Math.hypot(dx, dz);
       if (d > LOCK_RANGE + (e.radiusBig || 0) || Math.abs(e.pos.y - p.y) > 5) continue;
       const ang = Math.abs(wrap(Math.atan2(dx, dz) - camFwd));

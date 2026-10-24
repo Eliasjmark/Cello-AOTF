@@ -55,8 +55,9 @@ export class Dialog {
     this.el.next.hidden = true;
     if (s.choices) {
       this.sel = 0;
+      // dim: en fråga som redan är ställd visas grå (0.11)
       this.el.choices.innerHTML = s.choices.map((c, k) =>
-        `<li data-choice="${k}"><span class="mark" aria-hidden="true">›</span>${c.text}</li>`).join('');
+        `<li data-choice="${k}"${c.dim ? ' class="asked"' : ''}><span class="mark" aria-hidden="true">›</span>${c.text}</li>`).join('');
       this.el.choices.hidden = false;
       this.renderChoices();
       if (s.prompt) {
@@ -77,6 +78,7 @@ export class Dialog {
 
   renderChoices() {
     [...this.el.choices.children].forEach((li, k) => li.classList.toggle('sel', k === this.sel));
+    this.el.choices.dataset.sel = this.sel;
   }
 
   choose(k) {

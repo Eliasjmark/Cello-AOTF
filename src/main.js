@@ -20,6 +20,10 @@ import { Pots } from './pots.js';
 import { Inventory } from './inventory.js';
 import { Folk } from './folk.js';
 import { Goat } from './goat.js';
+import { Clock } from './clock.js';
+import { Weather } from './weather.js';
+import { Chats } from './talk.js';
+import { Songs } from './songs.js';
 
 const PIXEL_LINES = 360; // retroläge: spelet ritas i ungefär så här många rader
 const FLASH = new THREE.Color(0x8d98b4);
@@ -46,9 +50,15 @@ function start(saved = {}) {
   const moon = new THREE.DirectionalLight(0xc6d0e6, 1.25);
   moon.position.set(-40, 60, 25);
   scene.add(moon);
-  const base = { hemi: 1.5, moon: 1.25, flash: 1 };
+  const base = { hemi: 1.5, moon: 1.25, flash: 1, sky: new THREE.Color(0x9aa7bd), ground: new THREE.Color(0x3a3029), moonColor: new THREE.Color(0xc6d0e6), near: 34, far: 260 };
+  // 0.11: dygnet och vädret
+  const ENV = {
+    nightSky: new THREE.Color(0x4a5a8a), duskSky: new THREE.Color(0xd8956a), nightMoon: new THREE.Color(0x7d8fcf), duskMoon: new THREE.Color(0xffa36a),
+    nightFog: new THREE.Color(0x0b0e18), duskFog: new THREE.Color(0x5a3b30), fogGrey: new THREE.Color(0x6a7078), haze: new THREE.Color(0x9a7a52),
+  };
 
   const sky = createSky(scene);
+  const clock = new Clock();
   const lights = new LightPool(scene, 8);
   const world = buildWorld(scene, lights);
   const areas = world.areas;
@@ -68,6 +78,7 @@ function start(saved = {}) {
   const sfx = new Sfx();
   const music = new Music(sfx);
   const fx = new Effects(scene);
+  const weather = new Weather({ scene, sky, sfx, fx, lights });
   const homeStart = areas.get('home').entry('start');
   const player = new Player(scene, collider, homeStart.pos, homeStart.facing);
   const rig = new CameraRig(camera, collider);
@@ -94,6 +105,24 @@ function start(saved = {}) {
       if (s.kind === 'shade') e.immuneHint = 'The blade passes through the shadow. Only sunlight can make it solid!';
     }
   }
+  // 0.11: förstärkningar som en flyende askling kan kalla på
+  for (let i = 0; i < 3; i++) enemies.add(new THREE.Vector3(0, -500, 0), [], { reserve: true, respawn: false, area: null });
+  // Dygnet: varannan askling ute i världen sover på dagen, och några kommer bara fram på natten
+  {
+    const OUT = new Set(['village', 'field', 'stormreach', 'ranch', 'pass', 'desert']);
+    let k = 0;
+    for (const e of enemies.list) {
+      if (e.group !== 'world' || e.kind === 'bat' || e.reserve || !OUT.has(e.area)) continue;
+      if (k++ % 2 === 0) e.sleepy = true;
+    }
+    const night = B.enemySpots.filter((s) => s.kind !== 'bat' && s.path?.length >= 2 && (s.area === 'field' || s.area === 'stormreach' || s.area === 'desert'));
+    night.forEach((s, i) => {
+      if (i % 3) return;
+      const e = enemies.add(s.path[0].clone(), [s.path[1].clone(), s.home.clone()], { kind: 'askling', area: s.area, respawn: true });
+      e.nocturnal = true;
+    });
+  }
+  enemies.hud = hud;
   // Fängelsehålan i området Cello är i (eller null)
   const dungeon = () => world.dungeonAt(areas.id);
   // Krukor i alla områden
@@ -101,7 +130,15 @@ function start(saved = {}) {
   for (const p of B.potSpots) pots.add(p.x, p.y, p.z, p.s, p.area);
   pots.build(collider);
   const combat = new Combat({ scene, player, enemies, rig, fx, sfx, hud, world: collider, camera });
-  const story = new Story({ scene, world, player, enemies, combat, rig, hud, dialog, sfx, fx, groundAt, lights, music });
+  const story = new Story({ scene, world, player, enemies, combat, rig, hud, dialog, sfx, fx, groundAt, lights, music, clock, weather });
+  story.chats = new Chats({ story, sfx, hud });
+  // Blixten i åskväder behöver veta var Cello och fienderna är
+  weather.game = {
+    player, enemies, hud, rig, isSafe: world.isSafe,
+    active: () => hud.started && story.phase === 'free' && !dialog.active && !story.cinematic && !story.fade && !window.__realm?.calm,
+    area: () => areas.id,
+    enemyCtx: () => ({ player, director: enemies, fx, sfx }),
+  };
   const inventory = new Inventory({ story, player, hud, sfx, input, fx, lights, music, world });
   story.inventory = inventory;
   const folk = new Folk({ story, world, inventory, sfx, hud, fx, lights, music, enemies });
@@ -110,6 +147,9 @@ function start(saved = {}) {
   const goat = new Goat({ areas, scene, player, sfx, fx, hud, story, groundAt, M: B.M });
   if (world.ranch.grumble) goat.setTether(world.ranch.grumble.pos, world.ranch.grumble.facing);
   story.goat = goat;
+  // Flöjten och sångerna (0.11)
+  const songs = new Songs({ story, player, hud, sfx, clock, weather, world, areas, fx, lights, music, rig });
+  story.songs = songs;
   player.onKnockedOff = (g) => g.dismount({ thrown: true });
   player.onHoof = (k) => sfx.play('hoof', { vol: 0.45 + k * 0.5 });
   hud.onItems = () => inventory.refresh(true);
@@ -181,18 +221,24 @@ function start(saved = {}) {
   };
 
   // ---------- när Cello kommer till ett nytt område ----------
+  // Ute under himlen: där syns dygnet och vädret (inte i hus, grottor och fängelsehålor)
+  const outdoorArea = (a) => !!a && !a.indoor && !world.dungeonAt(a.id);
   areas.onActivate = (a) => {
     scene.fog.color.set(a.fog.color);
     fogBase.set(a.fog.color);
-    scene.fog.near = a.fog.near;
-    scene.fog.far = a.fog.far;
+    scene.fog.near = base.near = a.fog.near;
+    scene.fog.far = base.far = a.fog.far;
     base.hemi = a.light.hemi;
     base.moon = a.light.moon;
     base.flash = a.light.flash;
-    hemi.color.set(a.light.sky ?? 0x9aa7bd);
-    hemi.groundColor.set(a.light.ground ?? 0x3a3029);
-    moon.color.set(a.light.moonColor ?? 0xc6d0e6);
+    base.sky.set(a.light.sky ?? 0x9aa7bd);
+    base.ground.set(a.light.ground ?? 0x3a3029);
+    base.moonColor.set(a.light.moonColor ?? 0xc6d0e6);
+    hemi.color.copy(base.sky);
+    hemi.groundColor.copy(base.ground);
+    moon.color.copy(base.moonColor);
     sky.setIndoor?.(!!a.indoor);
+    weather.setRegion(a.id, outdoorArea(a));
     goat.enterArea(a.id);
     enemies.enterArea(a.id);
     pots.setArea(a.id);
@@ -298,7 +344,20 @@ function start(saved = {}) {
     fx.burst('spark', point.clone().setY(point.y + 0.2), 22, 0x9fdcff);
     fx.burst('ash', point.clone().setY(point.y + 0.2), 12);
     lights.flash(point.clone().setY(point.y + 1), 0x9fdcff, 30, 9, 0.3);
-    const ctx = { player, fx, sfx };
+    // Laddad av en blixt (0.11): slaget når dubbelt så långt och slår hårdare
+    const charged = weather.charged > 0;
+    if (charged) {
+      weather.charged = 0;
+      player.charged = 0;
+      sfx.play('thunder', { vol: 1 });
+      sfx.play('zap', { vol: 1 });
+      fx.shockwave(point, 0xd8ecff, 7);
+      fx.burst('spark', point.clone().setY(point.y + 0.4), 40, 0xd8ecff);
+      lights.flash(point.clone().setY(point.y + 1.5), 0xd8ecff, 70, 18, 0.5);
+      rig.shake(0.7);
+      hud.toast('Thunder answers the hammer!', 2400);
+    }
+    const ctx = { player, fx, sfx, slamR: charged ? 6.8 : undefined, slamDmg: charged ? 4 : undefined };
     enemies.slam(point, ctx);
     pots.slam(point);
     // Hammaren plattar till gräset runt slaget
@@ -418,6 +477,12 @@ function start(saved = {}) {
       if (wing.trap) return { id: 'march', now: true };
       return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull', pdepths: 'whispers', pbarque: 'skull', pascent: 'march', papex: 'skull' }[here] };
     }
+    // Natten (0.11): byarna somnar och fälten blir kusliga
+    if (clock.isNight && outdoorArea(areas.cur)) {
+      if (here === 'village' && world.inAetheria(P.x, P.z)) return { id: 'hearth' };
+      if (here === 'field' || here === 'stormreach') return { id: 'whispers' };
+      if (here === 'willowmere' || here === 'ranch' || here === 'home' || here === 'village') return { id: 'quiet' };
+    }
     if (here === 'village') {
       if (world.inAetheria(P.x, P.z)) return { id: 'hearth' };
       if (world.inVillage(P.x, P.z)) return { id: s.bastionDone ? 'firstlight' : 'forgotten' };
@@ -494,7 +559,7 @@ function start(saved = {}) {
     }
     if (hud.started && story.state) story.state.playTime = (story.state.playTime || 0) + dt;
 
-    const calm = !dialog.active && !story.cinematic && !story.fade && !respawn;
+    const calm = !dialog.active && !story.cinematic && !story.fade && !respawn && !songs.active;
     if (hud.started && inp.map && !inventory.open && (hud.mapOpen || calm)) toggleMap(!hud.mapOpen);
     let bagNow = false;
     if (hud.started && inp.bag && !hud.mapOpen && (inventory.open || (calm && story.phase !== 'intro'))) {
@@ -524,11 +589,20 @@ function start(saved = {}) {
     if (hud.started) {
       const talking = dialog.active;
       if (talking) dialog.update(dt, inp);
-      const blocked = talking || story.cinematic || !!story.fade || !!respawn;
+      // Flöjten: tangenterna spelar toner i stället för att styra Cello
+      if (songs.active && (dialog.active || story.cinematic || player.state !== 'move' || respawn)) songs.stop();
+      if (songs.active) songs.update(dt, inp);
+      const blocked = talking || story.cinematic || !!story.fade || !!respawn || songs.active;
       const pin = blocked ? input.empty : inventory.actions(inp);
       if (sim > 0) {
         const dg = dungeon();
-        combat.extra = story.combatTargets().concat(dg ? dg.combatTargets() : []).concat(folk.combatTargets());
+        combat.extra = story.combatTargets().concat(dg ? dg.combatTargets() : []).concat(folk.combatTargets()).concat(enemies.extraTargets());
+        // Asklingarna ser och hör sämre på natten, i dimma och i regn (0.11)
+        const outNow = outdoorArea(areas.cur);
+        enemies.env.night = outNow && clock.isNight;
+        enemies.env.fog = outNow ? weather.cur.fog : 0;
+        enemies.env.rain = outNow ? weather.cur.rain : 0;
+        enemies.env.lantern = inventory.lit;
         player.update(sim, pin, rig.yaw);
         goat.update(sim);
         if (!talking && !story.shown) enemies.update(sim, world2);
@@ -589,10 +663,12 @@ function start(saved = {}) {
       story.titan.update(dt, player);
     }
 
+    // Dygnet och vädret: klockan går bara i det fria spelet (inte under prologen, i samtal eller i tester)
+    const freePlay = hud.started && story.phase === 'free' && !window.__realm?.calm;
+    clock.update(sim, freePlay && !dialog.active && !story.cinematic && !story.fade);
+    weather.update(dt, { camera, now: clock.day * 24 + clock.hour, running: freePlay });
     const flash = sky.update(dt, t, camera) * base.flash;
-    hemi.intensity = base.hemi + flash * 1.8;
-    moon.intensity = base.moon + flash * 1.4;
-    scene.fog.color.copy(fogBase).lerp(FLASH, flash * 0.22);
+    applyEnv(flash);
     world.update(t, dt);
     cull(dt);
     lights.update(dt, t, hud.started ? player.feet : camera.position);
@@ -602,10 +678,37 @@ function start(saved = {}) {
     hud.frame(dt, player);
   }
 
+  // Ljuset, dimman och himlen efter tid på dygnet och väder
+  const _c = new THREE.Color();
+  function applyEnv(flash) {
+    const out = outdoorArea(areas.cur) && hud.started;
+    const wx = weather.cur;
+    const day = out ? clock.daylight : 1, dusk = out ? clock.dusk : 0;
+    const over = out ? wx.over : 0, fog = out ? wx.fog : 0, haze = out ? wx.haze || 0 : 0;
+    const n = 1 - day, dim = 1 - over * 0.28;
+    hemi.intensity = (base.hemi * (0.46 + 0.54 * day) * dim) + flash * 1.8;
+    moon.intensity = (base.moon * (0.5 + 0.5 * day) * (1 - over * 0.4)) + flash * 1.4;
+    hemi.color.copy(base.sky).lerp(ENV.nightSky, n * 0.7).lerp(ENV.duskSky, dusk * 0.45);
+    moon.color.copy(base.moonColor).lerp(ENV.nightMoon, n * 0.8).lerp(ENV.duskMoon, dusk * 0.6);
+    _c.copy(fogBase).lerp(ENV.nightFog, n * 0.78).lerp(ENV.duskFog, dusk * 0.35);
+    if (fog > 0) _c.lerp(haze > 0.5 ? ENV.haze : ENV.fogGrey, fog * (0.25 + 0.3 * day));
+    scene.fog.color.copy(_c).lerp(FLASH, flash * 0.22);
+    scene.fog.near = base.near * (1 - 0.8 * fog);
+    scene.fog.far = base.far * (1 - 0.68 * fog) * (1 - n * 0.25);
+    sky.setEnv(day, dusk, Math.max(over, fog * 0.6));
+    // Klockan och vädret uppe till vänster
+    clockT -= 1;
+    if (clockT <= 0) {
+      clockT = 15;
+      hud.setClock?.(hud.started && story.phase === 'free' ? { label: clock.label, text: clock.text, night: clock.isNight, weather: weather.local, day: clock.day } : null);
+    }
+  }
+  let clockT = 0;
+
   // Handtag för felsökning i webbläsarens konsol
   window.__realm = {
     player, rig, world, areas, input, hud, scene, camera, enemies, combat, fx, sfx, story, dialog, bastion, pyramid, lights, collider, renderer,
-    culled, cullS, music, pots, inventory, folk, goat, title, THREE,
+    culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs,
     tick: (dt, inp) => update(dt, { ...input.empty, ...inp }),
   };
   requestAnimationFrame(frame);

@@ -10,6 +10,8 @@ const SIGHT = 11, SIGHT_COS = Math.cos((72 * Math.PI) / 180), HEAR = 4;
 const CHASE_SPEED = 3.4, PATROL_SPEED = 1.5, CIRCLE_SPEED = 1.8;
 const ATTACK_RANGE = 2.3, HIT_RANGE = 2.6;
 const RESPAWN_TIME = 25;
+// 0.11: smartare asklingar
+const FETCH_SPEED = 3.9, FLEE_SPEED = 4.0, ROCK_CD = 2.3, ROCK_GRAV = 14;
 
 const _ray = new THREE.Ray(), _down = new THREE.Vector3(0, -1, 0), _v = new THREE.Vector3();
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -181,6 +183,48 @@ const place = (mesh, x, y, z) => {
   return mesh;
 };
 
+// 0.11: klubban som flyger ur handen och ligger på marken
+const CLUB_MATS = {
+  dark: new THREE.MeshLambertMaterial({ color: 0x23201e, flatShading: true }),
+  stone: new THREE.MeshLambertMaterial({ color: 0x5b5650, flatShading: true }),
+};
+function buildDroppedClub() {
+  const g = new THREE.Group();
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.9, 6), CLUB_MATS.dark);
+  handle.position.y = 0.45;
+  const knob = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), CLUB_MATS.stone);
+  knob.position.y = 0.95;
+  knob.scale.set(1, 1.3, 1);
+  g.add(handle, knob);
+  return g;
+}
+const ROCK_GEO = new THREE.DodecahedronGeometry(0.17, 0);
+const ROCK_MAT = new THREE.MeshLambertMaterial({ color: 0x6a645a, flatShading: true });
+
+// Z-tecken som stiger upp från en sovande askling
+let ZZZ_TEX = null;
+function zzzSprite() {
+  if (!ZZZ_TEX) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 32;
+    const g = c.getContext('2d');
+    g.font = 'bold 26px sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.lineWidth = 5;
+    g.strokeStyle = '#120a06';
+    g.strokeText('Z', 16, 17);
+    g.fillStyle = '#ffd27a';
+    g.fillText('Z', 16, 17);
+    ZZZ_TEX = new THREE.CanvasTexture(c);
+    ZZZ_TEX.colorSpace = THREE.SRGBColorSpace;
+  }
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: ZZZ_TEX, transparent: true, depthWrite: false, fog: false }));
+  sp.scale.set(0.4, 0.4, 1);
+  sp.visible = false;
+  return sp;
+}
+
 class Askling {
   constructor(scene, octree, home, waypoints, index, opts = {}) {
     this.octree = octree;
@@ -206,6 +250,15 @@ class Askling {
     if (this.kind === 'shade') this.makeShade();
     this.lightT = 0;
     this.blindT = 0;
+    // 0.11: dygnet, avväpning och flykt
+    this.sleepy = false; // sover på dagen
+    this.nocturnal = false; // finns bara på natten
+    this.reserve = !!opts.reserve; // förstärkning som väntar tills någon kallar
+    this.hasClub = true;
+    this.drop = null;
+    this.zzz = zzzSprite();
+    scene.add(this.zzz);
+    this.scene = scene;
     mergeRigid(this.model.root);
     this.reset();
   }
@@ -296,7 +349,58 @@ class Askling {
     this.model.body.position.y = 0;
     this.snapToGround(true);
     this.model.root.position.copy(this.pos);
+    // 0.11: klubban tillbaka i handen, rädslan glömd
+    this.hasClub = true;
+    this.model.club.visible = true;
+    this.clearDrop();
+    this.fleeTried = false;
+    this.rockCd = 0;
+    this.fetchT = 0;
+    this.holdRock = false;
+    if (this.zzz) this.zzz.visible = false;
     if (this.dormant) this.sleep();
+    if (this.reserve && !this.called) {
+      this.state = 'dead';
+      this.deadT = -1e9;
+      this.permaDead = true;
+      this.model.root.visible = false;
+    }
+  }
+
+  clearDrop() {
+    if (this.drop) {
+      this.drop.mesh.removeFromParent();
+      this.drop = null;
+    }
+  }
+
+  // Dag eller natt: sover, gräver ner sig eller vaknar (anropas av Enemies)
+  applyTime(env, instant = false) {
+    if (this.group !== 'world' || this.state === 'dead' || this.state === 'dormant') return;
+    const night = !!env?.night;
+    if (this.nocturnal) {
+      if (!night && this.state === 'spawn') { this.bury(); return; }
+      if (night && this.state === 'buried') {
+        this.model.root.visible = true;
+        this.setState('spawn');
+      } else if (!night && (this.state === 'patrol' || this.state === 'return' || (instant && this.state !== 'buried'))) {
+        if (instant) this.bury();
+        else this.setState('burrow');
+      }
+    }
+    if (this.sleepy) {
+      if (night && this.state === 'sleep') this.setState('patrol');
+      else if (!night && instant && this.state === 'patrol') this.setState('sleep');
+      else if (!night && this.state === 'patrol') this.setState('return');
+    }
+  }
+
+  bury() {
+    this.state = 'buried';
+    this.st = 0;
+    this.model.root.visible = false;
+    this.exclT = 0;
+    if (this.zzz) this.zzz.visible = false;
   }
 
   // Sover osynlig tills ett fällrum väcker den
@@ -314,7 +418,7 @@ class Askling {
   }
 
   get targetable() {
-    return this.state !== 'dead' && this.state !== 'spawn' && this.state !== 'dormant';
+    return this.state !== 'dead' && this.state !== 'spawn' && this.state !== 'dormant' && this.state !== 'buried' && this.state !== 'burrow';
   }
 
   get alive() {
@@ -392,12 +496,17 @@ class Askling {
     this.facing += wrap(target - this.facing) * (1 - Math.exp(-rate * dt));
   }
 
-  canSee(player) {
+  canSee(player, env = null) {
     const dx = player.feet.x - this.pos.x, dz = player.feet.z - this.pos.z;
     const dist = Math.hypot(dx, dz);
     if (Math.abs(player.feet.y - this.pos.y) > 6) return false;
-    if (dist < HEAR) return true;
-    if (dist > SIGHT) return false;
+    // 0.11: på natten ser de kortare, men en tänd lykta syns långt; dimma döljer, regn dränker stegen
+    let sight = SIGHT, hear = HEAR;
+    if (env?.night) sight *= env.lantern ? 1.3 : 0.7;
+    if (env?.fog) sight *= 1 - 0.45 * env.fog;
+    if (env?.rain) hear *= 0.75;
+    if (dist < hear) return true;
+    if (dist > sight) return false;
     const cos = (dx * Math.sin(this.facing) + dz * Math.cos(this.facing)) / dist;
     if (cos < SIGHT_COS) return false;
     _ray.origin.set(this.pos.x, this.pos.y + 1.5, this.pos.z);
@@ -422,6 +531,13 @@ class Askling {
         return 'blocked';
       }
     }
+    // Smyganfall (0.11): en sovande askling tar dubbel skada
+    const wasAsleep = this.state === 'sleep';
+    if (wasAsleep) {
+      dmg *= 2;
+      w.director.onSneak?.(this);
+    }
+    const inWindup = this.state === 'windup';
     this.hp -= dmg;
     this.flash = 0.14;
     _v.set(this.pos.x - from.x, 0, this.pos.z - from.z);
@@ -435,18 +551,70 @@ class Askling {
       w.fx.drop?.(this.pos.clone(), this.kind === 'shield' ? 'shield' : 'askling', w.player);
       this.exclT = 0;
       if (!this.respawn) this.permaDead = true;
+      w.director.onDeath?.(this, w);
       return 'killed';
     }
     w.sfx.play('ehurt');
-    this.setState('hurt');
+    // Avväpning (0.11): ett hugg mitt i uppsvingen, eller ett hårt slag, slår klubban ur handen
+    if (this.hasClub && !this.reserveNoDisarm && (inWindup || (dmg >= 2 && Math.random() < 0.5)) && this.kind !== 'shade') {
+      this.disarm(from, w);
+      return 'hit';
+    }
+    if (this.state === 'flee' || this.state === 'howl') {
+      this.flash = 0.14;
+      return 'hit';
+    }
+    this.setState(wasAsleep ? 'stagger' : 'hurt');
+    if (wasAsleep) this.exclT = 0.9;
     return 'hit';
+  }
+
+  // Klubban flyger ur handen och landar en bit bort
+  disarm(from, w) {
+    this.hasClub = false;
+    this.model.club.visible = false;
+    this.clearDrop();
+    const mesh = buildDroppedClub();
+    (this.model.root.parent ?? this.scene).add(mesh);
+    const away = Math.atan2(this.pos.x - from.x, this.pos.z - from.z) + (Math.random() - 0.5) * 1.4;
+    const sp = 4.5 + Math.random() * 1.5;
+    this.drop = {
+      mesh, pos: new THREE.Vector3(this.pos.x, this.pos.y + 1.3, this.pos.z),
+      vel: new THREE.Vector3(Math.sin(away) * sp, 5.2, Math.cos(away) * sp), spin: 9 + Math.random() * 6, landed: false, t: 0, owner: this,
+    };
+    w.sfx.play('clang');
+    w.fx.burst('spark', this.chest, 10, 0xffe2a0);
+    w.director.onDisarm?.(this);
+    this.setState('disarmed');
+  }
+
+  // Klubban på marken: flyger, landar, och kan krossas av Cellos svärd
+  updateDrop(dt) {
+    const d = this.drop;
+    if (!d) return;
+    d.t += dt;
+    if (!d.landed) {
+      d.vel.y -= 16 * dt;
+      d.pos.addScaledVector(d.vel, dt);
+      d.mesh.rotation.x += d.spin * dt;
+      const gy = this.groundAt(d.pos.x, d.pos.y + 0.5, d.pos.z);
+      if (gy !== null && d.pos.y <= gy + 0.12 && d.vel.y < 0) {
+        d.pos.y = gy + 0.1;
+        d.landed = true;
+        d.mesh.rotation.set(Math.PI / 2, Math.random() * 6, 0);
+      } else if (d.pos.y < this.pos.y - 12) {
+        this.clearDrop(); // föll över kanten
+        return;
+      }
+    }
+    d.mesh.position.copy(d.pos);
   }
 
   // Hammarslaget: krossar skölden, eller slår hårt
   slamHit(point, w) {
     if (!this.targetable) return;
     const d = Math.hypot(point.x - this.pos.x, point.z - this.pos.z);
-    if (d > 3.3 || Math.abs(point.y - this.pos.y) > 2) return;
+    if (d > (w.slamR ?? 3.3) || Math.abs(point.y - this.pos.y) > 2) return;
     if (this.kind === 'shade' && this.lightT <= 0) {
       this.stagger(w);
       return;
@@ -461,7 +629,7 @@ class Askling {
       this.st = -0.6;
       return;
     }
-    const res = this.hurt(3, point, { ...w, unblockable: true });
+    const res = this.hurt(w.slamDmg ?? 3, point, { ...w, unblockable: true });
     if (res === 'hit') this.push.multiplyScalar(1.6);
   }
 
@@ -474,7 +642,9 @@ class Askling {
   // --- AI ---
   update(dt, w) {
     const { player, director } = w;
+    const env = director.env;
     this.st += dt;
+    this.updateDrop(dt);
     this.lightT = Math.max(0, this.lightT - dt);
     this.blindT = Math.max(0, this.blindT - dt);
     this.flash = Math.max(0, this.flash - dt);
@@ -489,11 +659,14 @@ class Askling {
       this.seeT -= dt;
       if (this.seeT <= 0) {
         this.seeT = 0.2;
-        this.seen = playerOk && this.canSee(player);
+        this.seen = playerOk && this.canSee(player, env);
       }
       return this.seen;
     };
+    // Regn gör askan tung: de rör sig långsammare
+    const slow = env?.rain ? 1 - 0.18 * Math.min(1, env.rain) : 1;
     const toward = (x, z, speed) => {
+      speed *= slow;
       const ddx = x - this.pos.x, ddz = z - this.pos.z, d = Math.hypot(ddx, ddz) || 1;
       tvx = (ddx / d) * speed;
       tvz = (ddz / d) * speed;
@@ -520,12 +693,112 @@ class Askling {
       case 'return': {
         toward(this.home.x, this.home.z, 2.2);
         if (Math.hypot(this.home.x - this.pos.x, this.home.z - this.pos.z) < 0.8) {
-          this.setState('patrol');
-          this.wait = 1;
+          if (this.sleepy && !env?.night) this.setState('sleep');
+          else if (this.nocturnal && !env?.night) this.setState('burrow');
+          else {
+            this.setState('patrol');
+            this.wait = 1;
+          }
         }
-        if (look()) this.alert(w);
+        if (this.state === 'return' && look()) this.alert(w);
         break;
       }
+      // ---------- 0.11: sömn, natt, avväpning och flykt ----------
+      case 'sleep': {
+        // Vaknar om Cello kommer för nära (springer han hörs han längre)
+        const sp = Math.hypot(player.vel.x, player.vel.z);
+        const wake = sp > 4 ? 3.4 : sp > 1.5 ? 2.4 : 1.4;
+        if (playerOk && dist < wake && Math.abs(player.feet.y - this.pos.y) < 2) {
+          this.alert(w);
+          this.st = -0.5; // yrvaken en stund
+        }
+        break;
+      }
+      case 'buried':
+        return;
+      case 'burrow':
+        if (this.st > 1.0) this.bury();
+        break;
+      case 'disarmed':
+        if (this.st > 0.7) this.chooseWeapon(w, dist);
+        break;
+      case 'fetch': {
+        const d = this.drop;
+        this.fetchT += dt;
+        if (!d) { this.setState('rocks'); break; }
+        const pd = Math.hypot(player.feet.x - d.pos.x, player.feet.z - d.pos.z);
+        if ((d.landed && pd < 2.4) || this.fetchT > 7) { this.setState('rocks'); break; }
+        if (!d.landed) { this.faceTowards(d.pos.x, d.pos.z, 8, dt); break; }
+        if (Math.hypot(d.pos.x - this.pos.x, d.pos.z - this.pos.z) < 0.9) { this.setState('pickup'); break; }
+        toward(d.pos.x, d.pos.z, FETCH_SPEED);
+        accel = 7;
+        break;
+      }
+      case 'pickup':
+        if (!this.drop) { this.setState('rocks'); break; }
+        if (Math.hypot(player.feet.x - this.drop.pos.x, player.feet.z - this.drop.pos.z) < 1.6) { this.setState('rocks'); break; }
+        if (this.st > 0.55) {
+          this.clearDrop();
+          this.hasClub = true;
+          this.model.club.visible = true;
+          w.sfx.play('growl', { vol: 0.7 });
+          this.cooldown = 0.8;
+          this.setState('chase');
+        }
+        break;
+      case 'rocks': {
+        // Håller avstånd och kastar sten; går tillbaka efter klubban om Cello lämnar den
+        this.faceTowards(player.feet.x, player.feet.z, 8, dt);
+        const ux = dx / (dist || 1), uz = dz / (dist || 1);
+        const radial = dist < 5.5 ? -FLEE_SPEED * 0.75 : dist > 10 ? CHASE_SPEED * 0.8 : 0;
+        tvx = ux * radial * slow - uz * this.strafe * 1.2;
+        tvz = uz * radial * slow + ux * this.strafe * 1.2;
+        if (Math.random() < dt * 0.3) this.strafe *= -1;
+        this.rockCd -= dt;
+        this.lostT = dist > 22 || !playerOk ? this.lostT + dt : 0;
+        if (this.lostT > 3) { this.setState('return'); break; }
+        if (this.rockCd <= 0 && dist < 16 && playerOk) { this.setState('throw'); this.holdRock = true; break; }
+        if (this.st > 3 && this.drop?.landed) {
+          const pd = Math.hypot(player.feet.x - this.drop.pos.x, player.feet.z - this.drop.pos.z);
+          const ed = Math.hypot(this.drop.pos.x - this.pos.x, this.drop.pos.z - this.pos.z);
+          if (pd > 5 && ed < 14) { this.fetchT = 0; this.setState('fetch'); }
+          else this.st = 0;
+        }
+        break;
+      }
+      case 'throw':
+        this.faceTowards(player.feet.x, player.feet.z, 12, dt);
+        if (this.st > 0.55) {
+          this.holdRock = false;
+          director.throwRock(this, player);
+          w.sfx.play('swing', { vol: 0.6 });
+          this.rockCd = ROCK_CD + Math.random() * 0.8;
+          this.setState('rocks');
+        }
+        break;
+      case 'flee': {
+        // Springer bort från Cello för att hämta förstärkning
+        const ax = -dx / (dist || 1), az = -dz / (dist || 1);
+        const tx = this.pos.x + ax * 4 + Math.cos(this.st * 1.3) * 1.2, tz = this.pos.z + az * 4 + Math.sin(this.st * 1.3) * 1.2;
+        toward(tx, tz, FLEE_SPEED);
+        accel = 9;
+        if (dist > 17 || this.st > 4.5) this.setState('howl');
+        break;
+      }
+      case 'howl':
+        this.faceTowards(player.feet.x, player.feet.z, 6, dt);
+        if (this.st > 0.05 && !this.howled) {
+          this.howled = true;
+          w.sfx.play('roar', { vol: 0.55 });
+          w.sfx.play('growl', { vol: 1 });
+        }
+        if (this.st > 1.3) {
+          this.howled = false;
+          director.reinforce(this, w);
+          this.cooldown = 0.5;
+          this.setState('chase');
+        }
+        break;
       case 'chase':
       case 'circle': {
         const farHome = Math.hypot(this.pos.x - this.home.x, this.pos.z - this.home.z) > 26;
@@ -535,6 +808,7 @@ class Askling {
           this.setState('return');
           break;
         }
+        if (!this.hasClub) { this.setState('rocks'); break; }
         const mayAttack = this.cooldown <= 0 && director.canAttack(this);
         if (this.state === 'chase') {
           if (mayAttack && dist < ATTACK_RANGE) {
@@ -619,13 +893,16 @@ class Askling {
         }
         break;
       case 'spawn':
-        if (this.st > 0.9) this.setState('patrol');
+        // Förstärkningar går direkt till anfall
+        if (this.st > 0.9) {
+          if (this.called) { this.exclT = 0.9; this.setState('chase'); } else this.setState('patrol');
+        }
         break;
       default:
         break;
     }
 
-    if (this.state !== 'dead' && this.state !== 'spawn') {
+    if (this.state !== 'dead' && this.state !== 'spawn' && this.state !== 'sleep' && this.state !== 'burrow') {
       const ratio = this.move(dt, tvx, tvz, accel);
       // Fastnat bakom en pelare: ta ett steg åt sidan en stund
       if (Math.hypot(tvx, tvz) > 1 && ratio < 0.3) {
@@ -645,6 +922,24 @@ class Askling {
     this.setState('alert');
     this.exclT = 0.9;
     w.sfx.play('alert');
+  }
+
+  // Utan klubba: hämta den om det går, annars sten
+  chooseWeapon(w, dist) {
+    const d = this.drop, P = w.player;
+    if (d) {
+      const pd = Math.hypot(P.feet.x - d.pos.x, P.feet.z - d.pos.z);
+      const ed = Math.hypot(d.pos.x - this.pos.x, d.pos.z - this.pos.z);
+      if (pd > 2.4 && ed < 14) { this.fetchT = 0; this.setState('fetch'); return; }
+    }
+    this.rockCd = 0.6;
+    this.setState('rocks');
+  }
+
+  flee() {
+    this.fleeTried = true;
+    this.setState('flee');
+    this.exclT = 0;
   }
 
   animate(dt) {
@@ -677,6 +972,25 @@ class Askling {
       armR = -0.9;
       armL = -0.9;
       headX = -0.25;
+    } else if (this.state === 'throw') {
+      const k = Math.min(1, st / 0.5);
+      armR = -2.6 * k;
+      torsoX = 0.35 - 0.4 * k;
+      torsoY = 0.45 * k;
+    } else if (this.state === 'pickup' || this.state === 'disarmed') {
+      torsoX = this.state === 'pickup' ? 1.1 : -0.3;
+      armR = this.state === 'pickup' ? -0.2 : 0.5;
+      armL = this.state === 'pickup' ? -0.2 : 0.5;
+      headX = this.state === 'pickup' ? 0.3 : -0.3;
+    } else if (this.state === 'howl') {
+      torsoX = -0.45;
+      headX = -0.6;
+      armR = -2.4;
+      armL = -2.4;
+    } else if (this.state === 'flee') {
+      torsoX = 0.6;
+      armR = 0.7;
+      armL = 0.7;
     }
     const r = this.state === 'windup' || this.state === 'strike' ? 30 : 12;
     m.legL.rotation.x = -sw - 0.15;
@@ -689,7 +1003,7 @@ class Askling {
     const elbowL = this.hasShield ? -1.2 : -0.35 - walk * 0.3;
     m.elbowR.rotation.x = approach(m.elbowR.rotation.x, elbowR, r, dt);
     m.elbowL.rotation.x = approach(m.elbowL.rotation.x, elbowL, 12, dt);
-    const jaw = this.state === 'alert' || this.state === 'windup' ? 0.45 : this.state === 'hurt' || this.state === 'stagger' ? 0.3 : 0.05 + Math.sin(a.phase * 0.7) * 0.03;
+    const jaw = this.state === 'alert' || this.state === 'windup' || this.state === 'howl' ? 0.5 : this.state === 'hurt' || this.state === 'stagger' || this.state === 'flee' ? 0.3 : 0.05 + Math.sin(a.phase * 0.7) * 0.03;
     m.jaw.rotation.x = approach(m.jaw.rotation.x, jaw, 14, dt);
     m.armR.rotation.x = approach(m.armR.rotation.x, armR, r, dt);
     m.armR.rotation.z = approach(m.armR.rotation.z, armRz, r, dt);
@@ -702,12 +1016,36 @@ class Askling {
     if (this.state === 'dead') {
       m.body.rotation.x = approach(m.body.rotation.x, -1.45, 6, dt);
       m.body.position.y = -Math.max(0, st - 0.7) * 0.9;
+      m.body.rotation.z = 0;
     } else if (this.state === 'spawn') {
       m.body.position.y = -1.8 * (1 - Math.min(1, st / 0.8));
+      m.body.rotation.x = 0;
+      m.body.rotation.z = 0;
+    } else if (this.state === 'burrow') {
+      m.body.position.y = -1.8 * Math.min(1, st / 0.9);
+      m.body.rotation.z = 0;
+    } else if (this.state === 'sleep') {
+      // Hopkrupen på sidan i askan, och andas långsamt
+      m.body.rotation.z = approach(m.body.rotation.z, 1.35, 5, dt);
+      m.body.position.y = approach(m.body.position.y, 0.3, 5, dt);
+      m.torso.scale.setScalar(1 + Math.sin(this.st * 2.2) * 0.03);
       m.body.rotation.x = 0;
     } else {
       m.body.position.y = 0;
       m.body.rotation.x = 0;
+      m.body.rotation.z = approach(m.body.rotation.z, 0, 8, dt);
+      m.torso.scale.setScalar(1);
+    }
+    // Zzz över de som sover
+    if (this.zzz) {
+      const z = this.zzz;
+      z.visible = this.state === 'sleep' && m.root.visible;
+      if (z.visible) {
+        const k = (this.st * 0.6) % 1;
+        z.position.set(this.pos.x + 0.3 + k * 0.4, this.pos.y + 1.0 + k * 1.1, this.pos.z);
+        z.material.opacity = Math.sin(k * Math.PI);
+        z.scale.setScalar(0.25 + k * 0.25);
+      }
     }
 
     const flashing = this.flash > 0;
@@ -938,6 +1276,136 @@ export class Enemies {
     this.active = true;
     this.cleared = new Set();
     this.area = null;
+    // 0.11: dygnet och vädret (sätts av main.js varje bildruta), stenar i luften
+    this.env = { night: false, fog: 0, rain: 0, lantern: false };
+    this.rocks = [];
+    this.timeT = 0;
+    this.hints = new Set();
+    this.hud = null;
+  }
+
+  // Ett kort tips första gången något nytt händer
+  hint(key, text) {
+    if (this.hints.has(key) || !this.hud) return;
+    this.hints.add(key);
+    this.hud.toast(text, 4200);
+  }
+  onSneak() { this.hint('sneak', 'A sneak attack! A sleeping Ashling takes double damage.'); }
+  onDisarm() { this.hint('disarm', "The club flew out of the Ashling's hand! Stand by it, or smash it, and the Ashling has only stones left."); }
+
+  // En askling dog: den sista i flocken kan fly för att hämta förstärkning
+  onDeath(dead, w) {
+    if (dead.group !== 'world') return;
+    const pack = this.list.filter((o) => o !== dead && o.alive && o.targetable && !o.flying && o.area === dead.area && o.group === 'world'
+      && Math.hypot(o.pos.x - dead.pos.x, o.pos.z - dead.pos.z) < 16);
+    for (const o of pack) o.fear = (o.fear ?? 0) + 1;
+    if (pack.length !== 1) return;
+    const last = pack[0];
+    const engaged = ['chase', 'circle', 'recover', 'hurt', 'stagger', 'alert', 'rocks', 'windup'].includes(last.state);
+    if (!engaged || last.fleeTried || last.reserve || last.kind === 'shade') return;
+    if ((last.fear ?? 0) >= 2 || last.hp <= 2) {
+      this.release(last);
+      last.flee();
+      this.hint('flee', 'The last Ashling is running away... to call for help!');
+    }
+  }
+
+  // Förstärkning: två asklingar reser sig ur askan bredvid den som ylade
+  reinforce(caller, w) {
+    const free = this.list.filter((e) => e.reserve && !e.called).slice(0, 2);
+    free.forEach((e, i) => {
+      const a = caller.facing + (i ? 1.4 : -1.4);
+      let x = caller.pos.x + Math.sin(a) * 2.6, z = caller.pos.z + Math.cos(a) * 2.6;
+      let gy = caller.groundAt(x, caller.pos.y + 1, z);
+      if (gy === null || Math.abs(gy - caller.pos.y) > 1.2) { x = caller.pos.x; z = caller.pos.z; gy = caller.pos.y; }
+      e.called = true;
+      e.area = caller.area;
+      e.home.set(x, gy, z);
+      e.waypoints = [e.home.clone()];
+      e.permaDead = false;
+      e.reset();
+      e.model.root.visible = true;
+      e.setState('spawn');
+      e.st = -0.2 * i;
+      e.fleeTried = true;
+      w.fx.burst('ash', e.chest, 22);
+    });
+    caller.fear = 0;
+    if (free.length) w.sfx.play('stomp', { vol: 0.5 });
+  }
+
+  // En sten kastas i en båge mot Cello
+  throwRock(e, player) {
+    const from = new THREE.Vector3(e.pos.x + Math.sin(e.facing) * 0.4, e.pos.y + 1.7, e.pos.z + Math.cos(e.facing) * 0.4);
+    const to = new THREE.Vector3(player.feet.x + player.vel.x * 0.35, player.feet.y + 1.0, player.feet.z + player.vel.z * 0.35);
+    const T = Math.max(0.45, Math.min(1.1, from.distanceTo(to) / 13));
+    const vel = new THREE.Vector3((to.x - from.x) / T, (to.y - from.y) / T + 0.5 * ROCK_GRAV * T, (to.z - from.z) / T);
+    const mesh = new THREE.Mesh(ROCK_GEO, ROCK_MAT);
+    mesh.position.copy(from);
+    (e.model.root.parent ?? this.scene).add(mesh);
+    this.rocks.push({ mesh, pos: from, vel, t: 0, owner: e });
+  }
+
+  updateRocks(dt, w) {
+    const P = w.player;
+    for (const r of this.rocks) {
+      r.t += dt;
+      r.vel.y -= ROCK_GRAV * dt;
+      r.pos.addScaledVector(r.vel, dt);
+      r.mesh.position.copy(r.pos);
+      r.mesh.rotation.x += dt * 9;
+      r.mesh.rotation.z += dt * 6;
+      const dx = P.feet.x - r.pos.x, dz = P.feet.z - r.pos.z, dy = P.feet.y + 1.0 - r.pos.y;
+      if (!r.done && Math.hypot(dx, dz) < 0.65 && Math.abs(dy) < 1.0) {
+        r.done = true;
+        const res = P.takeHit(1, r.pos.clone());
+        if (res === 'blocked') w.fx.burst('debris', r.pos.clone(), 8, 0x6a645a);
+        else if (res === 'hit') w.onPlayerHit?.(r.owner);
+        w.sfx.play(res === 'blocked' ? 'clang' : 'hit', { vol: 0.6 });
+      }
+      const gy = r.owner.groundAt(r.pos.x, r.pos.y + 0.3, r.pos.z);
+      if (!r.done && gy !== null && r.pos.y < gy + 0.1) {
+        r.done = true;
+        w.fx.burst('debris', r.pos.clone().setY(gy + 0.1), 6, 0x6a645a);
+      }
+      if (r.t > 3) r.done = true;
+      if (r.done) r.mesh.removeFromParent();
+    }
+    this.rocks = this.rocks.filter((r) => !r.done);
+  }
+
+  // Klubbor som ligger på marken: Cellos svärd kan krossa dem
+  extraTargets() {
+    const out = [];
+    for (const e of this.list) {
+      const d = e.drop;
+      if (!d || !d.landed || (this.area && e.area && e.area !== this.area)) continue;
+      if (!d.target) {
+        d.target = {
+          pos: d.pos, hitRadius: 0.55, noLock: true, noWear: true, hitHeight: [-1.2, 1.2],
+          get targetable() { return !!e.drop && e.drop === d; },
+          get chest() { return d.pos; },
+          hurt: (dmg, from, w) => {
+            if (e.drop !== d) return false;
+            w.fx.burst('debris', d.pos.clone().setY(d.pos.y + 0.3), 14, 0x5b5650);
+            w.sfx.play('crumble', { vol: 0.7 });
+            e.clearDrop();
+            this.hint('smash', 'The club shatters! That Ashling will have to make do with stones.');
+            return 'killed';
+          },
+        };
+      }
+      out.push(d.target);
+    }
+    return out;
+  }
+
+  // Dygnet: sovande och nattliga asklingar i området
+  applyTime(instant = false) {
+    for (const e of this.list) {
+      if (e.group !== 'world' || !e.applyTime || (this.area && e.area !== this.area)) continue;
+      e.applyTime(this.env, instant);
+    }
   }
 
   // opts: { kind: 'askling' | 'shield' | 'bat', room, dormant, respawn, bounds, group: 'world' | 'bastion' }
@@ -958,12 +1426,24 @@ export class Enemies {
   enterArea(id) {
     this.area = id;
     this.attacker = null;
+    // Förstärkningar och stenar hör till det område de kallades i
+    for (const r of this.rocks) r.mesh.removeFromParent();
+    this.rocks = [];
     for (const e of this.list) {
+      if (!e.reserve) continue;
+      e.called = false;
+      e.area = null;
+      e.home.set(0, -500, 0);
+      e.reset();
+    }
+    for (const e of this.list) {
+      if (e.reserve) continue;
       if (e.area !== id || e.group !== 'world' || !this.active) continue;
       if (e.permaDead && !e.respawn) continue;
       e.permaDead = false;
       e.reset();
     }
+    this.applyTime(true);
   }
 
   // Under prologen finns inga asklingar i byn; efteråt reser de sig ur askan
@@ -971,7 +1451,7 @@ export class Enemies {
     this.active = on;
     this.attacker = null;
     for (const e of this.list) {
-      if (e.group !== 'world') continue;
+      if (e.group !== 'world' || e.reserve) continue;
       e.reset();
       if (on) {
         e.setState('spawn');
@@ -1038,6 +1518,12 @@ export class Enemies {
     const ctx = { ...w, director: this };
     const p = w.player;
     const near = [];
+    this.updateRocks(dt, ctx);
+    this.timeT -= dt;
+    if (this.timeT <= 0) {
+      this.timeT = 0.5;
+      this.applyTime(false);
+    }
     for (const e of this.list) {
       if (e.group === 'world' && !this.active) continue;
       if (this.area && e.area && e.area !== this.area) continue;

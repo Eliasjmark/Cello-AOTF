@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.10 · The Deepening Pyramid (pyramiden fem gånger så stor; fas 8 och 9 står näst på tur i utvecklingsplanen)
+**Version:** prototyp 0.11 · A Living World (fas 8 i utvecklingsplanen: dygn, väder, dialogträd, flöjten och smartare fiender)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -23,7 +23,22 @@ npm install          # en gång, hämtar esbuild
 npm run build:artifact   # → build/play.html
 ```
 
-## Vad är nytt i 0.10: pyramiden blev djupare
+## Vad är nytt i 0.11: en levande värld
+
+Fas 8 i planen. Världen reagerar nu på Cello, och den lever även när han står still.
+
+| Del | Vad som händer |
+| --- | --- |
+| **Dag och natt** | Ett dygn tar 20 minuter. Ljuset, dimman och himlen följer klockan: solnedgång i skymningen, stjärnor och en blek måne i glipor mellan molnen på natten. Klockan och vädret syns uppe till vänster. Vid en eld kan Cello vila en stund, vänta in natten eller sova till morgonen. På natten blir musiken i byarna lugnare och fälten kusligare |
+| **Väder** | Lugnt, regn, åska och dimma, och sanddis i öknen. Vädret byter med några timmars mellanrum och glider över mjukt. Regn syns och hörs, dimma döljer långt bort. **I åskväder söker blixten metall:** en ring på marken varnar, och den som står kvar tar två hjärtans skada. Sköldbärande asklingar förlorar skölden. Håller Cello Mjölnirs skärva med tung vikt **dricker hammaren blixten**, och nästa markslag blir dubbelt så stort |
+| **Dialogträd med humör** | Folk har frågor som går att ställa i valfri ordning. En fråga som redan är ställd blir grå (det sparas). Ett av svaren är dumt: då blir personen arg (barn blir ledsna), samtalet tar slut, och efter det fnyser hen bara och vänder ryggen till, med en ikon över huvudet, tills en ny dag har börjat. Huvuduppdragen påverkas aldrig: det som måste sägas sägs ändå, med en sur kommentar först |
+| **Folk går hem** | Vid halv nio på kvällen går Hollis och Tilly in i bondgården, och Mira, Tob och Fenwick in i sina hus i Willowmere. Det går att knacka på. Odo somnar på bänken på bron, Ilo vid elden i Aetheria. På morgonen kommer alla ut igen |
+| **Flöjten** | Odo på Long Bridge ger Cello **Pilgrim's Flute** och lär honom den första sången. Spelaren spelar själv med ↑ ← → ↓ och mellanslag. Fyra sånger går att lära sig: **Waking Chant** (Odo) öppnar stenarna med en sjungande fågel, **Grumble's Call** (Tilly) kallar på Grumble, **Sunturn Hymn** (Nefret) gör natt till dag och dag till natt, **Lament of Rain** (Ysolde) kallar på åskan eller skickar bort den. Tre sångstenar finns: på bron, vid den fallna gudastatyn och i pelarsalen i öknen |
+| **Smartare asklingar** | Ett hugg mitt i en uppsving slår klubban ur handen. Asklingen springer efter den, men står Cello vid klubban (eller krossar den) kastar den sten i stället. Den sista i en flock flyr när kamraterna faller och ylar på förstärkning. Varannan askling sover på dagen (ett smyganfall gör dubbel skada), och några kommer bara upp ur askan på natten. I mörker ser de kortare, men en tänd lykta syns långt. Regn gör dem långsamma, dimma gör dem närsynta |
+
+Nytt i koden: `src/clock.js` (dygnet), `src/weather.js` (vädret, regnet och blixtnedslagen), `src/talk.js` (dialogträd med humör) och `src/songs.js` (flöjten, sångerna och sångstenarna). `enemies.js` har fått avväpning, stenkast, flykt med förstärkning, sömn och nattliga asklingar.
+
+## Vad var nytt i 0.10: pyramiden blev djupare
 
 Pyramiden har fått samma behandling som fästningen i 0.8: den gamla delen är första våningen, och fyra nya delar laddas när Cello går genom trappor och dörrar (en kort övertoning, ingen dimma). Solögonen i Spegelgalleriet ger inte längre Solnyckeln: de öppnar en dörr i västra väggen och en trappa ner. Solnyckeln ligger nu högst upp.
 
@@ -220,6 +235,7 @@ Spåren ligger i `music/` (128 kbit/s MP3). När spelet publiceras som artifact 
 | Tab / B | Föremålsmenyn: välj föremål och lägg dem på F, G eller V |
 | K | Karta över området och en översikt över riket (pausar spelet) |
 | M · N · P · H · I | Ljud · musik · retroläge · dölj hjälpen · felsökningsinfo |
+| ↑ ← → ↓ · Space | Med flöjten framme: spela toner (Esc slutar spela) |
 
 Handkontroll: A hopp, X svärd, B rulla, RT sköld, LT lås, Y prata, RB/LB/höger på styrkorset föremålsknapparna, Start föremålsmenyn, Back karta.
 På mobil styr vänster halva av skärmen Cello och höger halva kameran; knapparna sitter nere till höger.
@@ -259,6 +275,10 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/bastion.js` | The Tempest Bastion: rum, dörrar, kistor, kretsar, pussel, fällor och bossarna |
 | `src/title.js` | Startmenyn: scenen med hjälten, menyerna, de två sparfilerna och inställningarna |
 | `src/heroModel.js` | Läser hjältemodellen (`models/cello-hero.bin`) |
+| `src/clock.js` | Dygnet (0.11): klockan, dagsljus, skymning och spolning (vila, Sunturn Hymn) |
+| `src/weather.js` | Vädret (0.11): lugnt, regn, åska, dimma och sanddis, regnet, och blixten som slår ner i metall |
+| `src/talk.js` | Dialogträd (0.11): frågor i valfri ordning, det dumma svaret, humör och ikoner över huvudet |
+| `src/songs.js` | Flöjten (0.11): spelläget, sångerna, lektionerna och sångstenarna |
 | `src/pyramidwings.js` | Pyramidens fyra nya delar (0.10): djupet, solbåten, uppstigningen och toppen |
 | `src/sunkit.js` | Pyramidens verktygslåda: solljus, kristaller, spegelblock, solvisaren, sandfall, stenkulor, timglaset och Solväktaren |
 | `src/bastionwings.js` | Fästningens fyra nya delar (0.8): cisternerna, smedjan, tornet och kronan |
