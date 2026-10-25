@@ -8,6 +8,7 @@ import { SONGS, GLYPH } from './songs.js';
 const OIL_MAX = 100;
 const OIL_BURN = 0.55; // per sekund när lyktan lyser (en full lykta räcker ungefär tre minuter)
 const POTION_MAX = 3;
+const FLASK_MAX = 3; // oljeflaskor (0.15)
 const WALLET_MAX = 500;
 const KEYS = ['F', 'G', 'V'];
 
@@ -29,7 +30,9 @@ export const ICONS = {
   horn: px('<rect x="1" y="1" width="3" height="2" fill="#d8c8a4"/><rect x="4" y="2" width="2" height="2" fill="#c8b48c"/><rect x="5" y="4" width="2" height="2" fill="#b09c74"/><rect x="4" y="6" width="2" height="1" fill="#9a8460"/><rect x="2" y="3" width="2" height="1" fill="#8c2a27"/><rect x="1" y="1" width="1" height="1" fill="#f0e6cc"/>'),
   sandals: px('<rect x="1" y="5" width="5" height="2" fill="#c9a24f"/><rect x="5" y="4" width="2" height="3" fill="#c9a24f"/><rect x="2" y="3" width="1" height="2" fill="#8a6a3a"/><rect x="4" y="3" width="1" height="2" fill="#8a6a3a"/><rect x="6" y="1" width="2" height="1" fill="#f4f4ff"/><rect x="5" y="2" width="3" height="1" fill="#dfe8ff"/><rect x="6" y="3" width="2" height="1" fill="#b8c8ff"/>'),
   scales: px('<rect x="3.5" y="1" width="1" height="6" fill="#2a2a30"/><rect x="2.5" y="7" width="3" height="1" fill="#2a2a30"/><rect x="0" y="1.5" width="8" height="0.8" fill="#c9a24f"/><rect x="3" y="0" width="2" height="1.5" fill="#6af0d4"/><rect x="0" y="2.3" width="0.5" height="2" fill="#c9a24f"/><rect x="7.5" y="2.3" width="0.5" height="2.4" fill="#c9a24f"/><rect x="0" y="4.3" width="2" height="0.8" fill="#c9a24f"/><rect x="6.3" y="4.7" width="1.7" height="0.8" fill="#9a7a3a"/>'),
+  trident: px('<rect x="1" y="0" width="1" height="3" fill="#6ac8b0"/><rect x="3.5" y="0" width="1" height="3" fill="#6ac8b0"/><rect x="6" y="0" width="1" height="3" fill="#6ac8b0"/><rect x="1" y="3" width="6" height="1" fill="#4a8a7a"/><rect x="3.5" y="4" width="1" height="4" fill="#4a8a7a"/><rect x="4" y="1" width="1" height="2" fill="#b06aff"/><rect x="2" y="3" width="1" height="1" fill="#b06aff"/>'),
   flute: px('<rect x="6" y="0" width="2" height="1" fill="#8c2a27"/><rect x="5" y="1" width="2" height="1" fill="#c8a06a"/><rect x="4" y="2" width="2" height="1" fill="#b8925a"/><rect x="3" y="3" width="2" height="1" fill="#c8a06a"/><rect x="2" y="4" width="2" height="1" fill="#b8925a"/><rect x="1" y="5" width="2" height="1" fill="#c8a06a"/><rect x="0" y="6" width="2" height="1" fill="#9a7444"/><rect x="4" y="2" width="1" height="1" fill="#3a2a1a"/><rect x="2" y="4" width="1" height="1" fill="#3a2a1a"/><rect x="0" y="7" width="1" height="1" fill="#6a4a2a"/>'),
+  flask: px('<rect x="3" y="0" width="2" height="1" fill="#8a6a4a"/><rect x="3" y="1" width="2" height="2" fill="#b8c4c8"/><rect x="2" y="3" width="4" height="4" fill="#d8a43a"/><rect x="2" y="7" width="4" height="1" fill="#9a7020"/><rect x="2" y="3" width="1" height="2" fill="#ffe08a"/><rect x="3" y="4" width="2" height="1" fill="#6a4a20"/>'),
   heart: px('<rect x="1" y="1" width="2" height="1" fill="#d8382f"/><rect x="5" y="1" width="2" height="1" fill="#d8382f"/><rect x="0" y="2" width="8" height="2" fill="#d8382f"/><rect x="1" y="4" width="6" height="1" fill="#d8382f"/><rect x="2" y="5" width="4" height="1" fill="#d8382f"/><rect x="3" y="6" width="2" height="1" fill="#d8382f"/><rect x="1" y="2" width="1" height="1" fill="#f4a196"/>'),
 };
 
@@ -37,6 +40,8 @@ export const ITEMS = {
   strike: { name: "Mjölnir's Shard", desc: 'Strike the ground. Lightning runs through copper, shatters shields and wakes old stones.', icon: 'strike' },
   weight: { name: 'Weight of Thunder', desc: 'The shard makes Cello heavy: slow, but unmoved by storm winds. He sinks through cracked floors.', icon: 'weight' },
   lantern: { name: 'Lantern', desc: 'An oil lantern. Lights the dark and old braziers. Uses oil while it burns.', icon: 'lantern' },
+  trident: { name: "Poseidon's Corrupted Trident", desc: 'The spear of the sea god, veined with a purple curse. Press its button to dash with it: under water Cello shoots forward like a fish. It breaks brittle coral. At a tide altar, press E to make the water rise or fall.', icon: 'trident' },
+  flask: { name: 'Oil Flask', desc: 'A stoppered flask of lantern oil. Use it to fill the lantern. If the lantern runs dry while it burns, Cello pours one in by himself.', icon: 'flask' },
   potion: { name: 'Healing Draught', desc: 'Restores four hearts. Bitter, but it works.', icon: 'potion' },
   prism: { name: "Ra's Shattered Prism", desc: 'Raise it to catch sunlight and throw it where Cello faces. Lock on to aim. Sunlight burns shadow and wakes sun eyes.', icon: 'prism' },
   horn: { name: "Grumble's Horn", desc: 'Blow it outdoors and Grumble comes running. Press E next to him to ride; he is twice as fast as Cello.', icon: 'horn' },
@@ -44,7 +49,7 @@ export const ITEMS = {
   scales: { name: "Anubis' Broken Scales", desc: 'Tip them to step between the realm of the living and the realm of the dead. The dead realm shows spirits, hidden bridges and the truth behind false stone.', icon: 'scales' },
   flute: { name: "Pilgrim's Flute", desc: 'Press its button to play. Play notes with ↑ ← → ↓ and Space; Esc stops. Songs you learn are listed below.', icon: 'flute' },
 };
-const ORDER = ['strike', 'weight', 'prism', 'scales', 'sandals', 'lantern', 'horn', 'flute', 'potion'];
+const ORDER = ['strike', 'weight', 'prism', 'scales', 'sandals', 'trident', 'lantern', 'flask', 'horn', 'flute', 'potion'];
 
 export class Inventory {
   constructor(ctx) {
@@ -70,6 +75,7 @@ export class Inventory {
     this.player.hasPrism = false;
     this.player.setPrism(false);
     this.player.hasSandals = false;
+    this.player.hasTrident = false;
     this.player.swift = false;
     this.player.wearMul = 1;
     this.refresh(true);
@@ -81,6 +87,7 @@ export class Inventory {
     if (s.items?.hammer && !s.slots.includes('strike') && !s.slots.includes('weight')) s.slots = ['strike', 'weight', s.slots[2]];
     this.player.hasPrism = !!s.items?.prism;
     this.player.hasSandals = !!s.items?.sandals;
+    this.player.hasTrident = !!s.items?.trident;
     this.player.swift = false;
     this.player.wearMul = s.whetstone ? 0.5 : 1;
     this.lit = false;
@@ -94,7 +101,7 @@ export class Inventory {
   owned() {
     const s = this.s;
     return ORDER.filter((id) => (id === 'strike' || id === 'weight' ? s.items?.hammer : id === 'prism' ? s.items?.prism : id === 'lantern' ? s.lantern
-      : id === 'horn' ? !!s.goat?.have : id === 'flute' ? !!s.flute : id === 'scales' ? !!s.items?.scales : id === 'sandals' ? !!s.items?.sandals : id === 'potion' ? s.potions > 0 : false));
+      : id === 'horn' ? !!s.goat?.have : id === 'flute' ? !!s.flute : id === 'scales' ? !!s.items?.scales : id === 'sandals' ? !!s.items?.sandals : id === 'trident' ? !!s.items?.trident : id === 'potion' ? s.potions > 0 : id === 'flask' ? s.flasks > 0 : false));
   }
 
   // ---------- skärvor ----------
@@ -155,13 +162,34 @@ export class Inventory {
     this.refresh(true);
     return true;
   }
+  // En oljeflaska att bära med sig (0.15)
+  giveFlask() {
+    if ((this.s.flasks || 0) >= FLASK_MAX) return false;
+    this.s.flasks = (this.s.flasks || 0) + 1;
+    this.autoSlot('flask');
+    this.refresh(true);
+    return true;
+  }
+  get flasksFull() { return (this.s.flasks || 0) >= FLASK_MAX; }
+  // Häller en flaska i lyktan. auto: när lyktan slocknar av sig själv
+  pourFlask(auto = false) {
+    const s = this.s;
+    if (!s.flasks || !s.lantern) return false;
+    s.flasks--;
+    s.oil = OIL_MAX;
+    this.sfx.play('pour');
+    this.hud.toast(auto ? `The lantern sputters... Cello pours in an Oil Flask. (${s.flasks} left)` : `Cello fills the lantern from an Oil Flask. (${s.flasks} left)`, 2600);
+    if (!s.flasks) s.slots = s.slots.map((x) => (x === 'flask' ? null : x));
+    this.refresh(true);
+    return true;
+  }
   get oilFull() { return (this.s.oil ?? 0) >= OIL_MAX - 0.5; }
   get potionsFull() { return (this.s.potions || 0) >= POTION_MAX; }
 
   // ---------- att använda föremål ----------
   // Knapptryckningar blir handlingar: markslag och tung vikt går till Cello, resten sköts här
   actions(inp) {
-    const out = { ...inp, slam: false, heavy: false, prism: false };
+    const out = { ...inp, slam: false, heavy: false, prism: false, trident: false };
     const P = this.player;
     ['item1', 'item2', 'item3'].forEach((key, i) => {
       if (!inp[key]) return;
@@ -183,6 +211,7 @@ export class Inventory {
       else if (id === 'weight') out.heavy = true;
       else if (id === 'prism') out.prism = true;
       else if (id === 'sandals') out.swift = true;
+      else if (id === 'trident') out.trident = true;
       else this.use(id);
     });
     return out;
@@ -195,7 +224,7 @@ export class Inventory {
       // Nära ett släckt eldfat tänds det i stället
       const torch = this.story.folk?.torchNear(P.feet);
       if (torch) {
-        if ((this.s.oil ?? 0) <= 0) { this.noOil(); return; }
+        if ((this.s.oil ?? 0) <= 0 && !this.pourFlask(true)) { this.noOil(); return; }
         this.s.oil = Math.max(0, this.s.oil - 2);
         this.story.folk.lightTorch(torch);
         if (!this.lit) this.setLit(true);
@@ -203,8 +232,12 @@ export class Inventory {
         return;
       }
       if (this.lit) this.setLit(false);
-      else if ((this.s.oil ?? 0) <= 0) this.noOil();
+      else if ((this.s.oil ?? 0) <= 0) { if (this.pourFlask(true)) this.setLit(true); else this.noOil(); }
       else this.setLit(true);
+    } else if (id === 'flask') {
+      if (!this.s.lantern) { this.hud.toast('Cello has no lantern to fill.', 2200); this.sfx.play('denied'); return; }
+      if (this.oilFull) { this.hud.toast('The lantern is already full.', 2200); this.sfx.play('denied'); return; }
+      this.pourFlask();
     } else if (id === 'horn') {
       this.story.goat?.call();
     } else if (id === 'flute') {
@@ -231,7 +264,7 @@ export class Inventory {
 
   noOil() {
     this.sfx.play('denied');
-    this.hud.toast('The lantern is out of oil. Pell in Willowmere sells Lantern Oil.', 3600);
+    this.hud.toast('The lantern is out of oil. Pell in Willowmere sells Lantern Oil and Oil Flasks to carry.', 3600);
   }
 
   setLit(on) {
@@ -262,7 +295,7 @@ export class Inventory {
     const P = this.player;
     if (this.lit) {
       this.s.oil = Math.max(0, (this.s.oil ?? 0) - dt * OIL_BURN);
-      if (this.s.oil <= 0) {
+      if (this.s.oil <= 0 && !this.pourFlask(true)) {
         this.setLit(false);
         this.hud.toast('The lantern flickers and goes out. It needs oil.', 3600);
       }
@@ -384,7 +417,7 @@ export class Inventory {
     this.el.items.innerHTML = items.length
       ? items.map((id, i) => {
         const slot = s.slots.indexOf(id);
-        const extra = id === 'potion' ? `<span class="count">${s.potions}</span>` : '';
+        const extra = id === 'potion' ? `<span class="count">${s.potions}</span>` : id === 'flask' ? `<span class="count">${s.flasks}</span>` : '';
         return `<button type="button" class="bag-item${i === this.sel ? ' sel' : ''}" data-item="${id}" data-index="${i}" aria-pressed="${i === this.sel}">
           <span class="ico">${ICONS[ITEMS[id].icon]}</span>${extra}${slot >= 0 ? `<kbd>${KEYS[slot]}</kbd>` : ''}</button>`;
       }).join('')
@@ -394,6 +427,7 @@ export class Inventory {
     let desc = id ? ITEMS[id].desc : 'Items you find will appear here.';
     if (id === 'lantern') desc += ` Oil: ${Math.round(s.oil ?? 0)}%.`;
     if (id === 'potion') desc += ` You carry ${s.potions} of ${POTION_MAX}.`;
+    if (id === 'flask') desc += ` You carry ${s.flasks} of ${FLASK_MAX}. Lantern oil: ${Math.round(s.oil ?? 0)}%.`;
     this.el.desc.textContent = desc;
     this.el.assign.innerHTML = KEYS.map((k, i) => {
       const it = s.slots[i];
@@ -430,7 +464,7 @@ export class Inventory {
     const s = this.s, P = this.player;
     if (!s) return;
     const sw = P.sword;
-    const key = [s.slots.join(','), this.owned().join(','), s.potions, Math.round(s.oil ?? 0), this.lit, sw.broken, Math.round(sw.dur), s.shards, P.heavy, P.gloves, P.prismUp, this.hud.started, !!this.story.realm?.dead].join('|');
+    const key = [s.slots.join(','), this.owned().join(','), s.potions, s.flasks, Math.round(s.oil ?? 0), this.lit, sw.broken, Math.round(sw.dur), s.shards, P.heavy, P.gloves, P.prismUp, this.hud.started, !!this.story.realm?.dead].join('|');
     if (!force && key === this.hudKey) return;
     this.hudKey = key;
     const show = this.hud.started && this.story.phase !== 'intro';
@@ -449,7 +483,7 @@ export class Inventory {
       b.classList.toggle('empty', !ok);
       b.classList.toggle('on', ok && ((id === 'weight' && P.heavy) || (id === 'lantern' && this.lit) || (id === 'prism' && P.prismUp) || (id === 'scales' && !!this.story.realm?.dead) || (id === 'sandals' && P.swift)));
       b.classList.toggle('gloves', ok && id === 'strike' && P.gloves);
-      b.querySelector('.count').textContent = ok && id === 'potion' ? s.potions : '';
+      b.querySelector('.count').textContent = ok && id === 'potion' ? s.potions : ok && id === 'flask' ? s.flasks : '';
       const oil = b.querySelector('.oil');
       oil.hidden = !(ok && id === 'lantern');
       if (!oil.hidden) oil.querySelector('i').style.width = `${Math.round(s.oil ?? 0)}%`;

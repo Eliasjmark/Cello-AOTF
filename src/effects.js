@@ -217,6 +217,14 @@ export class Effects {
           p: pos.clone(), v: dir.multiplyScalar(3 + Math.random() * 5), g: -14, drag: 2,
           life, max: life, size: 0.6 + Math.random() * 0.8, color: new THREE.Color(color), shrink: true, fade: true, r: Math.random() * 3,
         });
+      } else if (kind === 'bubble') {
+        // 0.15: bubblor som stiger och darrar
+        const life = 0.9 + Math.random() * 0.9;
+        this.sparks.add({
+          p: pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.4, Math.random() * 0.3, (Math.random() - 0.5) * 0.4)),
+          v: new THREE.Vector3((Math.random() - 0.5) * 0.4, 1.2 + Math.random() * 1.2, (Math.random() - 0.5) * 0.4), g: 1.5, drag: 1.4,
+          life, max: life, size: 0.25 + Math.random() * 0.35, color: new THREE.Color(color), shrink: false, fade: true, r: Math.random() * 3,
+        });
       } else if (kind === 'debris') {
         // Lerskärvor som flyger iväg och faller
         const life = 0.6 + Math.random() * 0.5;

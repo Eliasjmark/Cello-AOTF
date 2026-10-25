@@ -79,7 +79,7 @@ export function buildField(B, areas) {
     B.put(g, new THREE.Mesh(box(1.2, 2.2, 9, 2), M.brick), -7.4, 1.3, -1, true);
     B.put(g, new THREE.Mesh(box(1.2, 4.4, 5, 2), M.brick), 7.4, 2.4, -3, true);
     for (const px of [-5, -1.5, 2, 5.5]) B.put(g, new THREE.Mesh(breakTop(cyl(0.5, 0.55, 3 + hash2(px, z) * 3, 10), 3, 0.5), M.marble), px, 1.8, 4.5, true);
-    B.chest('fieldTemple', x - 2, y + 0.3, z - 2, 0.6, { shards: 20 });
+    B.chest('fieldTemple', x - 2, y + 0.3, z - 2, 0.6, { shards: 10 });
     a.map.pois.push({ x, z, label: 'Old Temple', icon: 'ruin' });
   }
   {
@@ -94,7 +94,7 @@ export function buildField(B, areas) {
       B.solid(place(m, x, H(x, z) + h / 2 - 0.3, z));
     }
     B.solid(place(new THREE.Mesh(cyl(2.2, 2.6, 0.5, 12, 2), M.rock), cx, y + 0.1, cz));
-    B.chest('fieldHenge', cx, y + 0.35, cz, 0, { shards: 50 });
+    B.chest('fieldHenge', cx, y + 0.35, cz, 0, { shards: 15 });
     a.map.pois.push({ x: cx, z: cz, label: 'Stone Circle', icon: 'ruin' });
   }
   {
@@ -120,7 +120,7 @@ export function buildField(B, areas) {
     B.watchtower(x, H(x, z), z, 0.3, 6);
     B.torch('fieldTower', x - 4, H(x - 4, z), z + 3);
     // En kista som bara syns när eldfatet brinner
-    B.chest('fieldTowerChest', x, H(x, z), z, 0.3, { shards: 50 }, { reveal: 'fieldTower' });
+    B.chest('fieldTowerChest', x, H(x, z), z, 0.3, { shards: 20 }, { reveal: 'fieldTower' });
   }
 
   // Kartritaren Wren sitter vid statyns fot med sina papper

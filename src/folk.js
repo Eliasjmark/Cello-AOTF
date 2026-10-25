@@ -5,12 +5,13 @@ import * as THREE from 'three';
 import { Npc } from './npcs.js';
 import { SWORD_MAX } from './player.js';
 import { box, cyl } from './geom.js';
+import { shardWord } from './items.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 // Priser i skärvor
-export const PRICES = { lantern: 40, oil: 10, potion: 20, sword: 30, reforge: 20, magsOil: 14, magsPotion: 25, hamidOil: 12, hamidPotion: 22, hamidSword: 34 };
+export const PRICES = { lantern: 40, oil: 10, flask: 12, magsFlask: 16, hamidFlask: 14, potion: 20, sword: 30, reforge: 20, magsOil: 14, magsPotion: 25, hamidOil: 12, hamidPotion: 22, hamidSword: 34 };
 
 const LOOKS = {
   hollis: { name: 'Hollis', look: { sculpt: 'bybo', skin: 0xb88a68, hairStyle: 'bald', beard: 0x8a7a6a, top: 0x6a5238, bottom: 0x3a3228, extraColor: 0x4a3a28, width: 1.18, scale: 1.0 } },
@@ -35,6 +36,11 @@ const LOOKS = {
   hamid: { name: 'Hamid', look: { sculpt: 'bybo', skin: 0x8a5a3a, hairStyle: 'hood', hood: 0x3a7a78, beard: 0x2a1a14, top: 0x3a7a78, apron: true, extraColor: 0xd8ccb0, width: 1.18, scale: 0.98 } },
   sabi: { name: 'Sabi', look: { skin: 0x8a5a3a, hair: 0x1a1210, top: 0xd8a050, scale: 0.55 } },
   tarek: { name: 'Tarek', look: { sculpt: 'bybo', skin: 0x9a6a48, hairStyle: 'hood', hood: 0x8a6a3a, beard: 0x3a2a1c, top: 0x6a4a2a, extraColor: 0x8a6a3a, scale: 0.95 } },
+  // 0.15: Brinehollow vid havet
+  nerissa: { name: 'Nerissa', look: { skin: 0xa87a58, hair: 0xd8d4cc, hairStyle: 'bun', top: 0x3a6a78, shawl: 0x8a7a5a, robe: true, scale: 0.84, width: 1.05 } },
+  corwin: { name: 'Corwin', look: { sculpt: 'bybo', skin: 0xc49f83, hairStyle: 'bald', beard: 0x6a4a3a, top: 0x7a3a5a, apron: true, extraColor: 0xd8c8a0, width: 1.15, scale: 0.96 } },
+  gull: { name: 'Gull', look: { sculpt: 'bybo', skin: 0xb8906a, hairStyle: 'hood', hood: 0x3a4a5a, beard: 0xe0dcd4, top: 0x3a4a5a, scale: 0.9 } },
+  marlo: { name: 'Marlo', look: { skin: 0xa8805f, hair: 0x2a1a14, top: 0x5a7a8a, extraColor: 0x8a6a3a, item: 'spear', scale: 0.98 } },
 };
 
 // ---------- djur ----------
@@ -181,7 +187,7 @@ export class Folk {
     this.npcs = {};
     // Alla platser för folk som områdena har bestämt
     const spots = {};
-    for (const r of [world.ranch, world.pass, world.field, world.willow, world.reach, world.interiors, world.desert]) Object.assign(spots, r?.npcs || {});
+    for (const r of [world.ranch, world.pass, world.field, world.willow, world.reach, world.interiors, world.desert, world.sea]) Object.assign(spots, r?.npcs || {});
     for (const [id, sp] of Object.entries(spots)) {
       const def = LOOKS[id];
       if (!def) continue;
@@ -219,13 +225,17 @@ export class Folk {
     talk('hamid', (n) => this.talkHamid(n));
     talk('sabi', (n) => this.talkSabi(n));
     talk('tarek', (n) => this.talkTarek(n));
+    talk('nerissa', (n) => this.story.sea?.talkNerissa(n));
+    talk('corwin', (n) => this.story.sea?.talkCorwin(n));
+    talk('gull', (n) => this.story.sea?.talkGull(n));
+    talk('marlo', (n) => this.story.sea?.talkMarlo(n));
 
     // Butiken: varorna på hyllorna
     const shop = world.interiors?.shop;
     if (shop) {
       const ware = (key, label, pos, fn) => story.interactions.push({ label, area: 'shop', pos: () => pos, radius: 1.5, ok: () => true, run: fn });
       ware('lantern', `Lantern — ${PRICES.lantern} shards`, shop.lantern, () => this.offer('lantern'));
-      ware('oil', `Lantern Oil — ${PRICES.oil} shards`, shop.oil, () => this.offer('oil'));
+      ware('oil', `Lantern Oil — ${PRICES.oil} · Oil Flask — ${PRICES.flask}`, shop.oil, () => this.offerOil());
       ware('potion', `Healing Draught — ${PRICES.potion} shards`, shop.potion, () => this.offer('potion'));
       ware('sword', `Traveler's Sword — ${PRICES.sword} shards`, shop.sword, () => this.offer('sword'));
     }
@@ -485,8 +495,7 @@ export class Folk {
         this.music?.duckFor(2.0, 0.15);
         this.inventory.addShards(c.shards);
         this.fx.burst('spark', V(ch.x, ch.y + 1.0, ch.z), 14, 0x8affa0);
-        const col = c.shards >= 50 ? 'a purple shard' : c.shards >= 20 ? 'a red shard' : c.shards >= 5 ? 'a blue shard' : 'a green shard';
-        story.read([`You found ${col}! It is worth ${c.shards}.`], () => { story.cinematic = false; story.save(true); });
+        story.read([`You found ${shardWord(c.shards)}! It is worth ${c.shards}.`], () => { story.cinematic = false; story.save(true); });
       } else if (c.item === 'potion') {
         this.sfx.play('fanfare');
         const ok = this.inventory.givePotion();
@@ -539,6 +548,35 @@ export class Folk {
           }
           this.sfx.play('buy');
           return this.deliver(key, L);
+        },
+      },
+    ]);
+  }
+
+  // Oljehyllan hos Pell (0.15): fyll lyktan direkt, eller köp en flaska att bära med sig
+  offerOil() {
+    const story = this.story, inv = this.inventory, s = inv.s;
+    const pell = this.npcs.pell;
+    const L = (t) => (pell ? story.line(pell, t) : { who: '', text: t });
+    if (!s.lantern) { story.dialog.start([L("Oil's no good without a lantern, friend. That one there, on the stand.")]); return; }
+    story.dialog.start([
+      { who: '', text: 'Jars of lantern oil, and small stoppered flasks to carry on the road.' },
+      {
+        who: '', prompt: `What will it be? (You have ${s.shards || 0} shards.)`,
+        choices: [
+          { text: `Fill the lantern — ${PRICES.oil}`, id: 'oil' },
+          { text: `Oil Flask to carry — ${PRICES.flask}`, id: 'flask' },
+          { text: 'No thanks', id: 'no' },
+        ],
+        onChoose: (id) => {
+          if (id === 'no') return [];
+          if (id === 'oil' && inv.oilFull) return [L('Your lantern is already full to the brim.')];
+          if (id === 'flask' && inv.flasksFull) return [L('Three flasks is all your belt will hold, friend.')];
+          if (!inv.spend(PRICES[id])) { this.sfx.play('denied'); return [L("Ah... you're a little short. Come back when the storm's been generous.")]; }
+          this.sfx.play('buy');
+          if (id === 'oil') { inv.fillOil(); return [L('There. Filled to the brim.')]; }
+          inv.giveFlask();
+          return [L('One flask of oil. If your lantern sputters in the dark, it will save you.'), { run: () => this.hud.toast(`Oil Flask (${s.flasks} of 3). Use it from an item button, or Cello pours it in when the lantern runs dry.`, 4200) }];
         },
       },
     ]);
@@ -619,7 +657,7 @@ export class Folk {
         "You saw Brindle? On the Stormvale? ...Alive?",
         'Hah! I knew it. That stubborn old mare. She will come home when she is ready, she always does.',
         "Here. It is not much, but I put it aside for whoever brought news of her.",
-        { run: () => { this.inventory.addShards(50); this.sfx.play('fanfare'); this.music?.duckFor(2.0, 0.15); this.hud.toast('Hollis gives you a purple shard, worth 50!', 3600); } },
+        { run: () => { this.inventory.addShards(20); this.sfx.play('fanfare'); this.music?.duckFor(2.0, 0.15); this.hud.toast('Hollis gives you a red shard, worth 20!', 3600); } },
         ...this.grumbleLines(),
       ], () => { s.brindleTold = true; this.giveGrumble(); });
       return;
@@ -789,17 +827,21 @@ export class Folk {
       who: '', prompt: `What will it be? (You have ${s.shards || 0} shards.)`,
       choices: [
         { text: `Lantern Oil — ${PRICES.magsOil}`, id: 'oil' },
+        { text: `Oil Flask — ${PRICES.magsFlask}`, id: 'flask' },
         { text: `Healing Draught — ${PRICES.magsPotion}`, id: 'potion' },
         { text: 'Just looking', id: 'no' },
       ],
       onChoose: (id) => {
         if (id === 'no') return [L("Off you go, then. Mind the Ashlings, they don't pay.")];
         if (id === 'oil' && !s.lantern) return [L("Oil, without a lantern? You'd just drink it. Pell in Willowmere sells lanterns.")];
+        if (id === 'flask' && !s.lantern) return [L("A flask of oil, without a lantern? Pell in Willowmere sells lanterns.")];
         if (id === 'oil' && inv.oilFull) return [L('Your lantern is full, dearie.')];
+        if (id === 'flask' && inv.flasksFull) return [L('Three flasks on one belt? You will clink like a tinker.')];
         if (id === 'potion' && inv.potionsFull) return [L('Your belt is full. Three bottles, no more.')];
-        const price = id === 'oil' ? PRICES.magsOil : PRICES.magsPotion;
+        const price = id === 'oil' ? PRICES.magsOil : id === 'flask' ? PRICES.magsFlask : PRICES.magsPotion;
         if (!inv.spend(price)) { this.sfx.play('denied'); return [L('Not enough shards, dearie. Mags is kind, not charitable.')]; }
         this.sfx.play('buy');
+        if (id === 'flask') { inv.giveFlask(); return [L('A flask for the road. Keep it corked, it stinks.')]; }
         if (id === 'oil') inv.fillOil(); else inv.givePotion();
         return [L(id === 'oil' ? 'Filled up! Mind it, the dark eats oil.' : 'One potion. Pinch your nose when you drink it.')];
       },
@@ -845,7 +887,9 @@ export class Folk {
     if (!s.titanRaid) return 'raid';
     if (!s.items.sandals && !s.talked.serenGale) return 'gale';
     if (!s.spireDone) return 'spire';
-    return 'later';
+    if (!s.swim) return 'swim';
+    if (!s.templeDone) return 'temple';
+    return 'frost';
   }
   goalText(key = this.story.state.hint) {
     return {
@@ -862,6 +906,10 @@ export class Folk {
       gale: 'The bridge west of Stormreach has stopped screaming. Cross it to the Galecrown. Your sword-friend waits by her fire.',
       spire: 'A tower of white stone, where no bird lands. The wind climbs it, and so must you. At its crown waits the titan of the storm.',
       later: 'The threads lead under the sea now, where the sea god fell... That road is not yet woven. Rest, child.',
+      sea: 'South of the Galecrown, the fishers have mended their bridge. The threads lead down to the sea, where the sea god fell.',
+      swim: 'The sea of Brinehollow is deep, and you sink like a stone. An old woman on the pier remembers how to swim. Ask her.',
+      temple: 'Under the broken spear in the middle of the sea lies a temple. The tide there rises and falls at a will that is not the moon\'s. Dive, child.',
+      frost: 'The king of the titans flies north, to the ice where the frost giants sleep. That road is not yet woven... Rest, child, while you can.',
     }[key] ?? null;
   }
 
@@ -976,6 +1024,7 @@ export class Folk {
   talkSeren(n) {
     const s = this.story.state;
     // 0.14: efter titanens anfall slår hon läger i The Galecrown
+    if (s.spireDone && this.story.sea && n.area === 'sea') { this.story.sea.talkSeren(n); return; }
     if (s.titanRaid && this.story.chronicle) { this.story.chronicle.talkSeren(n); return; }
     if (!s.talked.seren) {
       this.say(n, [
@@ -1095,8 +1144,8 @@ export class Folk {
             ];
           }
           return [
-            { run: () => { this.inventory.addShards(60); this.sfx.play('shard', { vol: 2 }); } },
-            { who: '', text: 'Cello picks up the satchel. It is heavy with shards: 60 of them.' },
+            { run: () => { this.inventory.addShards(40); this.sfx.play('shard', { vol: 2 }); } },
+            { who: '', text: 'Cello picks up the satchel. It is heavy with shards: 40 of them.' },
             L('...You would rob a dying man?'),
             L('Go, then. The desert remembers.'),
             { run: () => { s.tarek = 'robbed'; s.karma -= 1; story.save(true); } },
@@ -1166,6 +1215,7 @@ export class Folk {
       who: '', prompt: `What will it be? (You have ${s.shards || 0} shards.)`,
       choices: [
         { text: `Lantern Oil — ${price('hamidOil')}`, id: 'oil' },
+        { text: `Oil Flask — ${price('hamidFlask')}`, id: 'flask' },
         { text: `Healing Draught — ${price('hamidPotion')}`, id: 'potion' },
         { text: `Desert Blade — ${price('hamidSword')}`, id: 'sword' },
         { text: 'Nothing', id: 'no' },
@@ -1173,13 +1223,16 @@ export class Folk {
       onChoose: (id) => {
         if (id === 'no') return [L(robbed ? 'Then go. Sand gets in everywhere, even in thieves.' : 'May the sun keep your back warm, friend.')];
         if (id === 'oil' && !s.lantern) return [L('Oil without a lantern? You want to drink it? No, no.')];
+        if (id === 'flask' && !s.lantern) return [L('A flask of oil and no lantern? No, no.')];
         if (id === 'oil' && inv.oilFull) return [L('Your lantern is full, friend.')];
+        if (id === 'flask' && inv.flasksFull) return [L('Three flasks is all a belt will carry.')];
         if (id === 'potion' && inv.potionsFull) return [L('Your belt is full. Three bottles, no more.')];
         if (id === 'sword' && P.sword.dur >= SWORD_MAX) return [L('Your blade is as good as new. Come back when it is not.')];
-        const p = price(id === 'oil' ? 'hamidOil' : id === 'potion' ? 'hamidPotion' : 'hamidSword');
+        const p = price(id === 'oil' ? 'hamidOil' : id === 'flask' ? 'hamidFlask' : id === 'potion' ? 'hamidPotion' : 'hamidSword');
         if (!inv.spend(p)) { this.sfx.play('denied'); return [L('Not enough shards. The desert does not give credit.')]; }
         this.sfx.play('buy');
         if (id === 'oil') { inv.fillOil(); return [L('Filled. It burns cleaner than the swamp oil up north.')]; }
+        if (id === 'flask') { inv.giveFlask(); return [L('A flask of desert oil. It will not freeze, it will not spoil.')]; }
         if (id === 'potion') { inv.givePotion(); return [L('Healing Draught. Cactus and something I will not tell you.')]; }
         P.setSword(SWORD_MAX);
         inv.refresh(true);

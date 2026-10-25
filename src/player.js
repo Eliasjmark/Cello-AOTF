@@ -1,7 +1,7 @@
 // Cello: rörelse, hopp, svärd, sköld, undanmanöver, skada, Mjölnirs skärva och en klossfigur.
 import * as THREE from 'three';
 import { Capsule } from 'three/addons/math/Capsule.js';
-import { buildHammer, ITEM_MATS } from './items.js';
+import { buildHammer, buildTrident, ITEM_MATS } from './items.js';
 import { mergeRigid } from './geom.js';
 import { heroAvailable, sculptHero } from './heroRig.js';
 
@@ -23,6 +23,10 @@ const RIDE_ACCEL = 20, RIDE_JUMP_V = 9.4;
 // 0.14: Hermes' Wing Sandals: snabbläget, väggspring och uppvindar
 export const SWIFT_SPEED = 10.2;
 const SWIFT_JUMP_V = 8.4, WALLRUN_SPEED = 9.2, WALLRUN_TIME = 1.7;
+// 0.15: simning. Cello flyter med fötterna FLOAT_DEPTH under ytan; under vattnet räcker luften BREATH_MAX sekunder
+const SWIM_SPEED = 3.9, SWIM_SPEED_SWIFT = 5.6, DIVE_SPEED = 3.7, SWIM_ACCEL = 12, SWIM_VY = 3.4, BUOY = 0.9;
+const FLOAT_DEPTH = 1.22, ENTER_DEPTH = 1.15, EXIT_DEPTH = 0.9, HEAD_Y = 1.5;
+export const BREATH_MAX = 12;
 const SLAM_WIND = 0.42, SLAM_WIND_GLOVES = 0.3, SLAM_RECOVER = 0.38, SLAM_REACH = 1.25;
 
 // Tre slag i kombination: från höger, från vänster, och ett tungt slag uppifrån
@@ -245,6 +249,12 @@ function buildModel() {
   hammerBack.rotation.set(0.12, 0, 0.62);
   hammerBack.visible = false;
   torso.add(hammerBack);
+  // 0.15: treudden i höger hand när Cello gör ett anfall med den
+  const tridentHand = buildTrident();
+  tridentHand.position.set(0, -0.3, 0);
+  tridentHand.rotation.x = 0;
+  tridentHand.visible = false;
+  elbowR.add(tridentHand);
   // Ra's Shattered Prism: en sprucken kristall i en gyllene ram, hålls framför Cello i höger hand
   const prism = new THREE.Group();
   {
@@ -283,7 +293,7 @@ function buildModel() {
   const lL = leg(-1), lR = leg(1);
   const parts = {
     body, hips, torso, head, tail, scarf, armL, armR, elbowL, elbowR, legL: lL.g, legR: lR.g, kneeL: lL.knee, kneeR: lR.knee,
-    skirt, sword, shield, eyes, lids, M, hammerHand, hammerBack, hammerGlow: glow, blade, tip, jag, lantern, lanternGlass, prism,
+    skirt, sword, shield, eyes, lids, M, hammerHand, hammerBack, hammerGlow: glow, blade, tip, jag, lantern, lanternGlass, prism, tridentHand,
   };
   root.scale.setScalar(0.9);
   // 0.13: Elias hjälteskulptur, när modellpaketet finns
@@ -370,6 +380,24 @@ export class Player {
     this.wallRun = null; // { n, dir, t, side }
     this.updrafts = null; // [{ x, z, r, y0, y1, power }]
     this.inDraft = 0;
+    // 0.15: vatten och simning
+    this.canSwim = false;
+    this.waterAt = null; // (x, z) => vattenytans höjd eller null (sätts av main.js från området)
+    this.bubbleAt = null; // (fötter) => sant där det finns luft att andas (luftfickor, bubblor)
+    this.current = new THREE.Vector3(); // strömmar i vattnet
+    this.waterY = null;
+    this.swimming = false;
+    this.swim = null; // { mode: 'surface' | 'dive' }
+    this.breath = BREATH_MAX;
+    this.breathMax = BREATH_MAX;
+    this.headUnder = false;
+    this.chokeT = 0.6;
+    this.wallPush = 0;
+    this.hasTrident = false; // 0.15: Poseidons treudd
+    this.dash = null; // { dir, under, dur, speed }
+    this.dashPower = 1;
+    this.onDash = null;
+    this.onSplash = null; this.onDive = null; this.onSurface = null; this.onClimbOut = null; this.onChoke = null;
     this.anim = { phase: 0, run: 0, air: 0, land: 0, t: 0, shield: 0, lastStep: 0, blink: 2.5, scarf: [0.3, 0.3, 0.3], scarfV: [0, 0, 0] };
     this.model = buildModel();
     mergeRigid(this.model.root, [this.model.skirt, ...this.model.eyes]);
@@ -406,6 +434,8 @@ export class Player {
 
   respawn() {
     this.drowning = false;
+    this.stopSwim();
+    this.breath = this.breathMax;
     this.teleport(this.safe);
     this.facing = this.safeFacing;
     this.setState('move');
@@ -414,6 +444,8 @@ export class Player {
 
   revive(p, facing) {
     this.drowning = false;
+    this.stopSwim();
+    this.breath = this.breathMax;
     this.hp = this.maxHp;
     this.heavy = false;
     this.wind.set(0, 0, 0);
@@ -475,6 +507,7 @@ export class Player {
     this.stateT = 0;
     if (s !== 'attack') this.swing = null;
     if (s !== 'dodge') this.dodge = null;
+    if (s !== 'dash') this.dash = null;
   }
 
   updateFeet() {
@@ -603,11 +636,14 @@ export class Player {
       if (!this.swift) this.wallRun = null;
       this.onSwift?.(this.swift);
     }
-    if (input.prism && this.hasPrism && !this.carried && !this.mount && this.state === 'move') this.setPrism(!this.prismUp);
+    if (input.prism && this.hasPrism && !this.carried && !this.mount && this.state === 'move' && !this.swimming) this.setPrism(!this.prismUp);
+    // 0.15: treuddens anfall (på land en kort rusning, under vattnet en snabb stöt som en fisk)
+    if (input.trident && this.hasTrident && !this.carried && !this.mount && !this.heavy && (this.state === 'move' || this.state === 'attack')) this.startDash();
     // Prisman sänks när Cello hugger, hoppar, rullar, tar upp skölden eller blir träffad
     if (this.prismUp && (this.state !== 'move' || input.attack || input.jump || input.dodge || input.shield || input.slam)) this.setPrism(false);
     this.jumpHeld = !!input.jumpHeld;
     this.stateT += dt;
+    this.updateWater(dt, input);
 
     const mag = Math.min(1, Math.hypot(input.moveX, input.moveY));
     const sy = Math.sin(camYaw), cy = Math.cos(camYaw);
@@ -638,6 +674,26 @@ export class Player {
             this.jump();
             this.vel.y = RIDE_JUMP_V;
           }
+          break;
+        }
+        // 0.15: simning. Shift dyker, Space vid en kant klättrar upp, under vattnet: Space upp och Shift ned
+        if (this.swimming) {
+          this.shielding = false;
+          const sp = this.swim.mode === 'dive' ? DIVE_SPEED : this.swift ? SWIM_SPEED_SWIFT : SWIM_SPEED;
+          tvx = this.wish.x * sp * mag;
+          tvz = this.wish.z * sp * mag;
+          accel = SWIM_ACCEL;
+          airControl = true;
+          turnRate = 7;
+          this.swimUp = !!input.jumpHeld;
+          this.swimDown = !!input.diveHeld;
+          if (this.swim.mode === 'surface') {
+            if (this.dodgeBuf > 0) { this.dodgeBuf = 0; this.swim.mode = 'dive'; this.swim.diveT = 0.7; this.vel.y = -3.2; this.onDive?.(); }
+            else if (this.jumpBuf > 0) { this.jumpBuf = 0; this.climbOut(); }
+            else if (this.wallPush > 0.18 && mag > 0.5) { this.wallPush = 0; this.climbOut(); }
+            else if (mag > 0.5 && (this.climbProbe = (this.climbProbe ?? 0) - dt) <= 0) { this.climbProbe = 0.2; this.climbOut(); }
+          } else this.dodgeBuf = 0;
+          if (this.swimming && this.attackBuf > 0 && this.attackCooldown <= 0) this.startAttack(0);
           break;
         }
         const carrying = !!this.carried;
@@ -682,6 +738,17 @@ export class Player {
       case 'itemget':
         accel = 30;
         break;
+      case 'dash': {
+        const d = this.dash;
+        if (!d) { this.setState('move'); break; }
+        const k = 1 - Math.min(1, this.stateT / d.dur) * 0.55;
+        tvx = d.dir.x * d.speed * k;
+        tvz = d.dir.z * d.speed * k;
+        accel = 90;
+        airControl = true;
+        if (this.stateT >= d.dur) this.setState('move');
+        break;
+      }
       case 'attack': {
         const A = ATTACKS[this.combo], t = this.stateT;
         this.swing.active = t >= A.a0 && t <= A.a1;
@@ -711,13 +778,13 @@ export class Player {
           if (t >= 0.5) this.setState('move');
         } else {
           accel = 0;
-          if ((t > 0.2 && this.grounded) || t > 1.3) this.setState('move');
+          if ((t > 0.2 && (this.grounded || this.swimming)) || t > 1.3) this.setState('move');
         }
         break;
       }
       case 'hurt':
         accel = 6;
-        if (this.stateT > 0.4 && this.grounded) this.setState('move');
+        if (this.stateT > 0.4 && (this.grounded || this.swimming)) this.setState('move');
         break;
       case 'dead':
         accel = 8;
@@ -924,6 +991,7 @@ export class Player {
   step(h, tvx, tvz, accel, airControl, allowAuto, mag) {
     this.wallCool = Math.max(0, (this.wallCool ?? 0) - h);
     if (this.wallRun) { this.stepWallRun(h); return; }
+    if (this.swimming) { this.stepSwim(h, tvx, tvz); return; }
     const wasGrounded = this.grounded;
     if (wasGrounded || airControl) {
       const a = wasGrounded ? accel : AIR_ACCEL;
@@ -937,7 +1005,9 @@ export class Player {
     else {
       // Släpper man Space tidigt blir hoppet lägre
       const g = (this.jumping && this.vel.y > 0 && !this.jumpHeld && this.state === 'move' ? GRAVITY * 2.2 : GRAVITY) * (this.heavy ? 1.5 : 1);
-      this.vel.y = Math.max(this.vel.y - g * h, -MAX_FALL);
+      // 0.15: i vattnet (tung, eller utan att simma) sjunker Cello långsamt
+      const wet = this.waterY != null && this.feet.y < this.waterY - 0.4;
+      this.vel.y = Math.max(this.vel.y - g * h * (wet ? 0.35 : 1), wet ? -5 : -MAX_FALL);
       this.airVy = this.vel.y;
     }
     // 0.14: uppvindar lyfter Cello (inte när han är tung)
@@ -982,6 +1052,150 @@ export class Player {
         this.onAutoJump?.();
       }
     }
+  }
+
+  // ---------- 0.15: vatten och simning ----------
+  updateWater(dt, input) {
+    const wy = this.waterAt ? this.waterAt(this.feet.x, this.feet.z) : null;
+    this.waterY = wy;
+    const depth = wy == null ? -1 : wy - this.feet.y;
+    if (this.swimming) {
+      if (wy == null || this.state === 'dead' || this.mount || this.carried || this.heavy) this.stopSwim();
+      else if (this.swim.mode === 'surface' && depth < EXIT_DEPTH) this.stopSwim();
+    } else if (wy != null && this.state !== 'dead' && !this.mount && !this.autoWalk) {
+      if (this.canSwim && !this.heavy && depth > ENTER_DEPTH) this.startSwim(depth);
+      else if (!this.canSwim && depth > 1.35 && !this.drowning) { this.drowning = true; this.onSplash?.(8); }
+    }
+    // Luften: under ytan räcker den en stund, sedan gör det ont
+    const under = wy != null && this.feet.y + HEAD_Y < wy && this.state !== 'dead';
+    this.headUnder = under;
+    if (under && !this.breathPause && !(this.bubbleAt?.(this.feet))) {
+      this.breath = Math.max(0, this.breath - dt);
+      if (this.breath <= 0) {
+        this.chokeT -= dt;
+        if (this.chokeT <= 0) {
+          this.chokeT = 1.4;
+          this.hp = Math.max(0, this.hp - 1);
+          this.invuln = Math.max(this.invuln, 0.3);
+          this.onHurt?.(this.hp);
+          this.onChoke?.();
+          if (this.hp <= 0) this.setState('dead');
+        }
+      }
+    } else {
+      this.breath = Math.min(this.breathMax, this.breath + dt * (under ? 6 : 5));
+      this.chokeT = 0.6;
+    }
+  }
+
+  startSwim(depth) {
+    const fall = -this.vel.y;
+    this.swimming = true;
+    this.swim = { mode: depth > 2.4 || fall > 7 ? 'dive' : 'surface' };
+    this.vel.y *= 0.2;
+    this.vel.x *= 0.6;
+    this.vel.z *= 0.6;
+    this.wallRun = null;
+    this.shielding = false;
+    this.setPrism(false);
+    if (this.state === 'dodge') this.setState('move');
+    this.grounded = false;
+    this.jumping = false;
+    this.onSplash?.(fall);
+  }
+
+  stopSwim() {
+    if (!this.swimming) return;
+    this.swimming = false;
+    this.swim = null;
+    this.model.body.rotation.x = Math.min(this.model.body.rotation.x, 0.4);
+  }
+
+  stepSwim(h, tvx, tvz) {
+    let dx = tvx - this.vel.x, dz = tvz - this.vel.z;
+    const dashing = this.state === 'dash' && this.dash;
+    const dl = Math.hypot(dx, dz), md = (dashing ? 90 : SWIM_ACCEL) * h;
+    if (dl > md) { dx *= md / dl; dz *= md / dl; }
+    this.vel.x += dx;
+    this.vel.z += dz;
+    const s = this.swim, wy = this.waterY ?? this.feet.y + FLOAT_DEPTH;
+    let tvy;
+    if (dashing && this.dash.dir.y < -0.1 && s.mode === 'surface') s.mode = 'dive';
+    if (dashing && s.mode === 'dive') {
+      tvy = this.dash.dir.y * this.dash.speed;
+      if (this.feet.y > wy - FLOAT_DEPTH - 0.05 && tvy > 0) { s.mode = 'surface'; this.onSurface?.(); }
+    } else if (s.mode === 'surface') {
+      const target = wy - FLOAT_DEPTH + Math.sin(this.anim.t * 2.4) * 0.04;
+      tvy = Math.max(-4, Math.min(4, (target - this.feet.y) * 5));
+    } else {
+      s.diveT = Math.max(0, (s.diveT ?? 0) - h);
+      tvy = this.swimUp ? SWIM_VY : this.swimDown ? -SWIM_VY : s.diveT > 0 ? -2.6 : BUOY;
+      if (this.feet.y > wy - FLOAT_DEPTH - 0.05 && tvy > 0) { s.mode = 'surface'; this.onSurface?.(); }
+    }
+    this.vel.y += (tvy - this.vel.y) * Math.min(1, (dashing ? 14 : 6) * h);
+    this.collider.translate(_v.copy(this.vel).multiplyScalar(h));
+    if (this.current.x || this.current.z || this.current.y) this.collider.translate(_v.copy(this.current).multiplyScalar(h));
+    // Ytan är taket när Cello simmar på den
+    this.updateFeet();
+    if (s.mode === 'surface' && this.feet.y > wy - FLOAT_DEPTH + 0.3) this.collider.translate(_w.set(0, wy - FLOAT_DEPTH + 0.3 - this.feet.y, 0));
+    let pushed = false;
+    for (let k = 0; k < 2; k++) {
+      const r = this.world.capsuleIntersect(this.collider);
+      if (!r || r.depth < 1e-6) break;
+      const n = r.normal;
+      if (n.y > FLOOR_NY) { this.collider.translate(_w.set(0, r.depth / n.y, 0)); if (this.vel.y < 0) this.vel.y = 0; continue; }
+      this.collider.translate(_w.copy(n).multiplyScalar(r.depth));
+      const vn = this.vel.dot(n);
+      if (vn < 0) this.vel.addScaledVector(n, -vn);
+      if (Math.abs(n.y) < 0.4) pushed = true;
+    }
+    this.wallPush = pushed ? this.wallPush + h : 0;
+    this.grounded = false;
+    this.jumping = false;
+  }
+
+  startDash() {
+    const under = !!this.swimming && (this.swim.mode === 'dive' || this.headUnder);
+    const dir = new THREE.Vector3();
+    if (this.wish.lengthSq() > 0.01) dir.copy(this.wish);
+    else dir.set(Math.sin(this.facing), 0, Math.cos(this.facing));
+    dir.y = 0;
+    dir.normalize();
+    if (under) { dir.y = this.swimUp ? 0.75 : this.swimDown ? -0.75 : 0; dir.normalize(); }
+    this.setPrism(false);
+    this.shielding = false;
+    this.setState('dash');
+    this.dash = { dir, under, dur: under ? 0.55 : 0.3, speed: (under ? 15 : 13) * this.dashPower, hit: new Set() };
+    this.facing = Math.atan2(dir.x, dir.z);
+    this.onDash?.(under);
+  }
+
+  // Klättrar upp på en kant framför Cello, om den ligger lagom högt över vattnet
+  climbOut() {
+    if (!this.swimming || this.waterY == null) return false;
+    const fx = Math.sin(this.facing), fz = Math.cos(this.facing), wy = this.waterY;
+    for (const d of [0.75, 1.05, 1.4]) {
+      _ray.origin.set(this.feet.x + fx * d, wy + 2.0, this.feet.z + fz * d);
+      _ray.direction.copy(_down);
+      const hit = this.world.rayIntersect(_ray, 3.4);
+      if (!hit) continue;
+      hit.triangle.getNormal(_n);
+      const top = _ray.origin.y - hit.distance;
+      if (_n.y < 0.7 || top < wy - 0.45 || top > wy + 1.7) continue;
+      _cap.copy(this.collider);
+      this.collider.start.set(_ray.origin.x, top + R + 0.05, _ray.origin.z);
+      this.collider.end.set(_ray.origin.x, top + HEIGHT - R + 0.05, _ray.origin.z);
+      const r = this.world.capsuleIntersect(this.collider);
+      this.collider.copy(_cap);
+      if (r && r.depth > 0.06) continue;
+      this.stopSwim();
+      this.teleport(new THREE.Vector3(_ray.origin.x, top + 0.02, _ray.origin.z));
+      this.grounded = true;
+      this.anim.land = 0.5;
+      this.onClimbOut?.();
+      return true;
+    }
+    return false;
   }
 
   // Skjuter ut kapseln ur världen. Golv löses rakt uppåt så att Cello inte glider i backar.
@@ -1036,6 +1250,8 @@ export class Player {
   trackSafe(dt) {
     this.safeTimer -= dt;
     if (!this.grounded || this.groundNormal.y < 0.85 || this.safeTimer > 0 || this.state === 'dead') return;
+    // 0.15: aldrig under vattnet (då hamnar Cello där igen och igen)
+    if (this.waterY != null && this.feet.y < this.waterY - 0.2) return;
     this.safeTimer = 0.3;
     const o = this.collider.start;
     for (const [ox, oz] of [[1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]]) {
@@ -1221,6 +1437,15 @@ export class Player {
         P.elbowL = P.elbowR = -0.12; P.kneeL = 0.95 - rec * 0.4; P.kneeR = 0.7 - rec * 0.3;
       }
       P.swordX = -0.2;
+    } else if (this.state === 'dash') {
+      // Treudden framåt i höger hand, kroppen sträckt
+      rate = 30;
+      const under = this.dash?.under;
+      P.armRx = -1.55; P.armRz = 0.05; P.elbowR = -0.05;
+      P.armLx = -0.6; P.armLz = -0.5; P.elbowL = -0.5;
+      P.torsoX = under ? 0.1 : 0.25; P.torsoY = -0.15; P.headX = -0.1;
+      P.legL = under ? 0.25 : -0.55; P.legR = under ? 0.1 : 0.45; P.kneeL = 0.3; P.kneeR = 0.2;
+      P.bodyX = under ? 1.35 : 0; P.swordX = -0.2;
     } else if (this.state === 'itemget') {
       rate = 14;
       P.armLx = P.armRx = -2.85; P.armLz = -0.28; P.armRz = 0.28;
@@ -1234,6 +1459,35 @@ export class Player {
       rate = 6;
       P.bodyX = -1.45; P.armLz = -1.2; P.armRz = 1.2; P.torsoX = 0; P.legL = 0.1; P.legR = -0.1;
       P.elbowL = P.elbowR = -0.25; P.kneeL = 0.15; P.kneeR = 0.05;
+    }
+
+    // 0.15: simning. På ytan trampar han vatten med huvudet ovanför; under ytan ligger han framåt och tar simtag
+    if (this.swimming && (this.state === 'move' || this.state === 'hurt')) {
+      const dive = this.swim.mode === 'dive';
+      const mv = Math.min(1, this.speed / 3.5);
+      a.swimPh = (a.swimPh ?? 0) + dt * (2.6 + mv * 4.5);
+      const sp = Math.sin(a.swimPh), cp = Math.cos(a.swimPh);
+      rate = 10;
+      if (dive) {
+        const up = this.swimUp ? -0.5 : this.swimDown ? 0.35 : 0;
+        P.bodyX = (0.55 + 0.8 * mv) + up;
+        P.armLx = P.armRx = -2.6 + (sp * 0.5 + 0.5) * 1.9;
+        P.armLz = -0.35 - (cp * 0.5 + 0.5) * 0.55; P.armRz = 0.35 + (cp * 0.5 + 0.5) * 0.55;
+        P.elbowL = P.elbowR = -0.25 - 0.5 * Math.max(0, cp);
+        P.legL = 0.15 + sp * 0.45; P.legR = 0.15 - sp * 0.45;
+        P.kneeL = 0.25 + 0.4 * Math.max(0, sp); P.kneeR = 0.25 + 0.4 * Math.max(0, -sp);
+        P.headX = -0.7 * (0.55 + 0.8 * mv); P.torsoX = 0; P.torsoY = 0;
+      } else {
+        P.bodyX = 0.18 + 0.32 * mv;
+        P.armLx = P.armRx = -0.9 + sp * 0.55;
+        P.armLz = -0.6 - cp * 0.35; P.armRz = 0.6 + cp * 0.35;
+        P.elbowL = P.elbowR = -0.7 - 0.3 * cp;
+        P.legL = 0.1 + sp * 0.35; P.legR = 0.1 - sp * 0.35;
+        P.kneeL = P.kneeR = 0.5 + 0.3 * cp;
+        P.headX = -0.2 - 0.3 * mv; P.torsoX = 0.05; P.torsoY = 0;
+      }
+      P.hipsY = 0.86;
+      P.swordX = -0.2;
     }
 
     // 0.13: skulpturen har skölden fast på underarmen, så sköldposen blir en annan
@@ -1304,6 +1558,7 @@ export class Player {
 
     // Skölden: på sidan eller framför bröstet
     const s = a.shield;
+    if (this.swimming) a.air = 0;
     m.shield.position.set(-0.37 + 0.32 * s, 0.3 + 0.06 * s, -0.02 + 0.42 * s);
     m.shield.rotation.set(0, (Math.PI / 2) * s, 0.1 * (1 - s));
 
@@ -1313,7 +1568,11 @@ export class Player {
     // Svärdet eller hammaren i handen, hammaren på ryggen
     const inHand = this.hasHammer && (this.state === 'slam' || (this.heavy && this.state !== 'attack'));
     const holding = this.state === 'itemget';
-    m.sword.visible = !inHand && !holding && !this.prismUp && !this.mount && !this.playing;
+    m.sword.visible = !inHand && !holding && !this.prismUp && !this.mount && !this.playing && this.state !== 'dash';
+    if (m.tridentHand) {
+      m.tridentHand.visible = this.state === 'dash';
+      m.tridentHand.rotation.x = m.sculpt ? 0.1 : 0;
+    }
     m.prism.visible = this.prismUp && this.state === 'move';
     if (m.prism.visible) {
       m.prism.rotation.y += dt * 2.5;

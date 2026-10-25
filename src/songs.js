@@ -411,11 +411,11 @@ export class Songs {
 export function defineSongStones(heights, chests) {
   const defs = [
     // Vilplatsen mitt på Long Bridge, där Odo sitter
-    { id: 'passStone', area: 'pass', x: 2000 - 2.2, z: -153, face: Math.PI / 2, y: 0.1, chest: { shards: 30 } },
+    { id: 'passStone', area: 'pass', x: 2000 - 2.2, z: -153, face: Math.PI / 2, y: 0.1, chest: { shards: 15 } },
     // Vid den fallna gudastatyn på Stormvale
-    { id: 'fieldStone', area: 'field', x: 3000 + 80, z: 126, face: -Math.PI / 2, chest: { shards: 100 }, big: true },
+    { id: 'fieldStone', area: 'field', x: 3000 + 80, z: 126, face: -Math.PI / 2, chest: { shards: 50 }, big: true },
     // Mitt i pelarsalen i öknen (på stenplattan)
-    { id: 'desertStone', area: 'desert', x: 8000 + 60, z: 64, face: 0, lift: 0.17, chest: { shards: 100 }, big: true },
+    { id: 'desertStone', area: 'desert', x: 8000 + 60, z: 64, face: 0, lift: 0.17, chest: { shards: 50 }, big: true },
   ];
   const out = [];
   for (const d of defs) {

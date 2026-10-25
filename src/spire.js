@@ -228,7 +228,7 @@ export function buildSpire(B, areas, sp) {
     w.runWall(-9, 3, LY - 3, LY + 7, Z0 - 0.3, Z0);
     w.room('HN', 'The North Gallery', 3, X1, Z0, -29, { y: LY, floorSlab: false });
     w.slab(3, X1, LY - 0.8, LY, Z0, -29, SM.flag);
-    w.chest({ id: 'sShards', x: 13.2, y: LY, z: -32.8, face: -Math.PI / 2, shards: 100 });
+    w.chest({ id: 'sShards', x: 13.2, y: LY, z: -32.8, face: -Math.PI / 2, shards: 50 });
     w.inscription(-12.5, -34.6, 0, ['Carved under a row of bronze feathers:', '"Where the feathers are, the swift may run where others fall."', '(With the sandals on, run and jump at the wall at an angle.)'], LY);
     // Uppvind 2: från balkong N till balkong E (öppnas med en ventil på balkong N)
     const EY = 25;

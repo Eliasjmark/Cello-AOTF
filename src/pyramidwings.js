@@ -173,7 +173,7 @@ export function buildPyramidWings(B, areas, pyramid) {
     w.shaft('g4s', 0, -47, 1.4, { room: 'G4' });
     const T = [[-11, -37], [11, -37], [-11, -57], [11, -57]].map(([x, z], i) => w.torch(`vault${i}`, x, z));
     w.cage('k4', 10.5, -51);
-    w.chest({ id: 'gV', x: 10.5, z: -51, face: -Math.PI / 2, shards: 100, cage: 'k4' });
+    w.chest({ id: 'gV', x: 10.5, z: -51, face: -Math.PI / 2, shards: 20, cage: 'k4' });
     w.onTorch = () => {
       const st = w.game.story.state.torches;
       if (T.every((t) => st[t.id]) && !s().solved['cage:k4']) {
@@ -255,7 +255,7 @@ export function buildPyramidWings(B, areas, pyramid) {
     w.shaft('b1se', 9, -18, 1.3, { room: 'B1' });
     w.trapRoom('tB1', 'B1', ['b01', 'b12'], ['B1a', 'B1b', 'B1c'], () => w.game?.hud.toast('The barque is quiet again. Something glints at its prow.', 3000));
     w.traps[0].text = 'The bars slam shut! The crew of the barque wakes!';
-    w.chest({ id: 'bB1', x: 0, z: -30.2, face: Math.PI, shards: 50, hidden: () => !!s().cleared.tB1 });
+    w.chest({ id: 'bB1', x: 0, z: -30.2, face: Math.PI, shards: 15, hidden: () => !!s().cleared.tB1 });
     for (const [x, z] of [[-8, -10], [8, -10], [-6, -30]]) w.enemy('askling', x, z, [[x, z], [x, z - 10]], 'B1a', { dormant: true, room: 'B1' });
     w.enemy('shield', -11, -26, [[-11, -26], [-11, -8]], 'B1b', { dormant: true, room: 'B1' });
     w.enemy('shield', 11, -26, [[11, -26], [11, -8]], 'B1b', { dormant: true, room: 'B1' });
@@ -305,7 +305,7 @@ export function buildPyramidWings(B, areas, pyramid) {
 
     // ---------- Väktarens gård (B3): Solväktaren ----------
     w.shaft('b3s', 0, -80, 1.5, { room: 'B3' });
-    w.chest({ id: 'bB3', x: -6, z: -91, face: 0, shards: 100, hidden: () => !!s().cleared.guardian });
+    w.chest({ id: 'bB3', x: -6, z: -91, face: 0, shards: 20, hidden: () => !!s().cleared.guardian });
     w.fightBars = ['b23'];
     w.onConnect.push(() => {
       const gd = new SunGuardian(w.D, w.V(0, 0, -88), 0, w.rooms.B3, w.groundAt);
@@ -463,7 +463,7 @@ export function buildPyramidWings(B, areas, pyramid) {
     w.sandfall('sfa', -28, -58, 1.3, { y: Yt, top: 7, period: 4.0, on: 1.3, phase: 0 });
     w.sandfall('sfb', -28, -64.5, 1.3, { y: Yt, top: 7, period: 4.0, on: 1.3, phase: 1.3 });
     w.sandfall('sfc', -28, -70.5, 1.3, { y: Yt, top: 7, period: 4.0, on: 1.3, phase: 2.6 });
-    w.chest({ id: 'aL', x: -39, y: 6, z: -71.5, face: 0, shards: 100 });
+    w.chest({ id: 'aL', x: -39, y: 6, z: -71.5, face: 0, shards: 20 });
     w.chest({ id: 'aK3', x: -17, y: 6, z: -86, face: 0, item: 'pkey' });
     w.door({ id: 'aX', x: -28, z: -77, axis: 'z', type: 'key', y: Yt, neg: null, pos: 'A2' });
     w.slab(-30, -26, Yt - 1, Yt, -86, -77, w.floorMat);

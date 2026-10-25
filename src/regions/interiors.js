@@ -194,7 +194,7 @@ export function buildInteriors(B, areas) {
   B.barrel(HX + 4.1, 0, 2.8);
   B.crate(HX + 3.0, 0, 3.2, 0.7, 0.4);
   // Cellos kista vid sängen
-  B.chest('homeChest', HX - 1.6, 0, -HD / 2 + 0.9, 0, { shards: 20 });
+  B.chest('homeChest', HX - 1.6, 0, -HD / 2 + 0.9, 0, { shards: 10 });
   // Fönster med stormljus
   for (const x of [HX - 2.4, HX + 1.4]) {
     B.deco(new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), new THREE.MeshBasicMaterial({ color: 0x6a7488 })), x, 1.9, -HD / 2 + 0.01);

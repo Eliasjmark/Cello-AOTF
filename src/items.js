@@ -57,11 +57,34 @@ export function buildPrism() {
   return g;
 }
 
+// 0.15: Poseidons förvridna treudd. Skaftet pekar längs −y från handen, spetsarna i änden
+export function buildTrident() {
+  const g = new THREE.Group();
+  const br = lam(0x4a8a7a), dark = lam(0x2a4a44), curse = new THREE.MeshBasicMaterial({ color: 0xb06aff });
+  g.add(B(0.05, 1.5, 0.05, br, 0, -0.55, 0));
+  g.add(B(0.08, 0.08, 0.08, dark, 0, 0.18, 0));
+  const head = new THREE.Group();
+  head.position.y = -1.3;
+  head.add(B(0.42, 0.06, 0.06, br, 0, 0, 0));
+  for (const [x, h] of [[-0.19, 0.3], [0, 0.4], [0.19, 0.3]]) {
+    head.add(B(0.045, h, 0.045, br, x, -h / 2, 0));
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.14, 4), br);
+    tip.rotation.x = Math.PI;
+    tip.position.set(x, -h - 0.06, 0);
+    head.add(tip);
+  }
+  head.add(B(0.02, 0.18, 0.02, curse, 0.03, -0.12, 0.03));
+  head.add(B(0.12, 0.02, 0.02, curse, -0.08, 0.02, 0.03));
+  g.add(head);
+  g.userData.head = head;
+  return g;
+}
+
 export function buildItem(kind) {
   const M = ITEM_MATS;
   const g = new THREE.Group();
-  if (kind === 'pmap' || kind === 'nmap' || kind === 'smap') kind = 'map';
-  else if (kind === 'pkey' || kind === 'nkey' || kind === 'skey') kind = 'key';
+  if (kind === 'pmap' || kind === 'nmap' || kind === 'smap' || kind === 'tmap') kind = 'map';
+  else if (kind === 'pkey' || kind === 'nkey' || kind === 'skey' || kind === 'tkey') kind = 'key';
   if (kind === 'prism') {
     g.add(buildPrism());
   } else if (kind === 'sunkey') {
@@ -217,6 +240,32 @@ export function buildItem(kind) {
     band.rotation.z = Math.PI / 2 - 0.5;
     band.position.set(-0.28, -0.15, 0);
     g.add(band);
+  } else if (kind === 'trident') {
+    // 0.15: Poseidons förvridna treudd: ärgad brons, tre spetsar, och lila sprickor av Kronos förbannelse
+    g.add(buildTrident());
+  } else if (kind === 'tidekey') {
+    // Tidvattennyckeln: grön brons med en liten treudd som ax
+    const br = lam(0x5a9a8a);
+    const loop = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.05, 6, 12), br);
+    loop.position.y = 0.3;
+    g.add(loop);
+    g.add(B(0.07, 0.55, 0.06, br, 0, -0.1, 0));
+    for (const dx of [-0.08, 0, 0.08]) g.add(B(0.04, 0.12, 0.05, br, dx, -0.38, 0));
+    g.add(B(0.2, 0.04, 0.05, br, 0, -0.31, 0));
+    g.add(B(0.09, 0.09, 0.09, new THREE.MeshBasicMaterial({ color: 0x7ff0e0 }), 0, 0.3, 0.04));
+  } else if (kind === 'pearl') {
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), lam(0x2a2838, { emissive: 0x2a1a44 }));
+    g.add(p);
+    g.add(B(0.05, 0.05, 0.05, new THREE.MeshBasicMaterial({ color: 0xd8c8ff }), 0.08, 0.1, 0.14));
+  } else if (kind === 'charm') {
+    // Dykarens amulett: ett snäckskal på ett band av tång
+    const shell = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.4, 8), lam(0xe8d8c8));
+    shell.rotation.z = Math.PI;
+    g.add(shell);
+    for (let k = 0; k < 4; k++) g.add(B(0.02, 0.32, 0.02, lam(0xc8a890), -0.09 + k * 0.06, 0.02, 0.1));
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.02, 4, 14), lam(0x4a6a3a));
+    band.position.y = 0.3;
+    g.add(band);
   } else if (kind === 'lantern') {
     // Mässingslykta med glas och ett varmt sken
     g.add(B(0.3, 0.05, 0.3, M.brass, 0, 0.2, 0));
@@ -281,9 +330,23 @@ export const ITEM_TEXT = {
     'Put it on F, G or V in the item menu (Tab) and press that button to play. Each of ↑ ← → ↓ and Space plays a note. Esc stops playing.',
     'Some melodies have power. The songs you learn are written in your item menu.',
   ],
+  tmap: ['You found the Temple Map!', 'Press K to view it. The drowned halls are on it now.'],
+  tkey: ['You got a Iron Key!', 'It opens a locked door somewhere in the drowned temple.'],
+  tidekey: ['You got the Tide Key!', 'Green bronze, cold as the deep. It opens the great door to the Throne of Tides.'],
+  trident: [
+    "You got Poseidon's Corrupted Trident!",
+    'The spear of the sea god, cracked and veined with Kronos\' purple curse. The sea still answers it.',
+    'Put it on F, G or V (Tab) and press that button: Cello dashes forward with the trident. Under water it drives him like a fish. It breaks brittle coral, and hurts what it hits.',
+    'At a tide altar, press E to plunge the trident in. The water rises or falls at its command.',
+  ],
+  pearl: ['You found a Black Pearl!', 'Dark as the deep, with a glow inside. Corwin in Brinehollow pays well for these... or so he says.'],
+  charm: ["You got the Diver's Charm!", "A shell on a cord of sea-grass. Wearing it, Cello can hold his breath far longer under water."],
   lantern: [
     'You got the Lantern!',
     'A brass oil lantern. Put it on F, G or V in the item menu (Tab), then press that button to light it.',
     'It burns oil while it is lit, so put it out when you do not need it. Hold it up to an old brazier to light the brazier.',
   ],
 };
+
+// Namnet på en skärva efter värdet (grön 1, blå 5-15, röd 20-49, lila 50)
+export const shardWord = (n) => (n >= 50 ? 'a purple shard' : n >= 20 ? 'a red shard' : n >= 5 ? 'a blue shard' : 'a green shard');

@@ -81,7 +81,7 @@ export function buildRanch(B, areas) {
   // ---------- ladan och stallet ----------
   B.barn(X0 + 20, H(X0 + 20, -6), -6, -Math.PI / 2, { w: 12, d: 9, h: 4.4, label: 'Barn' });
   for (const [x, z, r] of [[23, -9, 0], [23, -6.5, 0], [24.4, -7.8, 0.4], [22, -2, 1.2], [18, -9.5, 0.2]]) B.hayBale(X0 + x, H(X0 + x, z), z, r);
-  B.chest('ranchBarn', X0 + 24.5, H(X0 + 24.5, -2), -2, -Math.PI / 2, { shards: 20 });
+  B.chest('ranchBarn', X0 + 24.5, H(X0 + 24.5, -2), -2, -Math.PI / 2, { shards: 15 });
   // Stallet: ett skjul med spiltor norr om ladan
   {
     const sx = X0 + 22, sz = -19, y = H(sx, sz);

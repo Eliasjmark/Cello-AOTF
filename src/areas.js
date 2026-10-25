@@ -37,6 +37,29 @@ export class Area {
     this.visited = false;
     this.connectFns = [];
     this.enterFns = [];
+    // 0.15: vatten att simma i: [{ x0, x1, z0, z1 } eller { x, z, r }, y: höjd eller () => höjd/null]
+    this.waters = [];
+    this.bubbles = []; // luftfickor och bubbelkällor: [{ x, y, z, r }]
+  }
+
+  // Vattenytans höjd där Cello står, eller null
+  waterAt(x, z) {
+    let best = null;
+    for (const w of this.waters) {
+      if (w.r !== undefined) { if ((x - w.x) ** 2 + (z - w.z) ** 2 > w.r * w.r) continue; }
+      else if (x < w.x0 || x > w.x1 || z < w.z0 || z > w.z1) continue;
+      const y = typeof w.y === 'function' ? w.y() : w.y;
+      if (y != null && (best === null || y > best)) best = y;
+    }
+    return best;
+  }
+
+  // Finns det luft att andas här (en luftficka eller en bubbelkälla)?
+  airAt(p) {
+    for (const b of this.bubbles) {
+      if ((p.x - b.x) ** 2 + (p.z - b.z) ** 2 < b.r * b.r && p.y > b.y - b.r - 1.6 && p.y < b.y + b.r) return true;
+    }
+    return false;
   }
 
   // Kollisionsträdet byggs först när Cello kommer hit (eller när någon frågar efter marken)

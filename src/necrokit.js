@@ -691,6 +691,8 @@ export class NecroWing extends Wing {
     const pool = { id, group: o.group ?? id, x0: this.X(x0), x1: this.X(x1), z0, z1, bottom, levels, level: levels[o.start ?? 0], target: levels[o.start ?? 0], start: o.start ?? 0, m, tex: t, splashT: 0 };
     m.position.set((pool.x0 + pool.x1) / 2, pool.level, (z0 + z1) / 2);
     this.pools.push(pool);
+    // 0.15: bassängen går att simma i när Cello har lärt sig
+    this.area.waters.push({ x0: pool.x0, x1: pool.x1, z0, z1, y: () => (pool.level > pool.bottom + 0.05 ? pool.level : null) });
     return pool;
   }
 
@@ -883,7 +885,7 @@ export class NecroWing extends Wing {
         pool.splashT = 0.35;
         g.fx.burst('spark', p.feet.clone().setY(pool.level + 0.05), 4, 0x9ae8d8);
       }
-      if (depth > 0.95 && !p.drowning) {
+      if (depth > 0.95 && !p.drowning && !p.canSwim) {
         p.drowning = true;
         g.sfx.play('splash', { vol: 1 });
         g.fx.burst('spark', p.feet.clone().setY(pool.level + 0.1), 22, 0x9ae8d8);

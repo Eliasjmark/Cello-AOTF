@@ -98,7 +98,7 @@ const freshState = () => ({
   northPath: false, eastPath: false, items: { hammer: false, prism: false }, hearts: 0, bastion: null,
   bastionDone: false, kaelLetter: false, letterGiven: false, gloves: false, spawnAt: 'aetheria',
   // 0.6: en större värld
-  area: 'home', entry: 'start', seen: {}, shards: 0, sword: SWORD_MAX, lantern: false, oil: 0, potions: 0,
+  area: 'home', entry: 'start', seen: {}, shards: 0, sword: SWORD_MAX, lantern: false, oil: 0, potions: 0, flasks: 0,
   slots: [null, null, null], opened: {}, torches: {}, hint: null, caveOpen: false,
   // 0.7: öknen och pyramiden
   sunGate: false, pyramid: null, pyramidDone: false, tarek: null, whetstone: false, lore: false,
@@ -109,6 +109,8 @@ const freshState = () => ({
   necropolis: null, necropolisDone: false,
   // 0.14: tornet, titanerna vaknar, det andra valet och sidouppdragen
   spire: null, spireDone: false, titanRaid: false, choice2: null, quests: {},
+  // 0.15: havet, simningen, templet och det tredje valet
+  swim: false, temple: null, templeDone: false, choice3: null, charm: false,
 });
 
 export class Story {
@@ -118,6 +120,7 @@ export class Story {
     this.pyramid = this.world.pyramid;
     this.necropolis = this.world.necropolis;
     this.spire = this.world.spire;
+    this.temple = this.world.temple;
     this.areas = this.world.areas;
     // Porten till nekropolen är full av sand tills ormen i pyramiden har fallit
     const necroExit = this.areas.get('desert')?.exits.find((e) => e.necro);
@@ -332,7 +335,10 @@ export class Story {
     this.state.necropolis = this.necropolis.state;
     this.spire.applyState(null);
     this.state.spire = this.spire.state;
+    this.temple.applyState(null);
+    this.state.temple = this.temple.state;
     this.chronicle?.applyState();
+    this.sea?.applyState();
     this.realm?.reset();
     this.world.setSunGate(false, true);
     this.goat?.load(this.state);
@@ -379,7 +385,10 @@ export class Story {
     s.necropolis = this.necropolis.state;
     this.spire.applyState(s.spire);
     s.spire = this.spire.state;
+    this.temple.applyState(s.temple);
+    s.temple = this.temple.state;
     this.chronicle?.applyState();
+    this.sea?.applyState();
     this.realm?.reset();
     this.setupFree();
     this.enemies.resetAll();
@@ -466,6 +475,7 @@ export class Story {
     s.pyramid = this.pyramid.state;
     s.necropolis = this.necropolis.state;
     s.spire = this.spire.state;
+    s.temple = this.temple.state;
     s.spawnAt = this.world.inBastion() ? 'bastion' : 'aetheria';
     s.area = this.areas.id;
     if (entry) s.entry = entry;
@@ -1154,6 +1164,15 @@ export class Story {
       this.necropolis.grant(kind);
     } else if (kind === 'smap' || kind === 'skey' || kind === 'galekey') {
       this.spire.grant(kind);
+    } else if (kind === 'tmap' || kind === 'tkey' || kind === 'tidekey') {
+      this.temple.grant(kind);
+    } else if (kind === 'trident') {
+      s.items.trident = true;
+      P.hasTrident = true;
+      this.inventory?.autoSlot('trident', true);
+      this.inventory?.refresh(true);
+    } else if (kind === 'pearl' || kind === 'charm') {
+      // sidouppdraget i havet sköter resten (seastory.js)
     } else if (kind === 'scales') {
       s.items.scales = true;
       this.inventory?.autoSlot('scales');
@@ -1563,7 +1582,7 @@ export class Story {
 
     // Vem eller vad går att prata med just nu?
     this.prompt = null;
-    if (!this.dialog.active && !this.fade && !this.cinematic && P.state === 'move' && P.grounded && !P.carried && !this.combat.lock && !this.songs?.active) {
+    if (!this.dialog.active && !this.fade && !this.cinematic && P.state === 'move' && (P.grounded || P.swimming) && !P.carried && !this.combat.lock && !this.songs?.active) {
       let best = null, bd = Infinity;
       const dg = this.world.dungeonAt(here);
       // I fängelsehålorna: deras egna saker, plus eldfaten och annat som hör till just det området

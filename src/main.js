@@ -28,6 +28,8 @@ import { Realm } from './realm.js';
 import { loadPack } from './skinned.js';
 import { WIND } from './build.js';
 import { Chronicle } from './chronicle.js';
+import { SeaStory } from './seastory.js';
+import { WATER } from './water.js';
 
 const PIXEL_LINES = 360; // retroläge: spelet ritas i ungefär så här många rader
 const FLASH = new THREE.Color(0x8d98b4);
@@ -193,6 +195,8 @@ function start(saved = {}) {
   for (const dg of Object.values(world.dungeons)) dg.game = { player, enemies, sfx, fx, hud, rig, dialog, story, lights, realm };
   // 0.14: krönikan (titanerna vaknar, Seren, valet efter Typhon, sidouppdragen)
   const chronicle = new Chronicle({ story, world, areas, player, hud, sfx, fx, rig, folk, inventory, combat, music });
+  // 0.15: havet (Seren följer med, simlektionen, pärlorna, fyren, templet och det tredje valet)
+  const seaStory = new SeaStory({ story, world, areas, player, hud, sfx, fx, rig, folk, inventory, combat, music });
   const world2 = { player, fx, sfx, onBlocked() {}, onPlayerHit() {} };
 
   // ---------- skärvor, hjärtan och vad fiender och krukor lämnar efter sig ----------
@@ -201,7 +205,7 @@ function start(saved = {}) {
     const hurt = p.hp < p.maxHp, low = p.hp <= p.maxHp / 2;
     if (kind === 'askling' || kind === 'shield') {
       if (roll(hurt ? 0.5 : 0.22)) fx.spawnHeart(pos);
-      if (roll(0.75)) fx.spawnShard(pos, roll(0.08) ? 20 : roll(0.35) ? 5 : 1);
+      if (roll(0.75)) fx.spawnShard(pos, roll(0.03) ? 20 : roll(0.3) ? 5 : 1);
       if (kind === 'shield') fx.spawnShard(pos, 5);
     } else if (kind === 'bat') {
       if (roll(0.25)) fx.spawnHeart(pos);
@@ -376,6 +380,57 @@ function start(saved = {}) {
     inventory.refresh();
   };
   player.onWallRun = (on) => { if (on) sfx.play('wallrun'); };
+  // 0.15: vatten och simning
+  player.waterAt = (x, z) => (areas.cur ? areas.cur.waterAt(x, z) : null);
+  player.bubbleAt = (p) => !!areas.cur?.airAt(p);
+  player.onSplash = (fall) => {
+    sfx.play('splash', { vol: Math.min(1, 0.35 + fall / 14) });
+    const y = player.waterY ?? player.feet.y + 1;
+    fx.burst('spark', player.feet.clone().setY(y + 0.05), 10 + Math.min(20, fall * 2), 0xcfeff8);
+  };
+  player.onDive = () => { sfx.play('dive'); fx.burst('bubble', player.feet.clone().setY(player.feet.y + 1.2), 10, 0xd8f4ff); };
+  player.onSurface = () => sfx.play('surface', { vol: player.breath < player.breathMax * 0.5 ? 1 : 0.5 });
+  player.onClimbOut = () => sfx.play('hup', { vol: 0.8 });
+  // 0.15: treuddens stöt
+  player.onDash = (under) => {
+    sfx.play('dash');
+    const at = player.feet.clone().setY(player.feet.y + 1);
+    if (under) fx.burst('bubble', at, 12, 0xd8f4ff);
+    else fx.burst('spark', at, 14, 0x9ff4e8);
+  };
+  // Treudden träffar fiender, bossar och spröd korall längs vägen
+  function dashHits() {
+    const d = player.dash;
+    if (!d) return;
+    const ctx = { player, director: enemies, fx, sfx };
+    const f = player.feet;
+    if (Math.random() < 0.6) fx.burst(player.headUnder ? 'bubble' : 'spark', f.clone().setY(f.y + 0.9), 2, player.headUnder ? 0xd8f4ff : 0x9ff4e8);
+    for (const e of enemies.list) {
+      if (!e.targetable || d.hit.has(e) || typeof e.hurt !== 'function' || e.area !== areas.id) continue;
+      if (Math.hypot(e.pos.x - f.x, e.pos.z - f.z) > 1.9 + (e.hitRadius ?? 0.5) || Math.abs(e.pos.y - f.y) > 2) continue;
+      d.hit.add(e);
+      const res = e.hurt(2, f, ctx);
+      if (res === 'blocked' || res === 'immune') { sfx.play('clang'); fx.burst('spark', e.chest.clone(), 12, 0xbfe4ff); continue; }
+      if (res) { sfx.play('hit', { vol: 1.1 }); fx.burst('spark', e.chest.clone(), 14, 0x9ff4e8); fx.hitStop(0.06); }
+    }
+    const dg = dungeon(), wing = dg?.wingAt?.(areas.id);
+    if (wing) {
+      for (const b of wing.bosses) {
+        if (d.hit.has(b) || !b.dashHit) continue;
+        const res = b.dashHit(player);
+        if (!res) continue;
+        d.hit.add(b);
+        if (res === 'blocked') { sfx.play('clang'); fx.burst('spark', b.chest.clone(), 14, 0xbfe4ff); rig.shake(0.2); player.setState('move'); }
+        else { sfx.play('hit', { vol: 1.2 }); sfx.play('ehurt', { vol: 0.8 }); fx.burst('spark', b.chest.clone(), 18, 0x9ff4e8); fx.hitStop(0.08); rig.shake(0.3); }
+      }
+      if (wing.dashBreak?.(player)) player.setState('move');
+    }
+    for (const at of B.cutGrass(areas.cur, f, player.facing, 1.6, 1.2)) fx.drop(at, 'grass');
+  }
+  player.onChoke = () => {
+    sfx.play('choke');
+    if (!story.state.chokeHint) { story.state.chokeHint = true; hud.toast('Cello is out of air! Swim up to the surface, or find bubbles to breathe.', 4200); }
+  };
   player.onSwordWear = (kind) => {
     if (kind === 'broken') {
       sfx.play('snap');
@@ -521,13 +576,14 @@ function start(saved = {}) {
       return { id: 'march' };
     }
     // Fästningens och pyramidens nya delar
-    const wing = bastion.wingAt(here) ?? pyramid.wingAt(here) ?? world.necropolis.wingAt(here) ?? world.spire.wingAt(here);
+    const wing = bastion.wingAt(here) ?? pyramid.wingAt(here) ?? world.necropolis.wingAt(here) ?? world.spire.wingAt(here) ?? world.temple.wingAt(here);
     if (wing) {
       if (wing.bossFight) return { id: 'warlord', now: true };
       if (wing.trap) return { id: 'march', now: true };
       if (here === 'nthrone' && world.necropolis.state.cleared.ammit) return { id: 'dawn' };
       if (here === 'scrown' && world.spire.state.cleared.typhon) return { id: 'dawn' };
-      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull', pdepths: 'whispers', pbarque: 'skull', pascent: 'march', papex: 'skull', ncrypts: 'whispers', nhall: 'skull', nduat: 'whispers', nthrone: 'skull', sgate: 'march', shall: 'march', sweb: 'skull', scrown: 'skull' }[here] };
+      if (here === 'tthrone' && world.temple.state.cleared.ketos) return { id: 'dawn' };
+      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull', pdepths: 'whispers', pbarque: 'skull', pascent: 'march', papex: 'skull', ncrypts: 'whispers', nhall: 'skull', nduat: 'whispers', nthrone: 'skull', sgate: 'march', shall: 'march', sweb: 'skull', scrown: 'skull', tgate: 'whispers', tdeep: 'whispers', tgrotto: 'skull', tthrone: 'skull' }[here] };
     }
     // Natten (0.11): byarna somnar och fälten blir kusliga
     if (clock.isNight && outdoorArea(areas.cur)) {
@@ -546,7 +602,7 @@ function start(saved = {}) {
     // Fältet: ett långsamt spår i moll (Elias ville ha något kusligare än galoppen)
     const byArea = {
       home: 'fieldsdawn', house: 'fieldsdawn', ranch: 'greenroad', pass: 'quiet', field: 'forgotten', willowmere: 'willowmere',
-      shop: 'willowmere', stormreach: 'march', cave: 'whispers',
+      shop: 'willowmere', stormreach: 'march', cave: 'whispers', sea: 'ballad',
     };
     if (here === 'pass' && P.z < -62) return { id: 'ballad' };
     return { id: byArea[here] };
@@ -658,7 +714,10 @@ function start(saved = {}) {
         enemies.env.dead = realm.dead;
         // 0.14: uppvindar och vindbyar i området (The Galecrown och The Windbound Spire)
         applyWinds(sim);
+        player.canSwim = !!story.state.swim;
+        player.breathPause = blocked;
         player.update(sim, pin, rig.yaw);
+        if (player.state === 'dash') dashHits();
         goat.update(sim);
         if (!talking && !story.shown) enemies.update(sim, world2);
         combat.update(sim, pin);
@@ -724,11 +783,14 @@ function start(saved = {}) {
     weather.update(dt, { camera, now: clock.day * 24 + clock.hour, running: freePlay });
     realm.update(dt);
     chronicle.update(dt);
+    seaStory.update(dt);
     const flash = sky.update(dt, t, camera) * base.flash;
     applyEnv(flash);
+    applyWater(dt);
     world.update(t, dt);
     // 0.13: gräset vajar, mer i regn och åska
     WIND.time.value = t;
+    WATER.time.value = t;
     WIND.strength.value = 1 + (weather.cur?.over ?? 0) * 1.4;
     cull(dt);
     lights.update(dt, t, hud.started ? player.feet : camera.position);
@@ -736,6 +798,30 @@ function start(saved = {}) {
     sfx.ambience(dt, story.ambienceState());
     updateMusic(dt);
     hud.frame(dt, player);
+  }
+
+  // 0.15: kameran under ytan (blått och dimmigt), luftmätaren och bubblor från Cello
+  let bubbleT = 0, strokeT = 0;
+  function applyWater(dt) {
+    const a = areas.cur, P = player;
+    const wy = a && hud.started ? a.waterAt(camera.position.x, camera.position.z) : null;
+    const under = wy != null && camera.position.y < wy - 0.05;
+    hud.setUnderwater(under);
+    if (under) {
+      scene.fog.color.set(a.waterFog ?? 0x1e5f72);
+      scene.fog.near = 0.5;
+      scene.fog.far = a.waterFar ?? 30;
+    }
+    hud.setBreath(P.breath / P.breathMax, hud.started && (P.headUnder || P.breath < P.breathMax - 0.05) && P.state !== 'dead');
+    if (P.headUnder && (bubbleT -= dt) <= 0) {
+      bubbleT = 0.35 + Math.random() * 0.5;
+      fx.burst('bubble', P.feet.clone().setY(P.feet.y + 1.55), 1 + (Math.random() < 0.3 ? 2 : 0), 0xd8f4ff);
+    }
+    if (P.swimming && P.speed > 1.2 && (strokeT -= dt) <= 0) {
+      strokeT = P.swim.mode === 'dive' ? 0.75 : 0.6;
+      sfx.play('stroke', { vol: P.headUnder ? 0.5 : 0.8 });
+      if (!P.headUnder) fx.burst('spark', P.feet.clone().setY((P.waterY ?? P.feet.y) + 0.05), 3, 0xcfeff8);
+    }
   }
 
   // 0.14: områdets uppvindar (lyfter Cello) och vindbyar (knuffar honom, men inte när han är tung)
@@ -802,7 +888,7 @@ function start(saved = {}) {
   // Handtag för felsökning i webbläsarens konsol
   window.__realm = {
     player, rig, world, areas, input, hud, scene, camera, enemies, combat, fx, sfx, story, dialog, bastion, pyramid, lights, collider, renderer,
-    culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs, realm, necropolis: world.necropolis, spire: world.spire, chronicle,
+    culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs, realm, necropolis: world.necropolis, spire: world.spire, chronicle, temple: world.temple, seaStory,
     tick: (dt, inp) => update(dt, { ...input.empty, ...inp }),
   };
   requestAnimationFrame(frame);

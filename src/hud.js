@@ -40,6 +40,7 @@ export class Hud {
       items: $('items'),
       dungeon: $('dungeon'), keys: $('dg-keys'), dgMap: $('dg-map'), dgBoss: $('dg-boss'),
       map: $('map'), mapCanvas: $('map-canvas'),
+      air: $('air'), underwater: $('underwater'),
     };
     this.mapView = new MapView(this.el.mapCanvas);
     this.mapOpen = false;
@@ -107,6 +108,26 @@ export class Hud {
     this.el.prompt.hidden = !text;
     if (text) this.el.promptText.textContent = text;
     this.el.talkBtn.hidden = !text;
+  }
+
+  // 0.15: luften under vattnet (frac 0..1); visas bara när den inte är full
+  setBreath(frac, show) {
+    const el = this.el.air;
+    if (!el) return;
+    const n = 6, left = Math.ceil(frac * n - 0.001);
+    const key = show ? `${left}` : 'off';
+    if (key === this.airKey) return;
+    this.airKey = key;
+    el.hidden = !show;
+    if (!show) return;
+    if (el.children.length !== n) el.innerHTML = '<i></i>'.repeat(n);
+    [...el.children].forEach((b, i) => b.classList.toggle('gone', i >= left));
+    el.classList.toggle('low', left <= 2);
+  }
+  setUnderwater(on) {
+    if (on === this.underOn) return;
+    this.underOn = on;
+    this.el.underwater?.classList.toggle('on', on);
   }
 
   setHearts(hp, max) {

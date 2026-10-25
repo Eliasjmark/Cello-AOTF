@@ -71,7 +71,7 @@ export function buildPass(B, areas) {
     const roof = new THREE.Mesh(rockGeo(1, 975, 0.5), M.rock);
     roof.scale.set(8, 2.4, 7);
     B.deco(roof, cx, H(cx, cz) + 7.5, cz);
-    B.chest('passCleft', cx - 1.5, H(cx - 1.5, cz), cz, Math.PI / 2, { shards: 50 });
+    B.chest('passCleft', cx - 1.5, H(cx - 1.5, cz), cz, Math.PI / 2, { shards: 20 });
     B.pot(cx + 1.6, H(cx + 1.6, cz - 2.6), cz - 2.6);
     B.pot(cx + 2.2, H(cx + 2.2, cz + 2.4), cz + 2.4);
     a.map.pois.push({ x: cx, z: cz, label: 'Cleft', icon: 'cave' });

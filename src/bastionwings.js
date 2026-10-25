@@ -232,7 +232,7 @@ export function buildBastionWings(B, areas, bastion) {
     // ---------- Fällsalen (F1): tre vågor ----------
     w.trapRoom('tF1', 'F1', ['f01', 'f12'], ['F1a', 'F1b', 'F1c'], () => w.game?.hud.toast('The last of them falls. Something glints where they stood.', 3000));
     w.traps[0].text = 'The bars slam shut! The forge fires roar!';
-    w.chest({ id: 'fF1', x: 0, z: -14, face: 0, shards: 50, hidden: () => !!s().cleared.tF1 });
+    w.chest({ id: 'fF1', x: 0, z: -14, face: 0, shards: 15, hidden: () => !!s().cleared.tF1 });
     for (const [x, z] of [[-8, -8], [0, -6], [8, -8]]) w.enemy('askling', x, z, [[x, z], [x, z - 8]], 'F1a', { dormant: true, room: 'F1' });
     w.enemy('shield', -6, -20, [[-6, -20], [6, -20]], 'F1b', { dormant: true, room: 'F1' });
     w.enemy('shield', 6, -10, [[6, -10], [-6, -10]], 'F1b', { dormant: true, room: 'F1' });
@@ -264,7 +264,7 @@ export function buildBastionWings(B, areas, bastion) {
       ramp.rotation.x = -th;
       B.solid(ramp);
     }
-    w.chest({ id: 'fF2L', x: -11, y: -6, z: -44, face: 0, shards: 50 });
+    w.chest({ id: 'fF2L', x: -11, y: -6, z: -44, face: 0, shards: 20 });
     w.enemy('askling', -6, -44, [[-10, -44], [2, -38]], 'F2L', { y: -6 });
     w.enemy('askling', 2, -36, [[2, -36], [-8, -48]], 'F2L', { y: -6 });
     w.inscription(-8, -29, Math.PI, ['Carved into the iron:', '"The bellows breathe, and the floor is old. Stand heavy on iron. Never on stone."']);

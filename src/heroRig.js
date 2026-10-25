@@ -99,6 +99,7 @@ export function sculptHero(p) {
   move(p.hammerHand, B.handR, 0, 0.02, 0).scale.setScalar(1.0);
   move(p.hammerBack, torso, -0.12, 0.46, -0.22).scale.setScalar(0.72);
   move(p.prism, B.handR, 0, -0.14, 0.06);
+  if (p.tridentHand) move(p.tridentHand, B.handR, 0, 0.0, 0.02).scale.setScalar(0.85);
   move(p.lantern, hips, -0.25, 0.0, 0.1);
 
   // Delar som rörelsekoden rör men som skulpturen inte har

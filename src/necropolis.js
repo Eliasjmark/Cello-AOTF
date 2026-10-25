@@ -371,7 +371,7 @@ export function buildNecropolis(B, areas, nec) {
     w.enemy('mummy', 10, -30, [[10, -30], [10, -44]], 'Bl', { y: -8, doze: true, room: 'Bl' });
     // Västra galleriet: nyckeln och en ande; östra galleriet: skatten och vålnader
     w.chest({ id: 'nK2', x: -22, y: 7, z: -40, face: Math.PI / 2, item: 'nkey' });
-    w.chest({ id: 'nHallE', x: 21.5, y: 7, z: -40, face: -Math.PI / 2, shards: 100 });
+    w.chest({ id: 'nHallE', x: 21.5, y: 7, z: -40, face: -Math.PI / 2, shards: 20 });
     w.enemy('wraith', 19.5, -30, [[19.5, -28], [19.5, -40]], 'Be', { y: 7, room: 'Be' });
     w.enemy('wraith', 20, -36, [[20, -34], [20, -42]], 'Be', { y: 7, room: 'Be' });
     w.spirit('bw', -18, -30, [

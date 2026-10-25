@@ -267,7 +267,7 @@ export function buildWillowmere(B, areas) {
 
   // ---------- väderkvarnen och en gömd kista bakom den ----------
   B.windmill(X0 + 28, H(X0 + 28, -38), -38, -0.5, 1.0);
-  B.chest('willowMill', X0 + 33.5, H(X0 + 33.5, -44.5), -44.5, -2.4, { shards: 20 });
+  B.chest('willowMill', X0 + 33.5, H(X0 + 33.5, -44.5), -44.5, -2.4, { shards: 10 });
   for (const [x, z, r] of [[22, -44, 0.3], [34, -33, 1.4]]) B.hayBale(X0 + x, H(X0 + x, z), z, r);
 
   // ---------- hönsgården ----------

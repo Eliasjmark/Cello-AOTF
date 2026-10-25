@@ -128,6 +128,7 @@ export class Input {
   press(name, down = true) {
     if (name === 'shield') this.virtual.shield = down;
     else if (name === 'jump') { this.virtual.jumpHeld = down; if (down) this.virtual.jump = true; }
+    else if (name === 'dodge') { this.virtual.diveHeld = down; if (down) this.virtual.dodge = true; }
     else if (down) this.virtual[name] = true;
   }
 
@@ -170,6 +171,7 @@ export class Input {
           pad.jumpHeld = b(0);
           pad.jump = edge('a', b(0));
           pad.dodge = edge('b', b(1));
+          pad.diveHeld = b(1);
           pad.attack = edge('x', b(2));
           pad.lock = edge('lt', b(6));
           pad.shield = b(7);
@@ -212,6 +214,8 @@ export class Input {
       map: p.has('KeyK') || pad.map || v.map,
       shield: this.mouseShield || k.has('KeyR') || pad.shield || v.shield,
       dodge: p.has('ShiftLeft') || p.has('ShiftRight') || pad.dodge || v.dodge,
+      // 0.15: Shift hålls nere = dyk nedåt under vattnet
+      diveHeld: k.has('ShiftLeft') || k.has('ShiftRight') || !!pad.diveHeld || !!v.diveHeld,
       lock: this.clicks.lock || p.has('KeyQ') || pad.lock || v.lock,
       togglePixel: p.has('KeyP'),
       toggleHelp: p.has('KeyH'),

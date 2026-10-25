@@ -345,7 +345,7 @@ function buildCave(B, areas) {
   B.enemy(VV(6, -12), [], { kind: 'bat' });
   B.enemy(VV(0, -54), [], { kind: 'bat' });
   for (const [x, z] of [[-12, 32], [-11, 33.4], [17, -4], [22, -8], [-1, -26]]) B.pot(X0 + x, H(X0 + x, z), z, 0.9);
-  B.chest('caveChest', X0 - 1, H(X0 - 1, -22), -22, 0.8, { shards: 50 });
+  B.chest('caveChest', X0 - 1, H(X0 - 1, -22), -22, 0.8, { shards: 15 });
 
   a.entries = {
     south: { pos: VV(0, 56), facing: Math.PI },

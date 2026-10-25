@@ -223,7 +223,7 @@ export function buildDesert(B, areas) {
     B.put(g, new THREE.Mesh(box(14.4, 0.8, 12.4, 2), M.sandstone), 0, 4.8, 0);
     // Sanddrivor som har blåst in genom porten
     for (let i = 0; i < 3; i++) B.put(g, new THREE.Mesh(new THREE.SphereGeometry(2.2 - i * 0.4, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), M.sandRock), -3 + i * 3, 0, 4.2 - i * 0.6);
-    B.chest('desertTemple', x, y + 0.4, z - 3, 0, { shards: 50 });
+    B.chest('desertTemple', x, y + 0.4, z - 3, 0, { shards: 15 });
     B.lights.add({ x, y: y + 2, z: z - 2, color: 0xffb060, power: 6, range: 7, flicker: 0.5 });
     a.map.pois.push({ x, z, label: 'Buried temple', icon: 'ruin' });
   }

@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { box, cyl, place, hash2, rockGeo } from './geom.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { buildItem } from './items.js';
+import { buildItem, shardWord } from './items.js';
 
 const DOOR_W = 2.4, DOOR_H = 3.6;
 const DIRS = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
@@ -690,7 +690,7 @@ export class Wing {
       story.after(0.7, () => {
         this.game.sfx.play('fanfare');
         story.inventory?.addShards(c.shards);
-        story.read([`You found ${c.shards >= 100 ? 'a golden' : c.shards >= 50 ? 'a purple' : 'a red'} shard! It is worth ${c.shards}.`], () => { story.cinematic = false; story.save(true); });
+        story.read([`You found ${shardWord(c.shards)}! It is worth ${c.shards}.`], () => { story.cinematic = false; story.save(true); });
       });
       return;
     }

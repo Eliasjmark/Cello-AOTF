@@ -191,6 +191,8 @@ export class Chronicle {
     const n = this.folk.npcs.seren;
     if (!n) return;
     const s = this.s;
+    // 0.15: efter tornet följer hon med till havet
+    if (s.spireDone && this.story.sea?.placeSeren()) return;
     const ga = this.ga, wa = this.areas.get('willowmere');
     if (s.titanRaid) {
       const c = this.gale.camp;
@@ -240,10 +242,10 @@ export class Chronicle {
     const s = this.s;
     s.quests.letter = 'done';
     s.potions = (s.potions || 0) + 1;
-    this.inventory.addShards?.(50);
+    this.inventory.addShards?.(20);
     this.inventory.autoSlot?.('potion');
     this.inventory.refresh(true);
-    this.story.after(0.6, () => { this.sfx.play('fanfare'); this.hud.toast('Quest complete: Fenn\'s Letter. Seren gives Cello a Healing Draught and 50 shards.', 4200); });
+    this.story.after(0.6, () => { this.sfx.play('fanfare'); this.hud.toast('Quest complete: Fenn\'s Letter. Seren gives Cello a Healing Draught and 20 shards.', 4200); });
     this.story.save(true);
     return ['From Fenn? ...That idiot. He writes like a bear with a stick.', '"Come back safe. The fire is warm. F." ...Hmph.', 'Here. Take this, for the walk. And do not tell him I smiled.'];
   }
@@ -255,7 +257,7 @@ export class Chronicle {
     if (!s.titanRaid) return [];
     if (id === 'tob') {
       if (!q.kite) return [{ id: 'kite', q: 'Why the long face, Tob?', a: () => { q.kite = 'asked'; this.questToast("Tob's Kite", 'The wind carried his kite to the Galecrown.'); this.story.save(true); return ['My kite! The big wind after the titan came took it. It flew all the way over Stormreach, to the west.', 'It is red with a yellow tail. If you see it... could you bring it back? I will give you my savings!']; } }];
-      if (q.kite === 'found') return [{ id: 'kite2', q: 'I found your kite!', a: () => { q.kite = 'done'; this.inventory.addShards?.(50); this.story.after(0.6, () => { this.sfx.play('fanfare'); this.questToast("Tob's Kite", 'Complete! Tob gives Cello 50 shards.', true); }); this.story.save(true); return ['MY KITE! You found it! Mira, LOOK!', 'Here, take my savings. It is fifty shards. I counted them twice.']; } }];
+      if (q.kite === 'found') return [{ id: 'kite2', q: 'I found your kite!', a: () => { q.kite = 'done'; this.inventory.addShards?.(20); this.story.after(0.6, () => { this.sfx.play('fanfare'); this.questToast("Tob's Kite", 'Complete! Tob gives Cello 20 shards.', true); }); this.story.save(true); return ['MY KITE! You found it! Mira, LOOK!', 'Here, take my savings. It is twenty shards. I counted them twice.']; } }];
     }
     if (id === 'fenn' && !q.letter) {
       return [{ id: 'letter', q: 'Do you know Seren?', a: () => { q.letter = 'carry'; this.questToast("Fenn's Letter", 'Deliver it to Seren in the Galecrown.'); this.story.save(true); return ['Seren? You saw her? Is she... I mean. Is she well?', 'If you are going west, give her this. It is nothing. A letter. Do not read it.']; } }];
@@ -400,14 +402,14 @@ export class Chronicle {
       ];
     }
     s.choice2 = 'slain';
-    this.inventory.addShards?.(100);
+    this.inventory.addShards?.(30);
     this.fx.burst('spark', P.feet.clone().setY(P.feet.y + 1.4), 40, 0x9fd8ff);
     this.rig.shake(0.6);
     this.sfx.play('thunder', { vol: 1 });
     return [
       { who: '', text: 'Cello drives the blade home. The storm-titan shatters into a hail of glittering storm-shards.' },
       { who: 'Kronos', voice: 'kronos', text: 'TYPHON! ...You will pay for every one of my brothers, spark.' },
-      { who: '', text: 'Cello gathers 100 shards from the broken storm.' },
+      { who: '', text: 'Cello gathers 30 shards from the broken storm.' },
     ];
   }
 
@@ -440,7 +442,8 @@ export class Chronicle {
         L('I am coming with you this time. No arguments.'),
       ], () => {
         story.cinematic = false;
-        this.hud.toast('The road to the sea opens in the next version of the game.', 4200);
+        this.hud.toast('The fishers of Brinehollow have mended the bridge south of the Galecrown. Seren goes ahead to the sea.', 4600);
+        this.placeSeren();
         story.save(true);
       });
     });

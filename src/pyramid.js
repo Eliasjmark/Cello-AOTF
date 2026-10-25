@@ -21,7 +21,7 @@ import { box, cyl, rockGeo, place, hash2 } from './geom.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Beams, BEAM_Y } from './beams.js';
 import { Khepri, Apophis } from './sunbosses.js';
-import { buildItem } from './items.js';
+import { buildItem, shardWord } from './items.js';
 
 export const OX = 9000;
 const H = 7; // väggarnas höjd
@@ -469,7 +469,7 @@ export class Pyramid {
       { id: 'pMap', x: 6.5, y: 0.3, z: -3.5, face: -Math.PI / 2, item: 'pmap', room: 'P1' },
       { id: 'pKey1', x: 28.5, y: 0, z: -15.5, face: -Math.PI / 2, item: 'pkey', room: 'P3', cage: 'c3' },
       { id: 'pKey2', x: -17.5, y: 0, z: -15.6, face: 0, item: 'pkey', room: 'P2', hidden: true },
-      { id: 'pCrypt', x: -32.2, y: 0, z: -9, face: Math.PI / 2, shards: 100, room: 'P2' },
+      { id: 'pCrypt', x: -32.2, y: 0, z: -9, face: Math.PI / 2, shards: 20, room: 'P2' },
     ];
     this.B.solid(place(new THREE.Mesh(cyl(1.1, 1.5, 0.3, 12, 1), M.sandstoneDark), OX + 6.5, 0.15, -3.5));
     for (const d0 of defs) {
@@ -823,7 +823,7 @@ export class Pyramid {
         this.game.sfx.play('fanfare');
         story.inventory?.addShards(c.shards);
         this.game.fx.burst('spark', new THREE.Vector3(c.x, c.y + 1.0, c.z), 14, 0xd08aff);
-        story.read([`You found a golden shard! It is worth ${c.shards}.`], () => { story.cinematic = false; story.save(true); });
+        story.read([`You found ${shardWord(c.shards)}! It is worth ${c.shards}.`], () => { story.cinematic = false; story.save(true); });
       });
       return;
     }

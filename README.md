@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.14 · The Windbound Spire (ett nytt tempel, titanerna vaknar, Seren följer med, ett moraliskt val och sidouppdrag)
+**Version:** prototyp 0.15 · The Drowned Temple (havet, simning, ett tempel under vattnet, Poseidons treudd och Kronos som vaknar)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -33,6 +33,27 @@ python3 tools/models/dump_fbx.py Boss1.fbx:boss1 ...   # FBX → tools/models/sr
 python3 tools/models/build_models.py                    # → models/pack.bin
 python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
 ```
+
+## Vad är nytt i 0.15: The Drowned Temple
+
+Söder om The Galecrown har fiskarna lagat bron. Nedanför ligger **The Shattered Sea**, ett innanhav i en skål av klippa, och mitt i havet sticker en bruten treudd upp ur vattnet.
+
+- **Simning** (`src/player.js`): Cello flyter på ytan i djupt vatten. Shift dyker, Space (hållen) simmar uppåt och Shift (hållen) nedåt. Mot en kant klättrar han upp av sig själv (eller med Space). Under ytan räcker luften en stund (bubblorna i mitten nertill); sedan gör det ont. Bubbelkällor på botten ger luft. Med tung vikt sjunker han och går på botten. Kameran under ytan blir blå och dimmig. Innan lektionen kan Cello inte simma.
+- **Nytt område: The Shattered Sea** (`src/regions/sea.js`): fiskebyn Brinehollow på stranden, en pir, en fyr på en klippö, koraller, tång, fiskstim, jättemusslor och ett skeppsvrak på botten. Seren följer med och går bredvid Cello på land (hon simmar inte).
+- **Simlektionen**: Nerissa på piren lär Cello simma (simma till den röda bojen och tillbaka). Sedan ror hon ut honom till ruinerna mitt i havet.
+- **Nytt tempel: The Drowned Temple** (`src/temple.js`), fyra delar:
+  - *The Sunken Gate*: Cello simmar in under vattnet. I Hall of Tides vrids ett tidvattenhjul (bara med fast mark under fötterna): högt vatten når de höga avsatserna, lågt vatten låter sigillen öppnas.
+  - *The Drowned Galleries*: en lång tunnel helt under vatten (andas vid bubbelkällorna, se upp för sjöborrarna) och en cistern där tung vikt på en tryckplatta öppnar ett galler en kort stund.
+  - *Karkinos' Grotto*: miniboss **Karkinos**, jättekrabban. Skalet tar inga hugg: lura den att rusa in i en korallpelare, eller vänd den på rygg med hammaren.
+  - *The Throne of Tides*: bossen **Ketos**, Poseidons havsodjur, förvridet av Kronos. Töm tronsalen med treudden vid ett tidvattenaltare, så strandar Ketos, och hugg förbannelsen på dess huvud.
+- **Ny relik: Poseidon's Corrupted Trident**: en stöt framåt (under vattnet skjuter Cello fram som en fisk), som slår sönder spröd korall och skadar det den träffar. Vid ett tidvattenaltare (E) stiger eller sjunker vattnet.
+- **Det tredje valet**: efter Ketos kan Cello dra ut förbannelsen och befria Ketos (längre andetag), eller ta den svarta pärlan ur dess hjärta (treudden slår hårdare).
+- **Slutet**: treudden var spiken i Kronos kista. Han vaknar och flyger norrut, mot frostjättarnas land.
+- **Sidouppdrag**: tre svarta pärlor i jättemusslorna (Corwin ger Dykarens amulett, mycket längre andetag) och den slocknade fyren (tänd den med lyktan åt Gull).
+- **Pengar**: kistorna ger mindre. De flesta ger 10–20 skärvor, ingen över 50 och bara tre ger 50. Belöningar från folk är också mindre.
+- **Oljeflaskor**: hos Pell, Mags och Hamid går det att köpa en flaska lampolja att bära med sig (högst tre). Använd den från en knapp, eller låt Cello hälla i den själv när lyktan slocknar.
+
+Nytt i koden: `src/water.js` (vattenytan, vågorna och ljusnätet på botten), `src/regions/sea.js`, `src/temple.js`, `src/templekit.js` (vattennivåer, hjul, altaren, sigill, bubbelkällor, korall, sjöborrar, Karkinos och Ketos) och `src/seastory.js` (berättelsen i 0.15).
 
 ## Vad är nytt i 0.14: The Windbound Spire
 
@@ -332,7 +353,7 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/areas.js` | Områdena: var och en har sin egen grupp, sitt kollisionsträd, ingångar och utgångar |
 | `src/build.js` | Byggverktygen alla områden använder: öar, vägar, broar, hus, ladan, träd, staket, eldar, dimma vid gränserna |
 | `src/world.js` | Cellos hem, byn och Aetheria, fästningens och pyramidens områden, och kopplingen mellan områdena |
-| `src/regions/` | `ranch.js`, `pass.js`, `field.js`, `willowmere.js`, `stormreach.js` (med grottan), `desert.js` (The Ember Wastes), `galecrown.js` (The Galecrown, 0.14) och `interiors.js` (butiken och Cellos hus) |
+| `src/regions/` | `ranch.js`, `pass.js`, `field.js`, `willowmere.js`, `stormreach.js` (med grottan), `desert.js` (The Ember Wastes), `galecrown.js` (The Galecrown, 0.14), `sea.js` (The Shattered Sea, 0.15) och `interiors.js` (butiken och Cellos hus) |
 | `src/folk.js` | Folket ute i världen, butikerna, kistorna, eldfaten, djuren och övningsdockan |
 | `src/inventory.js` | Föremålsmenyn, snabbknapparna, skärvorna, lyktan och dryckerna |
 | `src/bastion.js` | The Tempest Bastion: rum, dörrar, kistor, kretsar, pussel, fällor och bossarna |
@@ -342,6 +363,10 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/weather.js` | Vädret (0.11): lugnt, regn, åska, dimma och sanddis, regnet, och blixten som slår ner i metall |
 | `src/talk.js` | Dialogträd (0.11): frågor i valfri ordning, det dumma svaret, humör och ikoner över huvudet |
 | `src/songs.js` | Flöjten (0.11): spelläget, sångerna, lektionerna och sångstenarna |
+| `src/water.js` | Vatten (0.15): vattenytan med vågor och glitter, och ljusnätet på botten |
+| `src/temple.js` | The Drowned Temple (0.15): templets fyra delar och tillståndet (nycklar, dörrar, kistor, vattennivåer) |
+| `src/templekit.js` | Templets byggdelar (0.15): bassänger, tidvattenhjul och altaren, sigill, bubbelkällor, spröd korall, sjöborrar, Karkinos och Ketos |
+| `src/seastory.js` | Berättelsen i 0.15: Seren vid havet, simlektionen, pärlorna, fyren, templet, det tredje valet och slutet |
 | `src/spire.js` | The Windbound Spire (0.14): templets fyra delar och tillståndet (nycklar, dörrar, kistor) |
 | `src/spirekit.js` | Vindtemplets byggdelar (0.14): uppvindar, ventiler, väggar att springa på, The Brass Weaver och Typhon |
 | `src/chronicle.js` | Berättelsen i 0.14: titanen över Willowmere, Kronos, Seren i The Galecrown, valet efter Typhon och sidouppdragen |

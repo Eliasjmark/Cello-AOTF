@@ -38,6 +38,11 @@ export const VOICES = {
   spirit: { f: 260, wave: 'sine', form: [[620, 3], [1240, 4]], wobble: 1.4, breath: 1.0 },
   ammit: { f: 72, wave: 'sawtooth', form: [[340, 3], [760, 3]], wobble: 1.0, breath: 0.7 },
   anubis: { f: 96, wave: 'triangle', form: [[420, 3], [900, 4]], breath: 0.6 },
+  // 0.15: Brinehollow
+  nerissa: { f: 235, wave: 'sawtooth', form: [[700, 3], [1250, 4]], wobble: 0.7, breath: 0.3 },
+  corwin: { f: 150, wave: 'square', form: [[620, 4], [1300, 5]], wobble: 0.2 },
+  gull: { f: 125, wave: 'sawtooth', form: [[520, 3], [980, 4]], wobble: 0.9, breath: 0.4 },
+  marlo: { f: 160, wave: 'sawtooth', form: [[600, 4], [1200, 5]] },
 };
 const STEPS = [1, 9 / 8, 5 / 4, 4 / 3, 3 / 2];
 const FANFARE = [[523.25, 0], [659.25, 0.13], [783.99, 0.26], [1046.5, 0.39], [987.77, 0.62], [1046.5, 0.78]];
@@ -589,6 +594,13 @@ export class Sfx {
           this.noiseThrough('lowpass', 700, 300, 1, ti, 0.1, this.gain(ti, 0.01, 0.12, 0.1));
         }
         break;
+      case 'pour': // olja hälls i lyktan (0.15): ett gluggande ljud som går uppåt
+        for (let i = 0; i < 5; i++) {
+          const ti = t + i * 0.09;
+          this.osc('sine', 260 + i * 40, 200 + i * 50, ti, 0.08, this.gain(ti, 0.005, 0.18 * v, 0.08));
+        }
+        this.noiseThrough('bandpass', 900, 1400, 2, t, 0.5, this.gain(t, 0.03, 0.08 * v, 0.5));
+        break;
       case 'menu': // menyn öppnas eller stängs
         this.osc('triangle', v > 0.5 ? 660 : 880, v > 0.5 ? 990 : 660, t, 0.12, this.gain(t, 0.004, 0.14, 0.12));
         break;
@@ -659,6 +671,32 @@ export class Sfx {
       case 'splash': // något faller i vattnet
         this.noiseThrough('bandpass', 1400, 400, 0.8, t, 0.5, this.gain(t, 0.01, 0.4 * v, 0.48));
         this.osc('sine', 180, 60, t, 0.25, this.gain(t, 0.005, 0.2 * v, 0.25));
+        break;
+      // ---------- 0.15: simning ----------
+      case 'tide': // vattnet stiger eller sjunker: ett djupt brus
+        this.noiseThrough('lowpass', 500, 180, 0.8, t, 2.2, this.gain(t, 0.4, 0.35 * v, 2.2));
+        this.osc('sine', 70, 52, t, 2.0, this.gain(t, 0.3, 0.12 * v, 2.0));
+        break;
+      case 'dash': // treuddens stöt: ett vattensus och en ton
+        this.noiseThrough('bandpass', 1200, 500, 1.2, t, 0.45, this.gain(t, 0.01, 0.32 * v, 0.45));
+        this.osc('triangle', 520, 880, t, 0.2, this.gain(t, 0.005, 0.1 * v, 0.2));
+        break;
+      case 'dive': // ner under ytan: ett bubbligt sus
+        this.noiseThrough('lowpass', 1800, 300, 1, t, 0.6, this.gain(t, 0.02, 0.3 * v, 0.6));
+        for (let i = 0; i < 4; i++) this.osc('sine', 500 + i * 140, 900 + i * 160, t + 0.08 + i * 0.07, 0.06, this.gain(t + 0.08 + i * 0.07, 0.004, 0.08 * v, 0.06));
+        break;
+      case 'surface': // upp till ytan: ett andetag
+        this.noiseThrough('bandpass', 900, 2200, 1.2, t, 0.35, this.gain(t, 0.03, 0.2 * v, 0.35));
+        this.noiseThrough('lowpass', 1200, 600, 1, t, 0.3, this.gain(t, 0.01, 0.15 * v, 0.3));
+        break;
+      case 'stroke': // ett simtag
+        this.noiseThrough('bandpass', 700, 1100, 1.5, t, 0.22, this.gain(t, 0.03, 0.12 * v, 0.22));
+        break;
+      case 'choke': // luften tar slut: ett gurgel
+        for (let i = 0; i < 5; i++) this.osc('sine', 260 - i * 20, 140, t + i * 0.06, 0.07, this.gain(t + i * 0.06, 0.004, 0.18 * v, 0.07));
+        break;
+      case 'bubble': // en enstaka bubbla
+        this.osc('sine', 700 + Math.random() * 500, 1500 + Math.random() * 600, t, 0.05, this.gain(t, 0.003, 0.05 * v, 0.05));
         break;
       // ---------- 0.11: flöjten ----------
       case 'note': { // en flöjtton: sinus med lite vibrato, en svag oktav och andning
