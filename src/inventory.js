@@ -258,6 +258,7 @@ export class Inventory {
       }
       this.s.potions--;
       P.heal(8);
+      P.poisonT = 0; // 0.17: drycken botar också gift
       this.hud.setHearts(P.hp, P.maxHp);
       this.sfx.play('drink');
       this.fx.burst('spark', P.feet.clone().setY(P.feet.y + 1.2), 14, 0xff8a7a);

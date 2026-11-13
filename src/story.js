@@ -816,6 +816,7 @@ export class Story {
     this.startFade(1.6, text, () => {
       const P = this.player;
       P.hp = P.maxHp;
+      P.poisonT = 0;
       this.hud.setHearts(P.hp, P.maxHp);
       if (this.clock) {
         if (until === null) this.clock.addHours(1);

@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.16 · Frostgiant's Maw (snö och kyla i norr, glidis, Lokis mask och skuggan, frostjätten Thrym och Kronos som får en kropp)
+**Version:** prototyp 0.17 · Steel & Shadow (svårare fiender med nya sorter och livmätare, konturer, riktiga skuggor och mer liv i luften)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -34,7 +34,29 @@ python3 tools/models/build_models.py                    # → models/pack.bin
 python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
 ```
 
-## Vad är nytt i 0.16: Frostgiant's Maw
+## Vad är nytt i 0.17: Steel & Shadow
+
+En stor uppdatering av striderna och av hur världen ser ut.
+
+**Striderna** (`src/foes.js`, `src/enemies.js`)
+- **Mer liv**: alla fiender tål mer. Varje område och fängelsehåla har en nivå (0–5) efter hur långt in i spelet den ligger: Hollowbrook och The Stormvale är nivå 0 (6 i liv, mot 4 förut), The Tempest Bastion nivå 1, öknen och pyramiden nivå 2, The Galecrown och tornet nivå 3, havet och templet nivå 4 och norr nivå 5 (12 i liv, och mer för de tunga sorterna).
+- **Nya sorters asklingar**, som dyker upp gradvis:
+  - *Ashling Brute* (från nivå 1): större och tyngre, med en järnklubba med spikar. Slår ett helt hjärta (ett och ett halvt längre fram) och knuffas knappt bakåt.
+  - *Venomfang* (från nivå 2): grön, med gifttänder och en skorpionsvans. Slaget förgiftar Cello: hjärtana blir gröna och han tappar ett halvt hjärta varannan sekund i sex sekunder (han dör inte av giftet). En Healing Draught eller en vila vid elden botar.
+  - *Ramhorn* (från nivå 3): krökta horn. Skrapar med foten och rusar rakt mot Cello på avstånd. Träffar den kastas Cello långt bakåt; skölden stoppar den och gör den yr, och rusar den in i en vägg blir den också yr.
+  - *Tide Reaver* (från nivå 4): ett hullingförsett spjut som når längre och slår ett helt hjärta.
+  - *Rimeling* (nivå 5): av is. Slaget kyler Cello, som blir långsam en stund och fryser lite mer.
+- Fladdermössen tål två hugg från havet och framåt. Frostgiant's Maw har fått fler vakter.
+- **Livmätare**: varje fiende har en liten mätare över huvudet (syns när den är arg, skadad eller när Cello låser på den). De nya sorterna har sitt namn över mätaren. **Bossar** har en stor mätare nere på skärmen med namnet, och en gul rand som visar hur mycket liv som just gick förlorat.
+
+**Grafiken** (`src/post.js`, `src/shadows.js`, `src/motes.js`)
+- **Konturer**: ett efterbehandlingspass ritar mörka tuschlinjer där djupet hoppar (runt figurer, hus, träd, stenar) och där ytor möts (kanter och hörn). Linjerna tonar bort på avstånd och i dimman, så att det inte blir plottrigt långt bort.
+- **Skuggor i vrår**: hörn, springor och fötter mot marken blir lite mörkare (en enkel AO på djupet), och en svag vinjett i kanterna.
+- **Riktiga skuggor**: solen och månen kastar skuggor från figurer, hus, pelare, träd, staket och stenar. Skuggkameran följer Cello (ungefär 70 × 70 meter) och flyttas i hela texlar så att kanterna inte darrar. Inomhus ligger den strax ovanför Cello, så att taket inte skuggar hela rummet. Med skuggor på kommer lite mer av ljuset från solen och mindre från himlen, så att de syns.
+- **Liv i luften**: pollen som glittrar i solen, eldflugor på natten, glöd som stiger i öknen och damm i fängelsehålorna.
+- **Inställningar**: *Outlines* och *Shadows* går att stänga av under Options (för långsamma datorer).
+
+## Vad var nytt i 0.16: Frostgiant's Maw
 
 Norr om The Galecrown går en ny bro (den öppnas när templet under havet är klart). Där ligger **The Frostmarch**, ett land av snö, och längst i norr en glaciär med huvudet av en frusen jätte.
 
@@ -388,6 +410,10 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/temple.js` | The Drowned Temple (0.15): templets fyra delar och tillståndet (nycklar, dörrar, kistor, vattennivåer) |
 | `src/templekit.js` | Templets byggdelar (0.15): bassänger, tidvattenhjul och altaren, sigill, bubbelkällor, spröd korall, sjöborrar, Karkinos och Ketos |
 | `src/seastory.js` | Berättelsen i 0.15: Seren vid havet, simlektionen, pärlorna, fyren, templet, det tredje valet och slutet |
+| `src/foes.js` | Fiendernas nivåer (0.17), de nya sorterna (Brute, Venomfang, Ramhorn, Tide Reaver, Rimeling), livmätarna och bossens mätare |
+| `src/post.js` | Efterbehandlingen (0.17): konturer, skuggor i vrår och vinjett |
+| `src/shadows.js` | Skuggorna från solen och månen (0.17) |
+| `src/motes.js` | Pollen, eldflugor, glöd och damm i luften (0.17) |
 | `src/maw.js` | Frostgiant's Maw (0.16): fängelsehålans fyra delar och tillståndet (nycklar, dörrar, kistor, navets läge) |
 | `src/frostkit.js` | Byggdelarna i jättens gap (0.16): glidis, isblock, rimfrostgaller, navet med spaken, Hati och Thrym |
 | `src/shadow.js` | Loki's Mask (0.16): skuggan som flyger, landar, håller ner plattor och byter plats med Cello |

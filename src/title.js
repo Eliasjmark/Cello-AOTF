@@ -12,7 +12,7 @@ import { heartSvg } from './hud.js';
 
 const SETTINGS_KEY = 'cello-ashes-of-the-fallen:settings';
 // 0.14: retroläget är avstängt från början (det går att slå på i inställningarna eller med P)
-export const DEFAULT_SETTINGS = { music: 8, sound: 8, pixel: false, v: 2 };
+export const DEFAULT_SETTINGS = { music: 8, sound: 8, pixel: false, outlines: true, shadows: true, v: 2 };
 
 export function loadSettings() {
   try {
@@ -737,6 +737,10 @@ export class TitleScreen {
       level('sound', 'Sound', 1),
       { label: `Retro mode<span class="val toggle">${S.pixel ? 'On' : 'Off'}</span>`, cls: 'opt', sub: 'Low resolution and big, chunky pixels',
         adjust: () => { apply('pixel', !S.pixel, 2); this.sfx.play('menuMove'); }, run: () => { apply('pixel', !S.pixel, 2); this.sfx.play('menuSelect'); } },
+      { label: `Outlines<span class="val toggle">${S.outlines !== false ? 'On' : 'Off'}</span>`, cls: 'opt', sub: 'Ink lines around everything, and soft shading in corners',
+        adjust: () => { apply('outlines', S.outlines === false, 3); this.sfx.play('menuMove'); }, run: () => { apply('outlines', S.outlines === false, 3); this.sfx.play('menuSelect'); } },
+      { label: `Shadows<span class="val toggle">${S.shadows !== false ? 'On' : 'Off'}</span>`, cls: 'opt', sub: 'Real shadows from the sun and moon (turn off on slow computers)',
+        adjust: () => { apply('shadows', S.shadows === false, 4); this.sfx.play('menuMove'); }, run: () => { apply('shadows', S.shadows === false, 4); this.sfx.play('menuSelect'); } },
       { label: 'Back', cls: 'back-btn', run: () => this.back() },
     ], focus);
   }
@@ -766,6 +770,7 @@ export class TitleScreen {
       </dl>
       <p class="panel-sub">Swimming: hold <kbd>Space</kbd> to swim up and <kbd>Shift</kbd> to swim down. Swim into a ledge to climb out.</p>
       <p class="panel-sub">In the cold north, keep your lantern lit or stay near a fire. On glide ice Cello slides until something stops him. Loki's Mask throws your shadow ahead: press again to swap places with it.</p>
+      <p class="panel-sub">The deeper you go, the tougher the Ashlings: Brutes with iron clubs, poisonous Venomfangs, charging Ramhorns, spear-wielding Tide Reavers and freezing Rimelings. A potion or a rest by the fire cures poison. Outlines and shadows can be turned off in Options.</p>
       <p class="panel-sub">The first click captures the mouse, <kbd>Esc</kbd> releases it. <kbd>M</kbd> sound, <kbd>N</kbd> music, <kbd>P</kbd> Retro mode. Gamepad: A jump, X sword, B roll, RT shield, LT lock on, Y talk, RB, LB and D-pad right items, Start item menu, Back map.</p>
       <div class="panel-back" id="title-howto"></div>`, 'panel-howto');
     this.list(document.getElementById('title-howto'), [{ label: 'Back', cls: 'back-btn', run: () => this.back() }]);

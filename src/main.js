@@ -32,6 +32,10 @@ import { SeaStory } from './seastory.js';
 import { FrostStory } from './froststory.js';
 import { ShadowDouble } from './shadow.js';
 import { WATER } from './water.js';
+import { Post } from './post.js';
+import { applyTiers, HealthBars, BossBar } from './foes.js';
+import { Motes } from './motes.js';
+import { SunShadows, markShadows } from './shadows.js';
 
 const PIXEL_LINES = 360; // retroläge: spelet ritas i ungefär så här många rader
 const FLASH = new THREE.Color(0x8d98b4);
@@ -49,6 +53,7 @@ function start(saved = {}) {
   renderer.setPixelRatio(1);
 
   const scene = new THREE.Scene();
+  const post = new Post(renderer);
   scene.fog = new THREE.Fog(0x323843, 34, 260);
   const fogBase = new THREE.Color(0x323843);
   const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 1500);
@@ -58,6 +63,7 @@ function start(saved = {}) {
   const moon = new THREE.DirectionalLight(0xc6d0e6, 1.25);
   moon.position.set(-40, 60, 25);
   scene.add(moon);
+  const sun = new SunShadows(renderer, moon, scene);
   // 0.13: ljuset en lugn dag (klassiska äventyrsspel): varmt, disigt solljus och dämpade gröna och bruna toner
   const TP = { sky: new THREE.Color(0xe0d2b0), ground: new THREE.Color(0x5a4630), sun: new THREE.Color(0xffd8a4), fog: new THREE.Color(0xa89878) };
   const base = { hemi: 1.5, moon: 1.25, flash: 1, sky: new THREE.Color(0x9aa7bd), ground: new THREE.Color(0x3a3029), moonColor: new THREE.Color(0xc6d0e6), near: 34, far: 260 };
@@ -133,6 +139,11 @@ function start(saved = {}) {
     });
   }
   enemies.hud = hud;
+  // 0.17: fienderna får liv, vapen och nya sorter efter hur långt in i spelet de finns
+  applyTiers(enemies.list);
+  const bars = new HealthBars(scene);
+  const bossBar = new BossBar();
+  const motes = new Motes(scene);
   // Fängelsehålan i området Cello är i (eller null)
   const dungeon = () => world.dungeonAt(areas.id);
   // Krukor i alla områden
@@ -652,7 +663,8 @@ function start(saved = {}) {
       return;
     }
     if (!window.__realm?.hold) update(dt, input.poll(dt));
-    renderer.render(scene, camera);
+    post.enabled = settings.outlines !== false;
+    post.render(scene, camera, { pixel: pixel && !title.active });
   }
 
   // All spellogik för en bildruta (utan ritning), så att den även går att testa snabbt
@@ -735,6 +747,7 @@ function start(saved = {}) {
         shadow.update(sim, areas.id);
         goat.update(sim);
         if (!talking && !story.shown) enemies.update(sim, world2);
+        statusEffects(sim);
         combat.update(sim, pin);
         cutGrass();
         pots.update(sim, player);
@@ -781,8 +794,21 @@ function start(saved = {}) {
         if (respawn.t > 1.3) respawn = null;
       }
       rig.indoor = (inDungeon() && areas.id === 'bastion' && player.feet.z < -150) || !!areas.cur?.indoor;
+      sun.setEnabled(settings.shadows !== false);
+      sun.update(player.feet, !outdoorArea(areas.cur) || !!areas.cur?.indoor, 1);
       rig.extra = areas.id === 'fthrone' && world.maw.wingAt('fthrone')?.bossFight ? 4.5 : 0;
       rig.update(dt, blocked ? input.empty : inp, player);
+      bars.update(dt, enemies.list, player, combat.lock, areas.id);
+      {
+        // 0.17: pollen, eldflugor, glöd eller damm i luften
+        const a = areas.cur, out = outdoorArea(a), wx = weather.cur;
+        const wet = (wx.rain || 0) > 0.2 || (wx.snow || 0) > 0.2;
+        motes.setKind(!a ? 'none' : !out ? (a.id.startsWith('t') && world.templeIds?.has(a.id) ? 'none' : 'dust')
+          : wet || a.id === 'frost' ? 'none' : a.id === 'desert' || (a.id === 'village' && story.phase !== 'free') ? 'embers'
+          : clock.isNight ? 'fireflies' : 'pollen');
+        motes.update(dt, camera.position, settings.outlines !== false);
+      }
+      bossBar.update(dt, combat.extra, player, story.phase === 'free' && !story.cinematic);
       player.model.root.visible = (rig.cur > 0.95 || rig.fallLock || !!rig.cinematic) && player.visibleBlink;
       hud.setDungeon(inRooms()?.state ?? null);
     } else {
@@ -897,6 +923,29 @@ function start(saved = {}) {
     if (player.gust.lengthSq() > 4 && gustSfx <= 0) { gustSfx = 2.4; sfx.play('gust', { vol: 0.8 }); }
   }
 
+  // 0.17: gift och kyla från de nya asklingarna
+  let poisonFx = 0;
+  function statusEffects(dt) {
+    const P = player;
+    if (P.slowT > 0) P.slowT = Math.max(0, P.slowT - dt);
+    if (P.poisonT > 0 && P.state !== 'dead') {
+      P.poisonT -= dt;
+      P.poisonTick = (P.poisonTick ?? 1.5) - dt;
+      if (P.poisonTick <= 0) {
+        P.poisonTick = 2;
+        if (P.hp > 1) {
+          P.hp -= 1;
+          hud.setHearts(P.hp, P.maxHp);
+          sfx.play('ehurt', { vol: 0.4 });
+        }
+      }
+      poisonFx -= dt;
+      if (poisonFx <= 0) { poisonFx = 0.25; fx.burst('spark', P.feet.clone().setY(P.feet.y + 0.8 + Math.random() * 0.8), 1, 0x7aff5a); }
+    }
+    if (P.state === 'dead') P.poisonT = 0;
+    hud.setPoison(P.poisonT > 0);
+  }
+
   // Ljuset, dimman och himlen efter tid på dygnet och väder
   const _c = new THREE.Color();
   function applyEnv(flash) {
@@ -923,6 +972,8 @@ function start(saved = {}) {
     scene.fog.near = base.near * (1 - 0.8 * fog) * (1 - 0.35 * warm);
     scene.fog.far = base.far * (1 - 0.68 * fog) * (1 - n * 0.25) * (1 - 0.15 * warm);
     sky.setEnv(day, dusk, Math.max(over, fog * 0.6), warm);
+    // 0.17: med skuggor kommer mer av ljuset från solen och mindre från himlen, så att skuggorna syns
+    if (sun.enabled) { moon.intensity *= 1.32; hemi.intensity *= 0.84; }
     // Klockan och vädret uppe till vänster
     clockT -= 1;
     if (clockT <= 0) {
@@ -934,10 +985,12 @@ function start(saved = {}) {
 
   // Handtag för felsökning i webbläsarens konsol
   window.__realm = {
-    player, rig, world, areas, input, hud, scene, camera, enemies, combat, fx, sfx, story, dialog, bastion, pyramid, lights, collider, renderer,
+    player, rig, world, areas, input, hud, scene, camera, enemies, post, sun, bars, bossBar, combat, fx, sfx, story, dialog, bastion, pyramid, lights, collider, renderer,
     culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs, realm, necropolis: world.necropolis, spire: world.spire, chronicle, temple: world.temple, seaStory, maw: world.maw, frostStory, shadow,
     tick: (dt, inp) => update(dt, { ...input.empty, ...inp }),
   };
+  // 0.17: skuggor på allt som är byggt (figurer, hus, träd, stenar, väggar) och konturer över bilden
+  markShadows(scene);
   requestAnimationFrame(frame);
 }
 

@@ -754,8 +754,10 @@ export class Player {
         const speed = carrying ? 3.6 : this.heavy ? Math.min(heavySpeed, this.shielding ? SHIELD_SPEED : heavySpeed)
           : this.prismUp ? PRISM_SPEED : this.shielding ? SHIELD_SPEED : this.lockTarget ? LOCK_SPEED : input.walk ? WALK_SPEED
           : this.swift ? SWIFT_SPEED : RUN_SPEED;
-        tvx = this.wish.x * speed * mag;
-        tvz = this.wish.z * speed * mag;
+        // 0.17: en Rimelings slag gör Cello långsam en stund
+        const chill = this.slowT > 0 ? 0.58 : 1;
+        tvx = this.wish.x * speed * mag * chill;
+        tvz = this.wish.z * speed * mag * chill;
         accel = mag > 0.01 ? ACCEL : DECEL;
         airControl = mag > 0.01;
         allowAuto = !this.lockTarget && !this.shielding && !carrying && !this.heavy && !this.prismUp;

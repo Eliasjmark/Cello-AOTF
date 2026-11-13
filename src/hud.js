@@ -136,6 +136,13 @@ export class Hud {
     this.el.underwater?.classList.toggle('on', on);
   }
 
+  // 0.17: gröna hjärtan när Cello är förgiftad
+  setPoison(on) {
+    if (on === this.poisoned) return;
+    this.poisoned = on;
+    this.el.hearts.classList.toggle('poison', !!on);
+  }
+
   setHearts(hp, max) {
     const key = `${hp}/${max}`;
     if (key === this.heartKey) return;

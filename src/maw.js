@@ -128,6 +128,9 @@ export function buildMaw(B, areas, mw) {
     for (const z of [4, 10, 16]) for (const s of [-1, 1]) w.B.solid(place(new THREE.Mesh(new THREE.ConeGeometry(0.8, 4.5, 5), FM.bone), w.X(s * 4.8), 2.25, z));
     w.inscription(-3, 18.6, Math.PI, ['Runes, cut into a tooth of the giant:', '"Here lies Thrym, king of the frost-giants, who stole the hammer of thunder and died for it."', '"The ice of his body does not melt. Walk it as he walked: straight, and without stopping."']);
     icicles(w, -6, 6, 1, 20, 7, 14);
+    // 0.17: vakter i förhallen
+    w.enemy('askling', -3, 12, [[-3, 12], [3, 15]], 'V0');
+    w.enemy('askling', 3, 7, [[3, 7], [-2, 5]], 'V0');
 
     // ---------- Glidsalen: 11 × 11 rutor glidis ----------
     const G1 = w.room('G1', 'The Gliding Hall', -11, 11, -31, 0);
@@ -175,6 +178,8 @@ export function buildMaw(B, areas, mw) {
     for (const [x, z] of [[-5.6, -5.6], [5.6, -5.6], [-5.6, 5.6], [5.6, 5.6]]) w.pillar(x, z, 0.7, 7);
     crystal(w, -6.4, -2.6); crystal(w, 6.4, 2.6);
     icicles(w, -7, 7, -7, 7, 7, 10);
+    w.enemy('askling', -4, 4, [[-4, 4], [4, 4]], 'H0');
+    w.enemy('askling', 4, -4, [[4, -4], [-4, -4]], 'H0');
     // Söder: gången från The Frozen Jaw
     corridor(w, -1.5, 1.5, 8, 24, { h: 4 });
     w.entry('entrance', 0, 18, Math.PI);
@@ -321,6 +326,8 @@ export function buildMaw(B, areas, mw) {
     for (let k = 0; k < 7; k++) w.deco(new THREE.ConeGeometry(0.4, 2.5, 5), FM.rime, -5 + k * 1.7, -1.5, -30.2);
     w.inscription(-4.4, -24, Math.PI / 2, ['Beside the chasm, another grinning face:', '"Too far to jump, little hero? Send your shadow over first."', '"Then trade places with it. I do it all the time."', '— L.']);
     crystal(w, -5.4, -28); crystal(w, 5.4, -40); crystal(w, -5.4, -46);
+    w.enemy('askling', -3, -44, [[-3, -44], [3, -44]], 'C2');
+    w.enemy('askling', 3, -40, [[3, -40], [-3, -41]], 'C2');
     // Den stora dörren
     corridor(w, -1.5, 1.5, -62, -50, { h: 4 });
     w.door({ id: 'b_throne', x: 0, z: -54, type: 'boss', neg: 'T', pos: 'C2' });

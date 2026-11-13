@@ -86,6 +86,24 @@
   @keyframes bump { 40% { transform: scale(1.12); } }
   @keyframes pulse { 50% { transform: scale(1.15); } }
 
+  /* 0.17: förgiftad (hjärtan blir gröna) och långsam av kyla */
+  .hearts.poison .heart .full { fill: #6ad04a; }
+  .hearts.poison .heart .shine { fill: #c8ff9a; }
+  .hearts.poison { animation: sick 1.2s ease-in-out infinite; }
+  @keyframes sick { 50% { filter: drop-shadow(0 1px 0 #000) drop-shadow(0 0 6px #4aff3a); } }
+  /* 0.17: bossens livmätare längst ner */
+  .bossbar {
+    position: absolute; left: 50%; bottom: max(96px, calc(env(safe-area-inset-bottom, 0px) + 96px)); transform: translateX(-50%);
+    width: min(560px, 76vw); pointer-events: none; text-align: center;
+  }
+  .bossbar[hidden] { display: none; }
+  .bossbar-name { font: 600 1.05rem/1.2 var(--font-title, Georgia, serif); letter-spacing: .18em; text-transform: uppercase; color: #f0e2c0; text-shadow: 0 2px 0 #000, 0 0 8px #000; margin-bottom: 6px; }
+  .bossbar-track { position: relative; height: 14px; border: 2px solid #c8b48a; background: rgba(12,8,8,.82); box-shadow: 0 0 0 2px #000, 0 4px 12px rgba(0,0,0,.6); }
+  .bossbar-lag, .bossbar-fill { position: absolute; left: 0; top: 0; bottom: 0; transition: width .08s linear; }
+  .bossbar-lag { background: #f0d080; opacity: .75; }
+  .bossbar-fill { background: linear-gradient(#e8604a, #a8281a 70%); }
+  @keyframes bossin { from { opacity: 0; transform: translate(-50%, 10px); } }
+
   /* 0.15: luften under vattnet (bubblor som spricker en i taget) och vattnets färg när kameran är under ytan */
   .air {
     position: absolute; left: 50%; bottom: max(118px, calc(env(safe-area-inset-bottom, 0px) + 118px)); transform: translateX(-50%);
@@ -591,7 +609,7 @@
   <div class="topright">
     <div class="badge">
       <span class="badge-name">Cello: Ashes of the Fallen</span>
-      <span class="badge-sub">Prototype 0.16 · Frostgiant&#39;s Maw</span>
+      <span class="badge-sub">Prototype 0.17 · Steel &amp; Shadow</span>
     </div>
     <div class="items" id="items" hidden></div>
     <pre class="info" id="info" hidden></pre>
@@ -651,7 +669,7 @@
       <div class="title-panel" id="title-panel" hidden></div>
       <p class="title-press" id="title-press"><span class="press-key">Press any key</span><span class="press-touch">Tap to begin</span></p>
     </div>
-    <p class="title-foot"><span>Prototype 0.16</span><span>Music by Treblo</span></p>
+    <p class="title-foot"><span>Prototype 0.17</span><span>Music by Treblo</span></p>
     <p class="sr" id="title-live" aria-live="polite"></p>
   </section>
   <div class="map" id="map" hidden role="dialog" aria-label="Map">

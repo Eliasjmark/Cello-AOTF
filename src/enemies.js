@@ -353,7 +353,8 @@ class Askling {
     this.pos.copy(this.home);
     this.vel.set(0, 0, 0);
     this.push.set(0, 0, 0);
-    this.hp = this.kind === 'mummy' ? 5 : MAX_HP;
+    this.hp = this.maxHp ?? (this.kind === 'mummy' ? 5 : MAX_HP);
+    this.chargeCd = 2 + Math.random() * 2;
     this.facing = this.index * 1.7;
     this.state = 'patrol';
     this.st = 0;
@@ -572,7 +573,7 @@ class Askling {
     this.flash = 0.14;
     _v.set(this.pos.x - from.x, 0, this.pos.z - from.z);
     if (_v.lengthSq() > 1e-6) _v.normalize();
-    this.push.copy(_v).multiplyScalar(dmg > 1 ? 7.5 : 5.5);
+    this.push.copy(_v).multiplyScalar((dmg > 1 ? 7.5 : 5.5) / (this.trait === 'brute' ? 1.8 : this.trait === 'ram' ? 1.3 : 1));
     w.director.release(this);
     if (this.hp <= 0) {
       this.setState('dead');
@@ -710,7 +711,7 @@ class Askling {
       return this.seen;
     };
     // Regn gör askan tung: de rör sig långsammare
-    const slow = (env?.rain ? 1 - 0.18 * Math.min(1, env.rain) : 1) * (this.kind === 'mummy' ? 0.8 : 1);
+    const slow = (env?.rain ? 1 - 0.18 * Math.min(1, env.rain) : 1) * (this.kind === 'mummy' ? 0.8 : 1) * (this.speedMul ?? 1);
     const toward = (x, z, speed) => {
       speed *= slow;
       const ddx = x - this.pos.x, ddz = z - this.pos.z, d = Math.hypot(ddx, ddz) || 1;
@@ -857,10 +858,18 @@ class Askling {
         if (!this.hasClub) { this.setState('rocks'); break; }
         const mayAttack = this.cooldown <= 0 && director.canAttack(this);
         if (this.state === 'chase') {
-          if (mayAttack && dist < ATTACK_RANGE) {
+          if (mayAttack && dist < ATTACK_RANGE * (this.reach ?? 1)) {
             director.take(this);
             this.setState('windup');
             w.sfx.play('growl');
+            break;
+          }
+          // 0.17: Ramhorn skrapar med foten och rusar mot Cello på avstånd
+          this.chargeCd -= dt;
+          if (this.trait === 'ram' && mayAttack && this.chargeCd <= 0 && dist > 4 && dist < 10 && Math.abs(player.feet.y - this.pos.y) < 1.2) {
+            director.take(this);
+            this.setState('rear');
+            w.sfx.play('growl', { vol: 1.2 });
             break;
           }
           if (!mayAttack && dist < 5) { this.setState('circle'); break; }
@@ -894,17 +903,59 @@ class Askling {
           this.hitDone = true;
           w.sfx.play('swing', { vol: 0.8 });
           const cos = dist > 0.01 ? (dx * fx + dz * fz) / dist : 1;
-          if (playerOk && dist < HIT_RANGE && cos > 0.45 && Math.abs(player.feet.y - this.pos.y) < 1.6) {
-            const res = player.takeHit(1, this.pos);
+          if (playerOk && dist < HIT_RANGE * (this.reach ?? 1) && cos > 0.45 && Math.abs(player.feet.y - this.pos.y) < 1.6) {
+            const res = player.takeHit(this.dmg ?? 1, this.pos);
             if (res === 'blocked') {
               w.onBlocked(this);
               this.stagger(w);
               break;
             }
-            if (res === 'hit') w.onPlayerHit(this);
+            if (res === 'hit') { w.onPlayerHit(this); director.onTraitHit?.(this, player, w); }
           }
         }
         if (this.st > 0.2) this.setState('recover');
+        break;
+      }
+      case 'rear':
+        // Skrapar med foten och sänker hornen (ett tydligt tecken: rulla undan eller håll upp skölden)
+        this.faceTowards(player.feet.x, player.feet.z, 6, dt);
+        if (Math.random() < dt * 12) w.fx.burst('debris', this.pos.clone().setY(this.pos.y + 0.1), 1, 0x8a7a60);
+        if (this.st > 0.75) { this.setState('charge'); this.hitDone = false; w.sfx.play('roar', { vol: 0.5 }); }
+        break;
+      case 'charge': {
+        const fx = Math.sin(this.facing), fz = Math.cos(this.facing);
+        tvx = fx * 10.5;
+        tvz = fz * 10.5;
+        accel = 14;
+        if (Math.random() < dt * 20) w.fx.burst('debris', this.pos.clone().setY(this.pos.y + 0.1), 1, 0x8a7a60);
+        if (!this.hitDone && playerOk && dist < 1.5 && Math.abs(player.feet.y - this.pos.y) < 1.6) {
+          this.hitDone = true;
+          const res = player.takeHit(this.dmg ?? 2, this.pos);
+          if (res === 'blocked') {
+            w.sfx.play('clang');
+            w.rig?.shake?.(0.3);
+            w.onBlocked(this);
+            this.stagger(w);
+            this.st = -0.9;
+            director.hint('ramblock', 'The shield stops the Ramhorn dead! It shakes its head, dazed. Strike now!');
+            break;
+          }
+          if (res === 'hit') { w.onPlayerHit(this); director.onTraitHit?.(this, player, w, 1.4); }
+        }
+        if (this.st > 0.12 && Math.hypot(this.vel.x, this.vel.z) < 3) {
+          // Rakt in i en vägg: yr en stund
+          w.sfx.play('stomp', { vol: 0.7 });
+          w.fx.burst('debris', this.chest, 10, 0x8a7a60);
+          this.stagger(w);
+          this.st = -0.7;
+          break;
+        }
+        if (this.st > 0.85) {
+          this.chargeCd = 3.5 + Math.random() * 2;
+          director.release(this);
+          this.cooldown = 1.2;
+          this.setState('chase');
+        }
         break;
       }
       case 'recover':
@@ -1005,6 +1056,17 @@ class Askling {
       armR = -0.35;
       torsoX = 0.85;
       torsoY = -0.2;
+    } else if (this.state === 'rear') {
+      // Ramhorn sänker hornen och skrapar med foten
+      torsoX = 0.95 + Math.sin(st * 18) * 0.05;
+      headX = 0.45;
+      armR = -0.5;
+      armL = 0.3;
+    } else if (this.state === 'charge') {
+      torsoX = 1.15;
+      headX = 0.55;
+      armR = -0.9;
+      armL = -0.9;
     } else if (this.state === 'recover') {
       armR = -0.3;
       torsoX = 0.7 + Math.sin(st * 8) * 0.04;
@@ -1057,6 +1119,7 @@ class Askling {
     m.torso.rotation.x = approach(m.torso.rotation.x, torsoX, r, dt);
     m.torso.rotation.y = approach(m.torso.rotation.y, torsoY, r, dt);
     m.head.rotation.x = approach(m.head.rotation.x, headX, 10, dt);
+    if (this.tail) { this.tail.rotation.y = Math.sin(a.phase * 0.7 + 1) * 0.35; this.tail.rotation.x = -0.15 + Math.sin(a.phase * 0.5) * 0.1; }
     m.hips.position.y = 0.85 + Math.abs(Math.sin(a.phase)) * 0.05 * walk;
 
     if (this.state === 'dead') {
@@ -1167,6 +1230,7 @@ class Bat {
   }
 
   reset() {
+    this.hp = this.maxHp ?? 1;
     this.pos.copy(this.home).y += 2.6;
     this.vel.set(0, 0, 0);
     this.hp = 1;
@@ -1221,6 +1285,13 @@ class Bat {
 
   hurt(dmg, from, w) {
     if (!this.targetable) return false;
+    this.hp = (this.hp ?? 1) - dmg;
+    if (this.hp > 0) {
+      this.flashT = 0.15;
+      w.sfx.play('ehurt');
+      this.setState('retreat');
+      return 'hit';
+    }
     this.die(w);
     return 'killed';
   }
@@ -1337,6 +1408,30 @@ export class Enemies {
     this.hud.toast(text, 4200);
   }
   onSneak() { this.hint('sneak', 'A sneak attack! A sleeping Ashling takes double damage.'); }
+  // 0.17: de nya asklingarnas slag gör mer än ont
+  onTraitHit(e, p, w, extraKnock = 1) {
+    const T = e.trait;
+    if (!T) return;
+    if (T === 'venom') {
+      p.poisonT = 6;
+      p.poisonTick = p.poisonTick ?? 1.5;
+      w.fx?.burst?.('spark', p.feet.clone().setY(p.feet.y + 1.2), 12, 0x7aff5a);
+      this.hint('venom', 'Poisoned! Cello loses health for a while. A potion, or a rest by a fire, cures it.');
+    } else if (T === 'frost') {
+      p.slowT = 3.5;
+      p.cold = Math.min(1, (p.cold ?? 0) + 0.2);
+      w.fx?.burst?.('spark', p.feet.clone().setY(p.feet.y + 1.2), 12, 0xbfe8ff);
+      this.hint('chill', 'The Rimeling\'s blow freezes Cello to the bone. He moves slowly for a moment.');
+    } else if (T === 'ram' || T === 'brute' || T === 'reaver') {
+      const k = (T === 'ram' ? 2.3 : T === 'brute' ? 1.5 : 1.2) * extraKnock;
+      p.vel.x *= k;
+      p.vel.z *= k;
+      if (T === 'ram') p.vel.y = 7;
+      if (T === 'ram') this.hint('ram', 'The Ramhorn sends Cello flying! Block its charge with the shield, or roll aside.');
+      if (T === 'brute') this.hint('brute', 'The Brute\'s iron club hits hard: a whole heart. Keep your shield up, or strike from behind!');
+    }
+  }
+
   onDisarm() { this.hint('disarm', "The club flew out of the Ashling's hand! Stand by it, or smash it, and the Ashling has only stones left."); }
 
   // En askling dog: den sista i flocken kan fly för att hämta förstärkning
