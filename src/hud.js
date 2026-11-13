@@ -40,7 +40,7 @@ export class Hud {
       items: $('items'),
       dungeon: $('dungeon'), keys: $('dg-keys'), dgMap: $('dg-map'), dgBoss: $('dg-boss'),
       map: $('map'), mapCanvas: $('map-canvas'),
-      air: $('air'), underwater: $('underwater'),
+      air: $('air'), underwater: $('underwater'), frost: $('frost'),
     };
     this.mapView = new MapView(this.el.mapCanvas);
     this.mapOpen = false;
@@ -123,6 +123,12 @@ export class Hud {
     if (el.children.length !== n) el.innerHTML = '<i></i>'.repeat(n);
     [...el.children].forEach((b, i) => b.classList.toggle('gone', i >= left));
     el.classList.toggle('low', left <= 2);
+  }
+  setFrost(k) {
+    const v = Math.round(Math.max(0, Math.min(1, k)) * 50) / 50;
+    if (v === this.frostK) return;
+    this.frostK = v;
+    if (this.el.frost) this.el.frost.style.opacity = String(Math.min(1, v * 1.1));
   }
   setUnderwater(on) {
     if (on === this.underOn) return;

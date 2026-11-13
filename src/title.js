@@ -180,6 +180,7 @@ const fmtDate = (ms) => {
 const ICONS = {
   hammer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h11v6H4z M8.5 11h2v9h-2z" fill="currentColor"/><path d="M15 6l4-2v8l-4-2z" fill="currentColor" opacity=".7"/></svg>',
   prism: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 16H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9l3 7H9z" fill="currentColor"/></svg>',
+  mask: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12v7a6 6 0 0 1-12 0z" fill="currentColor"/><path d="M3 2l3 6 2-1zM21 2l-3 6-2-1z" fill="currentColor" opacity=".8"/><circle cx="9.5" cy="11" r="1.4" fill="#0b0b0b"/><circle cx="14.5" cy="11" r="1.4" fill="#0b0b0b"/></svg>',
   trident: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 9h2v13h-2z" fill="currentColor"/><path d="M5 2h2v6h4V2h2v6h4V2h2v8H5z" fill="currentColor" opacity=".85"/></svg>',
   sandals: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h12l3-3h3v4H3z" fill="currentColor"/><path d="M14 9c3-4 6-5 9-5-2 2-3 4-4 6 1 0 2 0 3 1-3 1-5 1-8-2z" fill="currentColor" opacity=".7"/></svg>',
   scales: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v15h-2z M7 20h10v2H7z M3 7h18v1.6H3z" fill="currentColor"/><path d="M3 9l-2 5h6z M21 9l-2 5h6z" fill="currentColor" opacity=".75"/></svg>',
@@ -620,7 +621,7 @@ export class TitleScreen {
     const s = save.state;
     const hearts = (6 + (s.amulet ? 2 : 0) + 2 * (s.hearts || 0)) / 2;
     const heartRow = Array.from({ length: hearts }, (_, i) => `<span class="heart">${heartSvg(`f${n}${i}`)}</span>`).join('');
-    const relics = [s.items?.hammer && ['hammer', "Mjölnir's Shard"], s.items?.prism && ['prism', "Ra's Shattered Prism"], s.items?.scales && ['scales', "Anubis' Broken Scales"], s.items?.sandals && ['sandals', "Hermes' Wing Sandals"], s.items?.trident && ['trident', "Poseidon's Corrupted Trident"], s.goat?.have && ['horn', 'Grumble']]
+    const relics = [s.items?.hammer && ['hammer', "Mjölnir's Shard"], s.items?.prism && ['prism', "Ra's Shattered Prism"], s.items?.scales && ['scales', "Anubis' Broken Scales"], s.items?.sandals && ['sandals', "Hermes' Wing Sandals"], s.items?.trident && ['trident', "Poseidon's Corrupted Trident"], s.items?.mask && ['mask', "Loki's Mask"], s.goat?.have && ['horn', 'Grumble']]
       .filter(Boolean).map(([k, name]) => `<span class="relic" title="${name}">${ICONS[k]}<span class="sr">${name}</span></span>`).join('');
     return `<span class="file-num">File ${n}</span>
       <span class="file-where">${this.where(save)}</span>
@@ -764,6 +765,7 @@ export class TitleScreen {
         <div><dt><kbd>C</kbd></dt><dd>Walk</dd></div>
       </dl>
       <p class="panel-sub">Swimming: hold <kbd>Space</kbd> to swim up and <kbd>Shift</kbd> to swim down. Swim into a ledge to climb out.</p>
+      <p class="panel-sub">In the cold north, keep your lantern lit or stay near a fire. On glide ice Cello slides until something stops him. Loki's Mask throws your shadow ahead: press again to swap places with it.</p>
       <p class="panel-sub">The first click captures the mouse, <kbd>Esc</kbd> releases it. <kbd>M</kbd> sound, <kbd>N</kbd> music, <kbd>P</kbd> Retro mode. Gamepad: A jump, X sword, B roll, RT shield, LT lock on, Y talk, RB, LB and D-pad right items, Start item menu, Back map.</p>
       <div class="panel-back" id="title-howto"></div>`, 'panel-howto');
     this.list(document.getElementById('title-howto'), [{ label: 'Back', cls: 'back-btn', run: () => this.back() }]);

@@ -40,6 +40,24 @@ export class Area {
     // 0.15: vatten att simma i: [{ x0, x1, z0, z1 } eller { x, z, r }, y: höjd eller () => höjd/null]
     this.waters = [];
     this.bubbles = []; // luftfickor och bubbelkällor: [{ x, y, z, r }]
+    // 0.16: is ({ x, z, r } eller { x0, x1, z0, z1 }, y, kind: 'slick' | 'glide'), kyla och varma platser
+    this.ices = [];
+    this.cold = false;
+    this.warm = []; // [{ x, z, r }]
+  }
+
+  // Vilken sorts is står Cello på (eller null)?
+  iceAt(p) { return this.iceRegion(p)?.kind ?? null; }
+
+  iceRegion(p) {
+    for (const w of this.ices) {
+      if (w.r !== undefined) { if ((p.x - w.x) ** 2 + (p.z - w.z) ** 2 > w.r * w.r) continue; }
+      else if (p.x < w.x0 || p.x > w.x1 || p.z < w.z0 || p.z > w.z1) continue;
+      if (w.y !== undefined && Math.abs(p.y - w.y) > 0.35) continue;
+      if (w.on && !w.on()) continue;
+      return w;
+    }
+    return null;
   }
 
   // Vattenytans höjd där Cello står, eller null

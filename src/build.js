@@ -190,6 +190,11 @@ export function createBuilder(scene, lights) {
     water: new THREE.MeshLambertMaterial({ map: tex.water, transparent: true, opacity: 0.82, depthWrite: false }),
     // 0.7: öknen och pyramiden
     sand: lam({ map: tex.sand, vertexColors: true }),
+    // 0.16: norr
+    snow: lam({ map: tex.snow, vertexColors: true }),
+    snowFlat: lam({ map: tex.snow }),
+    ice: new THREE.MeshPhongMaterial({ map: tex.ice, color: 0xcfeaf8, specular: 0xffffff, shininess: 90, emissive: 0x0a1a24 }),
+    iceClear: new THREE.MeshPhongMaterial({ map: tex.ice, color: 0xa8d8f0, specular: 0xffffff, shininess: 110, transparent: true, opacity: 0.72, emissive: 0x0a2030 }),
     sandRock: lam({ map: tex.sand, color: 0xa8865a, flatShading: true }),
     sandstone: lam({ map: tex.sandstone }),
     roadStone: lam({ map: tex.sandstone, color: 0xc0a078, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),

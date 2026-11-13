@@ -43,6 +43,13 @@ export const VOICES = {
   corwin: { f: 150, wave: 'square', form: [[620, 4], [1300, 5]], wobble: 0.2 },
   gull: { f: 125, wave: 'sawtooth', form: [[520, 3], [980, 4]], wobble: 0.9, breath: 0.4 },
   marlo: { f: 160, wave: 'sawtooth', form: [[600, 4], [1200, 5]] },
+  // 0.16: Rimeholt och jättens gap
+  sigrun: { f: 205, wave: 'triangle', form: [[640, 3], [1200, 4]], wobble: 0.6, breath: 0.4 },
+  ylva: { f: 330, wave: 'triangle', form: [[820, 4], [1650, 5]] },
+  hakon: { f: 118, wave: 'sawtooth', form: [[500, 4], [1000, 5]], wobble: 0.3 },
+  bjarke: { f: 108, wave: 'sawtooth', form: [[480, 3], [940, 4]], wobble: 0.8, breath: 0.5 },
+  loki: { f: 190, wave: 'square', form: [[760, 4], [1500, 5]], wobble: 1.2, breath: 0.2 },
+  thrym: { f: 55, wave: 'sawtooth', form: [[260, 3], [620, 3]], wobble: 0.4, breath: 0.8 },
 };
 const STEPS = [1, 9 / 8, 5 / 4, 4 / 3, 3 / 2];
 const FANFARE = [[523.25, 0], [659.25, 0.13], [783.99, 0.26], [1046.5, 0.39], [987.77, 0.62], [1046.5, 0.78]];
@@ -694,6 +701,31 @@ export class Sfx {
         break;
       case 'choke': // luften tar slut: ett gurgel
         for (let i = 0; i < 5; i++) this.osc('sine', 260 - i * 20, 140, t + i * 0.06, 0.07, this.gain(t + i * 0.06, 0.004, 0.18 * v, 0.07));
+        break;
+      // ---------- 0.16: is, masken och vargen ----------
+      case 'shadowcast': // masken kastar skuggan: ett mörkt sus som stiger
+        this.noiseThrough('bandpass', 600, 1800, 2, t, 0.35, this.gain(t, 0.01, 0.25 * v, 0.35));
+        this.osc('triangle', 220, 660, t, 0.3, this.gain(t, 0.01, 0.1 * v, 0.3));
+        break;
+      case 'shadowswap': // Cello byter plats med skuggan: två toner som korsar varandra
+        this.osc('triangle', 330, 880, t, 0.22, this.gain(t, 0.005, 0.14 * v, 0.22));
+        this.osc('triangle', 880, 330, t, 0.22, this.gain(t, 0.005, 0.14 * v, 0.22));
+        this.noiseThrough('highpass', 2500, 4000, 1, t, 0.2, this.gain(t, 0.005, 0.12 * v, 0.2));
+        break;
+      case 'shadowland': // skuggan landar
+        this.osc('sine', 300, 180, t, 0.18, this.gain(t, 0.005, 0.12 * v, 0.18));
+        break;
+      case 'glide': // Cello glider på isen: ett vasst skrap
+        this.noiseThrough('highpass', 3200, 1800, 2, t, 0.5, this.gain(t, 0.02, 0.12 * v, 0.5));
+        break;
+      case 'icecrack': // isen spricker
+        for (let i = 0; i < 4; i++) this.noiseThrough('bandpass', 2400 - i * 300, 900, 3, t + i * 0.05, 0.08, this.gain(t + i * 0.05, 0.002, 0.25 * v, 0.08));
+        this.osc('sine', 120, 60, t, 0.3, this.gain(t, 0.01, 0.15 * v, 0.3));
+        break;
+      case 'howl': // vargen ylar
+        this.osc('sawtooth', 300, 620, t, 0.6, this.gain(t, 0.1, 0.12 * v, 0.6));
+        this.osc('sawtooth', 620, 420, t + 0.6, 1.2, this.gain(t + 0.6, 0.05, 0.12 * v, 1.2));
+        this.osc('sine', 610, 410, t + 0.6, 1.2, this.gain(t + 0.6, 0.05, 0.1 * v, 1.2));
         break;
       case 'bubble': // en enstaka bubbla
         this.osc('sine', 700 + Math.random() * 500, 1500 + Math.random() * 600, t, 0.05, this.gain(t, 0.003, 0.05 * v, 0.05));

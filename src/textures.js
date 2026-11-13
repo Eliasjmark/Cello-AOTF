@@ -433,8 +433,29 @@ export function createTextures() {
     }
   });
 
+  // 0.16: snö (vitt med blå skuggor och glitter) och is (blått med sprickor och luftbubblor)
+  const snow = canvasTexture(64, 61, (g, s, r) => {
+    noisyFill(g, s, r, [236, 240, 246], 5);
+    for (let i = 0; i < 16; i++) {
+      const x = r() * s, y = r() * s, rad = 5 + r() * 12;
+      for (const [ox, oy] of [[0, 0], [s, 0], [-s, 0], [0, s], [0, -s]]) {
+        const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, rad);
+        gr.addColorStop(0, r() < 0.5 ? 'rgba(190,206,228,0.35)' : 'rgba(255,255,255,0.4)');
+        gr.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = gr;
+        g.fillRect(x + ox - rad, y + oy - rad, rad * 2, rad * 2);
+      }
+    }
+    for (let i = 0; i < 60; i++) { g.fillStyle = 'rgba(255,255,255,0.95)'; g.fillRect(Math.floor(r() * s), Math.floor(r() * s), 1, 1); }
+  });
+  const ice = canvasTexture(64, 67, (g, s, r) => {
+    noisyFill(g, s, r, [150, 196, 222], 8);
+    for (let i = 0; i < 7; i++) walk(g, s, r, 40, 'rgba(230,246,255,0.55)', [r() - 0.5, r() - 0.5]);
+    for (let i = 0; i < 5; i++) walk(g, s, r, 30, 'rgba(70,120,150,0.4)', [r() - 0.5, r() - 0.5]);
+    for (let i = 0; i < 30; i++) { g.fillStyle = 'rgba(255,255,255,0.7)'; g.beginPath(); g.arc(r() * s, r() * s, 0.6 + r(), 0, 6.3); g.fill(); }
+  });
   return {
     grass, rock, cliff, marble, brick, wood, tuft, mosaic, runes, charred, iron, ironFloor, cracked,
-    dirt, plaster, shingle, cobble, hay, leaf, bark, floor, water, sand, sandstone, hiero,
+    dirt, plaster, shingle, cobble, hay, leaf, bark, floor, water, sand, sandstone, hiero, snow, ice,
   };
 }

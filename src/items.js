@@ -83,8 +83,8 @@ export function buildTrident() {
 export function buildItem(kind) {
   const M = ITEM_MATS;
   const g = new THREE.Group();
-  if (kind === 'pmap' || kind === 'nmap' || kind === 'smap' || kind === 'tmap') kind = 'map';
-  else if (kind === 'pkey' || kind === 'nkey' || kind === 'skey' || kind === 'tkey') kind = 'key';
+  if (kind === 'pmap' || kind === 'nmap' || kind === 'smap' || kind === 'tmap' || kind === 'fmap') kind = 'map';
+  else if (kind === 'pkey' || kind === 'nkey' || kind === 'skey' || kind === 'tkey' || kind === 'fkey') kind = 'key';
   if (kind === 'prism') {
     g.add(buildPrism());
   } else if (kind === 'sunkey') {
@@ -243,6 +243,32 @@ export function buildItem(kind) {
   } else if (kind === 'trident') {
     // 0.15: Poseidons förvridna treudd: ärgad brons, tre spetsar, och lila sprickor av Kronos förbannelse
     g.add(buildTrident());
+  } else if (kind === 'mask') {
+    // 0.16: Lokis mask: ett ansikte av guld med gröna, böjda horn och gröna ögon
+    const gold = lam(0xc9a24f, { emissive: 0x2a1c06 }), green = lam(0x2f7a4a);
+    const face = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10, 0, Math.PI * 2, 0, Math.PI / 1.6), gold);
+    face.rotation.x = Math.PI / 2;
+    face.scale.set(1, 1, 0.45);
+    g.add(face);
+    for (const s of [-1, 1]) {
+      g.add(B(0.07, 0.04, 0.03, new THREE.MeshBasicMaterial({ color: 0x9dff9a }), 0.09 * s, 0.04, 0.1));
+      for (let k = 0; k < 3; k++) {
+        const h = new THREE.Mesh(new THREE.ConeGeometry(0.07 - k * 0.018, 0.24, 5), green);
+        h.position.set((0.2 + 0.07 * k) * s, 0.2 + 0.16 * k, -0.04 * k);
+        h.rotation.z = -(0.4 + 0.45 * k) * s;
+        g.add(h);
+      }
+    }
+  } else if (kind === 'frostkey') {
+    // Frostnyckeln: en nyckel av blå is med en jättes tand som ax
+    const ice = lam(0x9fd8f0, { emissive: 0x16303a, transparent: true, opacity: 0.9 });
+    const loop = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.05, 6, 12), ice);
+    loop.position.y = 0.3;
+    g.add(loop);
+    g.add(B(0.07, 0.55, 0.06, ice, 0, -0.1, 0));
+    g.add(B(0.18, 0.14, 0.06, lam(0xe8e4d8), 0.04, -0.33, 0));
+  } else if (kind === 'reindeer' || kind === 'thaw') {
+    g.add(B(0.2, 0.2, 0.2, lam(0xc8a878), 0, 0, 0));
   } else if (kind === 'tidekey') {
     // Tidvattennyckeln: grön brons med en liten treudd som ax
     const br = lam(0x5a9a8a);
@@ -338,6 +364,15 @@ export const ITEM_TEXT = {
     'The spear of the sea god, cracked and veined with Kronos\' purple curse. The sea still answers it.',
     'Put it on F, G or V (Tab) and press that button: Cello dashes forward with the trident. Under water it drives him like a fish. It breaks brittle coral, and hurts what it hits.',
     'At a tide altar, press E to plunge the trident in. The water rises or falls at its command.',
+  ],
+  fmap: ['You found the Labyrinth Map!', 'Press K to view it. Though the halls of the Maw may not stay where the map says...'],
+  fkey: ['You got a Iron Key!', 'It opens a locked door somewhere in the Frostgiant\'s Maw.'],
+  frostkey: ['You got the Frost Key!', 'Cut from blue ice that never melts. It opens the great door to the Giant\'s Heart.'],
+  mask: [
+    "You got Loki's Mask!",
+    'The face of the trickster god, gold and green, with horns that curl like smoke. It grins even when you do not.',
+    'Put it on F, G or V (Tab) and press that button: Cello\'s shadow flies ahead and stands where it lands. It slips through rime grates, and it is heavy enough to hold down a plate.',
+    'Press the button again to swap places with the shadow.',
   ],
   pearl: ['You found a Black Pearl!', 'Dark as the deep, with a glow inside. Corwin in Brinehollow pays well for these... or so he says.'],
   charm: ["You got the Diver's Charm!", "A shell on a cord of sea-grass. Wearing it, Cello can hold his breath far longer under water."],

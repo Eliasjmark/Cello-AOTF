@@ -913,7 +913,10 @@ export class Wing {
     for (const pl of this.pressure) {
       const onBlock = this.blocks.some((b) => !b.slide && Math.abs(b.x - pl.x) < 0.5 && Math.abs(b.z - pl.z) < 0.5);
       const onHeavy = !pl.blockOnly && p.heavy && p.grounded && Math.abs(p.feet.x - pl.x) < 1.0 && Math.abs(p.feet.z - pl.z) < 1.0 && Math.abs(p.feet.y - pl.y) < 0.8;
-      const pressed = onBlock || onHeavy;
+      // 0.16: Lokis skugga är lika tung som Cello
+      const sh = g.shadow;
+      const onShadow = !pl.blockOnly && !!sh?.active && Math.abs(sh.pos.x - pl.x) < 1.0 && Math.abs(sh.pos.z - pl.z) < 1.0 && Math.abs(sh.pos.y - pl.y) < 0.8;
+      const pressed = onBlock || onHeavy || onShadow;
       if (pressed !== pl.pressed) {
         pl.pressed = pressed;
         pl.m.position.y = pl.y + (pressed ? -0.02 : 0.06);

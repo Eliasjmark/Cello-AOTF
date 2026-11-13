@@ -111,6 +111,8 @@ const freshState = () => ({
   spire: null, spireDone: false, titanRaid: false, choice2: null, quests: {},
   // 0.15: havet, simningen, templet och det tredje valet
   swim: false, temple: null, templeDone: false, choice3: null, charm: false,
+  // 0.16: norr, labyrinten, Lokis mask och det fjärde valet
+  maw: null, mawDone: false, choice4: null, frostBlessing: false,
 });
 
 export class Story {
@@ -121,6 +123,7 @@ export class Story {
     this.necropolis = this.world.necropolis;
     this.spire = this.world.spire;
     this.temple = this.world.temple;
+    this.maw = this.world.maw;
     this.areas = this.world.areas;
     // Porten till nekropolen är full av sand tills ormen i pyramiden har fallit
     const necroExit = this.areas.get('desert')?.exits.find((e) => e.necro);
@@ -337,8 +340,11 @@ export class Story {
     this.state.spire = this.spire.state;
     this.temple.applyState(null);
     this.state.temple = this.temple.state;
+    this.maw.applyState(null);
+    this.state.maw = this.maw.state;
     this.chronicle?.applyState();
     this.sea?.applyState();
+    this.frost?.applyState();
     this.realm?.reset();
     this.world.setSunGate(false, true);
     this.goat?.load(this.state);
@@ -387,8 +393,11 @@ export class Story {
     s.spire = this.spire.state;
     this.temple.applyState(s.temple);
     s.temple = this.temple.state;
+    this.maw.applyState(s.maw);
+    s.maw = this.maw.state;
     this.chronicle?.applyState();
     this.sea?.applyState();
+    this.frost?.applyState();
     this.realm?.reset();
     this.setupFree();
     this.enemies.resetAll();
@@ -476,6 +485,7 @@ export class Story {
     s.necropolis = this.necropolis.state;
     s.spire = this.spire.state;
     s.temple = this.temple.state;
+    s.maw = this.maw.state;
     s.spawnAt = this.world.inBastion() ? 'bastion' : 'aetheria';
     s.area = this.areas.id;
     if (entry) s.entry = entry;
@@ -1166,6 +1176,13 @@ export class Story {
       this.spire.grant(kind);
     } else if (kind === 'tmap' || kind === 'tkey' || kind === 'tidekey') {
       this.temple.grant(kind);
+    } else if (kind === 'fmap' || kind === 'fkey' || kind === 'frostkey') {
+      this.maw.grant(kind);
+    } else if (kind === 'mask') {
+      s.items.mask = true;
+      P.hasMask = true;
+      this.inventory?.autoSlot('mask', true);
+      this.inventory?.refresh(true);
     } else if (kind === 'trident') {
       s.items.trident = true;
       P.hasTrident = true;

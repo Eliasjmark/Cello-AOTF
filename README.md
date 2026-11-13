@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.15 · The Drowned Temple (havet, simning, ett tempel under vattnet, Poseidons treudd och Kronos som vaknar)
+**Version:** prototyp 0.16 · Frostgiant's Maw (snö och kyla i norr, glidis, Lokis mask och skuggan, frostjätten Thrym och Kronos som får en kropp)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -34,7 +34,28 @@ python3 tools/models/build_models.py                    # → models/pack.bin
 python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
 ```
 
-## Vad är nytt i 0.15: The Drowned Temple
+## Vad är nytt i 0.16: Frostgiant's Maw
+
+Norr om The Galecrown går en ny bro (den öppnas när templet under havet är klart). Där ligger **The Frostmarch**, ett land av snö, och längst i norr en glaciär med huvudet av en frusen jätte.
+
+- **Kyla** (`src/main.js`): ute i The Frostmarch fryser Cello sakta, fort i snöstorm (snön ligger tät och dimman tjock). En tänd lykta eller en eld håller kylan borta; helt nedkyld tappar han ett halvt hjärta i taget. Lampolja och oljeflaskor betyder mycket här. En blå frostkant syns runt skärmen när det blir kallt.
+- **Snö och snöstorm** (`src/weather.js`): två nya väder i norr, med flingor som yr och en tät, vit dimma.
+- **Is** (`src/player.js`): på *blank is* (den frusna sjön) halkar Cello och har dåligt fäste. På *glidis* glider han rakt fram, i en av fyra riktningar, tills han slår i något, och kan inte styra under tiden. Glidisen har rutor om två meter, och Cello dras mjukt mot mitten av sin ruta.
+- **Nytt område: The Frostmarch** (`src/regions/frost.js`): renskötarbyn **Rimeholt** med långhus och en långeld, renar i en fålla, en frusen sjö, snötallar, och **Lokis röse** (en kista på en klippa bakom rimfrost). Seren följer med, och på isen åker hon skridsko.
+- **Rimeholts folk**: den gamla **Sigrun** (om jättarna och Loke), renskötaren **Ylva** och fiskaren **Hakon**.
+- **Sidouppdrag**: *The Lost Herd* (locka hem tre vilsna renar åt Ylva; hon ger Herder's Cloak, kylan kryper in hälften så fort) och *Thin Ice* (tina fiskaren Bjarke ur isen på sjön med den tända lyktan; Hakon ger två oljeflaskor).
+- **Ny fängelsehåla: Frostgiant's Maw** (`src/maw.js`), fyra delar inne i jättens gap och strupe:
+  - *The Frozen Jaw*: Glidsalen, 11 × 11 rutor glidis med isblock att stanna mot. Kartan ligger i en nisch, nyckeln på avsatsen i norr.
+  - *The Turning Halls*: ett nav med en spak. Spaken vrider golvet och byter vilka två av fyra isportar som är öppna (norr och söder, eller öster och väster). Väster: Kylsalen, en till glidsal med nyckel nummer två. Öster: Rimsalen, där tryckplattan ligger bakom rimfrost.
+  - *Hati's Den*: miniboss **Hati**, isvargen som jagar månen. Den är för snabb för svärdet: blockera språnget med skölden, eller rulla undan så att den glider vilse på isen. I andra fasen kastar den sig två gånger i rad. Efter Hati: Loki's Mask, rimfrostgallret och klyftan.
+  - *The Throne of Thrym*: bossen **Thrym**, frostjättarnas kung, död och besatt av Kronos. Kronen är långt utom räckhåll. Men jätten slår mot det som rör sig: kasta skuggan, så krossar han den och klubban fastnar i isen. Då böjer han sig ner, och kristallen i kronan går att hugga.
+- **Ny relik: Loki's Mask** (`src/shadow.js`): masken kastar Cellos skugga rakt fram (nio meter). Skuggan flyger igenom rimfrostgaller som Cello inte kommer igenom, landar och står kvar. Den är lika tung som Cello och håller ner tryckplattor. Tryck igen: Cello byter plats med den (över klyftor, genom galler, upp på klippor).
+- **Det fjärde valet**: efter Thrym står Cellos skugga upp med Lokes mask och erbjuder ett avtal. *Lita på Loke* (skuggan flyger mycket längre, men Loke följer med) eller *vägra* (bandet bryts, och jättens sista andetag gör att kylan i norr aldrig mer biter).
+- **Slutet**: mörkret i Thryms krona samlas över glaciären och tar form. Kronos har en kropp nu, byggd av det titanerna lämnade efter sig, och han går österut mot Mount Othrys.
+
+Nytt i koden: `src/regions/frost.js`, `src/maw.js`, `src/frostkit.js` (glidis, isblock, rimfrost, navet med spaken, Hati och Thrym), `src/shadow.js` (Lokis skugga) och `src/froststory.js` (berättelsen i 0.16).
+
+## Vad var nytt i 0.15: The Drowned Temple
 
 Söder om The Galecrown har fiskarna lagat bron. Nedanför ligger **The Shattered Sea**, ett innanhav i en skål av klippa, och mitt i havet sticker en bruten treudd upp ur vattnet.
 
@@ -353,7 +374,7 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/areas.js` | Områdena: var och en har sin egen grupp, sitt kollisionsträd, ingångar och utgångar |
 | `src/build.js` | Byggverktygen alla områden använder: öar, vägar, broar, hus, ladan, träd, staket, eldar, dimma vid gränserna |
 | `src/world.js` | Cellos hem, byn och Aetheria, fästningens och pyramidens områden, och kopplingen mellan områdena |
-| `src/regions/` | `ranch.js`, `pass.js`, `field.js`, `willowmere.js`, `stormreach.js` (med grottan), `desert.js` (The Ember Wastes), `galecrown.js` (The Galecrown, 0.14), `sea.js` (The Shattered Sea, 0.15) och `interiors.js` (butiken och Cellos hus) |
+| `src/regions/` | `ranch.js`, `pass.js`, `field.js`, `willowmere.js`, `stormreach.js` (med grottan), `desert.js` (The Ember Wastes), `galecrown.js` (The Galecrown, 0.14), `sea.js` (The Shattered Sea, 0.15), `frost.js` (The Frostmarch, 0.16) och `interiors.js` (butiken och Cellos hus) |
 | `src/folk.js` | Folket ute i världen, butikerna, kistorna, eldfaten, djuren och övningsdockan |
 | `src/inventory.js` | Föremålsmenyn, snabbknapparna, skärvorna, lyktan och dryckerna |
 | `src/bastion.js` | The Tempest Bastion: rum, dörrar, kistor, kretsar, pussel, fällor och bossarna |
@@ -367,6 +388,10 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/temple.js` | The Drowned Temple (0.15): templets fyra delar och tillståndet (nycklar, dörrar, kistor, vattennivåer) |
 | `src/templekit.js` | Templets byggdelar (0.15): bassänger, tidvattenhjul och altaren, sigill, bubbelkällor, spröd korall, sjöborrar, Karkinos och Ketos |
 | `src/seastory.js` | Berättelsen i 0.15: Seren vid havet, simlektionen, pärlorna, fyren, templet, det tredje valet och slutet |
+| `src/maw.js` | Frostgiant's Maw (0.16): fängelsehålans fyra delar och tillståndet (nycklar, dörrar, kistor, navets läge) |
+| `src/frostkit.js` | Byggdelarna i jättens gap (0.16): glidis, isblock, rimfrostgaller, navet med spaken, Hati och Thrym |
+| `src/shadow.js` | Loki's Mask (0.16): skuggan som flyger, landar, håller ner plattor och byter plats med Cello |
+| `src/froststory.js` | Berättelsen i 0.16: Seren i norr, Rimeholt, renarna, fiskaren, Lokes röst, Thrym, det fjärde valet och slutet |
 | `src/spire.js` | The Windbound Spire (0.14): templets fyra delar och tillståndet (nycklar, dörrar, kistor) |
 | `src/spirekit.js` | Vindtemplets byggdelar (0.14): uppvindar, ventiler, väggar att springa på, The Brass Weaver och Typhon |
 | `src/chronicle.js` | Berättelsen i 0.14: titanen över Willowmere, Kronos, Seren i The Galecrown, valet efter Typhon och sidouppdragen |

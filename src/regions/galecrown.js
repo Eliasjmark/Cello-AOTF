@@ -32,12 +32,13 @@ export function buildGalecrown(B, areas) {
   const road2 = R([[36, 20], [16, -10], [-10, -40], [-40, -62]]);
   const isl = B.island({
     cx: GX, cz: 0, baseR: 86, rNoise: 8, seed: 1701, amp: 1.1, hills: 7, hillFreq: 0.02,
-    keepAngles: [0, toSpire, Math.PI / 2], depth: 70, rings: 54, segs: 150, label: 'The Galecrown',
+    keepAngles: [0, toSpire, Math.PI / 2, Math.atan2(-84, 20)], depth: 70, rings: 54, segs: 150, label: 'The Galecrown',
     mapCol: '#4a5a44',
     pads: [
       { x: GX + 84, z: 0, r: 7, h: 0 }, { x: GX, z: 84, r: 7, h: 0 }, { x: CAMP.x, z: CAMP.z, r: 9, h: 0.6 }, { x: SHRINE.x, z: SHRINE.z, r: 13, h: 0.8 },
       { x: GX - 44, z: -66, r: 6, h: 0.4 }, { x: GX + 44, z: -34, r: 12, h: 0.5 }, { x: GX + 4, z: -30, r: 8, h: 0.6 },
       { x: GX - 44, z: 4, r: 9, h: 0.5 },
+      { x: GX + 20, z: -84, r: 7, h: 0 },
     ],
     roads: [{ pts: road, w: 3.2 }, { pts: road2, w: 2.6 }],
     grass: 900,
@@ -149,6 +150,13 @@ export function buildGalecrown(B, areas) {
   a.entries.south = { pos: V3(GX, DECK, 88), facing: Math.PI };
   a.exits.push({ x0: GX - 3, x1: GX + 3, z0: 112, z1: 126, to: 'sea', entry: 'north', sea: true, text: 'Cello crosses the long bridge south, toward the smell of salt...' });
   a.map.exits.push({ x: GX, z: 110, label: 'The Shattered Sea', to: 'sea', when: 'spireDone' });
+  // 0.16: bron norrut mot The Frostmarch (öppnas när templet är klart)
+  B.bridge('z', -114, -84, GX + 20, DECK, { rails: true });
+  B.mist(GX + 20, -3, -114, 11, 5, 9);
+  B.sign(GX + 23, H(GX + 23, -80), -80, 0, ['An old runestone, white with frost on the north side:', '"NORTH: THE FROSTMARCH. RIMEHOLT."', '"Those who go north take fire with them. Those who forget, stay there."']);
+  a.entries.north = { pos: V3(GX + 20, DECK, -88), facing: 0 };
+  a.exits.push({ x0: GX + 17, x1: GX + 23, z0: -126, z1: -112, to: 'frost', entry: 'south', frost: true, text: 'Cello crosses the long bridge north. The wind turns bitter, and the first snow falls...' });
+  a.map.exits.push({ x: GX + 20, z: -110, label: 'The Frostmarch', to: 'frost', when: 'templeDone' });
 
   // ---------- klocktemplet ----------
   const shrine = { x: SHRINE.x, z: SHRINE.z, y: H(SHRINE.x, SHRINE.z) };

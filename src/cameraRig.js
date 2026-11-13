@@ -16,6 +16,7 @@ export class CameraRig {
     this.world = world;
     this.cinematic = null;
     this.dist = DIST; // avståndet just nu (längre vid lock-on mot stora fiender)
+    this.extra = 0; // 0.16: extra avstånd i en stor bossal (jätten Thrym)
     this.cineLook = new THREE.Vector3();
     this.wasCine = false;
     this.yaw = 0;
@@ -86,7 +87,7 @@ export class CameraRig {
     const big = locked ? this.lockTarget.radiusBig || 0 : 0;
     // På Grumbles rygg sitter Cello högre och rör sig fortare: kameran backar lite
     const riding = player.mount ? 1 : 0;
-    const wantDist = DIST + Math.min(3, big * 0.5) - (this.indoor ? 0.6 : 0) + riding * 1.6;
+    const wantDist = DIST + Math.min(3, big * 0.5) - (this.indoor ? 0.6 : 0) + riding * 1.6 + this.extra;
     this.dist += (wantDist - this.dist) * (1 - Math.exp(-dt * 3));
     this.lockBlend += ((locked ? 1 : 0) - this.lockBlend) * (1 - Math.exp(-dt * 6));
 

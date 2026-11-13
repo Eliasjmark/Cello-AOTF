@@ -27,6 +27,8 @@ const SWIFT_JUMP_V = 8.4, WALLRUN_SPEED = 9.2, WALLRUN_TIME = 1.7;
 const SWIM_SPEED = 3.9, SWIM_SPEED_SWIFT = 5.6, DIVE_SPEED = 3.7, SWIM_ACCEL = 12, SWIM_VY = 3.4, BUOY = 0.9;
 const FLOAT_DEPTH = 1.22, ENTER_DEPTH = 1.15, EXIT_DEPTH = 0.9, HEAD_Y = 1.5;
 export const BREATH_MAX = 12;
+// 0.16: is. På blank is (slick) har Cello dåligt fäste; på glidis (glide) glider han rakt fram tills han slår i något
+const GLIDE_SPEED = 9, SLICK_ACCEL = 4.5;
 const SLAM_WIND = 0.42, SLAM_WIND_GLOVES = 0.3, SLAM_RECOVER = 0.38, SLAM_REACH = 1.25;
 
 // Tre slag i kombination: från höger, från vänster, och ett tungt slag uppifrån
@@ -393,6 +395,16 @@ export class Player {
     this.headUnder = false;
     this.chokeT = 0.6;
     this.wallPush = 0;
+    // 0.16: is, Lokis mask och kyla
+    this.iceAt = null; // (fötter) => 'slick' | 'glide' | null
+    this.iceLane = null; // (fötter) => isytan (med lane: rutstorlek) eller null
+    this.onIce = null;
+    this.glide = null; // { dx, dz, t }
+    this.glideBlock = null;
+    this.onGlide = null;
+    this.hasMask = false;
+    this.maskRange = 9;
+    this.cold = 0;
     this.hasTrident = false; // 0.15: Poseidons treudd
     this.dash = null; // { dir, under, dur, speed }
     this.dashPower = 1;
@@ -508,6 +520,7 @@ export class Player {
     if (s !== 'attack') this.swing = null;
     if (s !== 'dodge') this.dodge = null;
     if (s !== 'dash') this.dash = null;
+    if (s !== 'move') this.glide = null;
   }
 
   updateFeet() {
@@ -644,6 +657,7 @@ export class Player {
     this.jumpHeld = !!input.jumpHeld;
     this.stateT += dt;
     this.updateWater(dt, input);
+    this.onIce = this.grounded && this.iceAt && !this.swimming ? this.iceAt(this.feet) : null;
 
     const mag = Math.min(1, Math.hypot(input.moveX, input.moveY));
     const sy = Math.sin(camYaw), cy = Math.cos(camYaw);
@@ -696,6 +710,44 @@ export class Player {
           if (this.swimming && this.attackBuf > 0 && this.attackCooldown <= 0) this.startAttack(0);
           break;
         }
+        // 0.16: glidis. Cello glider rakt fram (i en av fyra riktningar) tills han slår i något
+        if (this.glide) {
+          const G = this.glide;
+          G.t += dt;
+          tvx = G.dx * GLIDE_SPEED;
+          tvz = G.dz * GLIDE_SPEED;
+          // Glidisen har banor (rutor): Cello dras mjukt mot mitten av sin bana
+          if (G.lane != null) { if (G.dx) tvz += (G.lane - this.feet.z) * 6; else tvx += (G.lane - this.feet.x) * 6; }
+          accel = 200;
+          turnRate = 0;
+          this.shielding = false;
+          this.jumpBuf = 0; this.dodgeBuf = 0; this.attackBuf = 0;
+          const sp = Math.hypot(this.vel.x, this.vel.z);
+          const wall = G.t > 0.12 && sp < 2.5;
+          if (this.heavy || wall || (this.grounded && this.onIce !== 'glide' && G.t > 0.05)) {
+            this.glideBlock = wall ? { dx: G.dx, dz: G.dz } : null;
+            this.glide = null;
+            if (wall) this.onGlide?.('stop');
+          }
+          break;
+        }
+        if (this.grounded && this.onIce === 'glide' && !this.heavy && mag > 0.5 && !this.carried && !this.lockTarget) {
+          const ax = Math.abs(this.wish.x) > Math.abs(this.wish.z);
+          const dx = ax ? Math.sign(this.wish.x) : 0, dz = ax ? 0 : Math.sign(this.wish.z);
+          const B = this.glideBlock;
+          if (!B || B.dx !== dx || B.dz !== dz) {
+            this.glideBlock = null;
+            this.glide = { dx, dz, t: 0, lane: null };
+            const R = this.iceLane?.(this.feet);
+            if (R?.lane) {
+              const L = R.lane, snap = (v, o) => o + L / 2 + Math.round((v - o - L / 2) / L) * L;
+              this.glide.lane = dx ? snap(this.feet.z, R.z0) : snap(this.feet.x, R.x0);
+            }
+            this.facing = Math.atan2(dx, dz);
+            this.onGlide?.('start');
+            break;
+          }
+        } else if (mag < 0.3) this.glideBlock = null;
         const carrying = !!this.carried;
         this.shielding = !!input.shield && this.grounded && !carrying;
         const heavySpeed = this.gloves ? HEAVY_SPEED_GLOVES : HEAVY_SPEED;
@@ -994,7 +1046,7 @@ export class Player {
     if (this.swimming) { this.stepSwim(h, tvx, tvz); return; }
     const wasGrounded = this.grounded;
     if (wasGrounded || airControl) {
-      const a = wasGrounded ? accel : AIR_ACCEL;
+      const a = wasGrounded ? (this.onIce === 'slick' && !this.heavy && this.state === 'move' ? Math.min(accel, SLICK_ACCEL) : accel) : AIR_ACCEL;
       let dx = tvx - this.vel.x, dz = tvz - this.vel.z;
       const dl = Math.hypot(dx, dz), md = a * h;
       if (dl > md) { dx *= md / dl; dz *= md / dl; }
@@ -1152,6 +1204,15 @@ export class Player {
     this.wallPush = pushed ? this.wallPush + h : 0;
     this.grounded = false;
     this.jumping = false;
+  }
+
+  // Får Cello plats med fötterna vid at? (Lokis skugga)
+  fitsAt(at) {
+    const c = this.collider.clone();
+    c.translate(_v.copy(at).sub(this.feet));
+    c.translate(_w.set(0, 0.06, 0));
+    const r = this.world.capsuleIntersect(c);
+    return !r || r.depth < 0.08;
   }
 
   startDash() {
@@ -1459,6 +1520,15 @@ export class Player {
       rate = 6;
       P.bodyX = -1.45; P.armLz = -1.2; P.armRz = 1.2; P.torsoX = 0; P.legL = 0.1; P.legR = -0.1;
       P.elbowL = P.elbowR = -0.25; P.kneeL = 0.15; P.kneeR = 0.05;
+    }
+
+    // 0.16: glider på isen med armarna ute för balansen
+    if ((this.glide || (this.onIce === 'slick' && this.speed > 2)) && this.state === 'move' && !this.swimming) {
+      const wob = Math.sin(this.anim.t * 7) * 0.12;
+      rate = 10;
+      P.armLx = -0.3; P.armRx = -0.3; P.armLz = -1.1 + wob; P.armRz = 1.1 + wob;
+      P.elbowL = P.elbowR = -0.2;
+      if (this.glide) { P.legL = -0.25; P.legR = 0.3; P.kneeL = 0.35; P.kneeR = 0.25; P.torsoX = 0.15; P.bodyX = 0; }
     }
 
     // 0.15: simning. På ytan trampar han vatten med huvudet ovanför; under ytan ligger han framåt och tar simtag

@@ -41,6 +41,10 @@ const LOOKS = {
   corwin: { name: 'Corwin', look: { sculpt: 'bybo', skin: 0xc49f83, hairStyle: 'bald', beard: 0x6a4a3a, top: 0x7a3a5a, apron: true, extraColor: 0xd8c8a0, width: 1.15, scale: 0.96 } },
   gull: { name: 'Gull', look: { sculpt: 'bybo', skin: 0xb8906a, hairStyle: 'hood', hood: 0x3a4a5a, beard: 0xe0dcd4, top: 0x3a4a5a, scale: 0.9 } },
   marlo: { name: 'Marlo', look: { skin: 0xa8805f, hair: 0x2a1a14, top: 0x5a7a8a, extraColor: 0x8a6a3a, item: 'spear', scale: 0.98 } },
+  // 0.16: Rimeholt i norr
+  sigrun: { name: 'Sigrun', look: { skin: 0xd8b8a0, hair: 0xe8e4dc, hairStyle: 'long', top: 0x5a3a3a, shawl: 0xd8d0c0, robe: true, scale: 0.86, width: 1.05 } },
+  ylva: { name: 'Ylva', look: { skin: 0xe0c0a8, hair: 0xd8b878, hairStyle: 'hood', hood: 0x8a3a2a, top: 0x8a3a2a, extraColor: 0xe8e0d0, scale: 0.86 } },
+  hakon: { name: 'Hakon', look: { sculpt: 'bybo', skin: 0xd0a888, hairStyle: 'hood', hood: 0x4a5a6a, beard: 0xb8783a, top: 0x5a4a3a, extraColor: 0xe8e0d0, width: 1.15, scale: 1.0 } },
 };
 
 // ---------- djur ----------
@@ -187,7 +191,7 @@ export class Folk {
     this.npcs = {};
     // Alla platser för folk som områdena har bestämt
     const spots = {};
-    for (const r of [world.ranch, world.pass, world.field, world.willow, world.reach, world.interiors, world.desert, world.sea]) Object.assign(spots, r?.npcs || {});
+    for (const r of [world.ranch, world.pass, world.field, world.willow, world.reach, world.interiors, world.desert, world.sea, world.frost]) Object.assign(spots, r?.npcs || {});
     for (const [id, sp] of Object.entries(spots)) {
       const def = LOOKS[id];
       if (!def) continue;
@@ -229,6 +233,9 @@ export class Folk {
     talk('corwin', (n) => this.story.sea?.talkCorwin(n));
     talk('gull', (n) => this.story.sea?.talkGull(n));
     talk('marlo', (n) => this.story.sea?.talkMarlo(n));
+    talk('sigrun', (n) => this.story.frost?.talkSigrun(n));
+    talk('ylva', (n) => this.story.frost?.talkYlva(n));
+    talk('hakon', (n) => this.story.frost?.talkHakon(n));
 
     // Butiken: varorna på hyllorna
     const shop = world.interiors?.shop;
@@ -889,7 +896,8 @@ export class Folk {
     if (!s.spireDone) return 'spire';
     if (!s.swim) return 'swim';
     if (!s.templeDone) return 'temple';
-    return 'frost';
+    if (!s.mawDone) return s.talked?.sigrun ? 'maw' : 'frost';
+    return 'othrys';
   }
   goalText(key = this.story.state.hint) {
     return {
@@ -909,7 +917,9 @@ export class Folk {
       sea: 'South of the Galecrown, the fishers have mended their bridge. The threads lead down to the sea, where the sea god fell.',
       swim: 'The sea of Brinehollow is deep, and you sink like a stone. An old woman on the pier remembers how to swim. Ask her.',
       temple: 'Under the broken spear in the middle of the sea lies a temple. The tide there rises and falls at a will that is not the moon\'s. Dive, child.',
-      frost: 'The king of the titans flies north, to the ice where the frost giants sleep. That road is not yet woven... Rest, child, while you can.',
+      frost: 'The king of the titans flies north, to the ice where the frost giants sleep. Cross the north bridge of the Galecrown, and carry fire with you. In Rimeholt, an old woman by the fire knows the giants.',
+      maw: 'A dead giant lies in the ice with his mouth open, and something has climbed inside him. Walk into the mouth. The ice there does not let you stop... and someone in there laughs.',
+      othrys: 'Kronos walks on his own legs now, east, to Mount Othrys, where the titans were crowned. That road is not yet woven... Rest, child, while you can.',
     }[key] ?? null;
   }
 
@@ -1024,6 +1034,7 @@ export class Folk {
   talkSeren(n) {
     const s = this.story.state;
     // 0.14: efter titanens anfall slår hon läger i The Galecrown
+    if (s.templeDone && this.story.frost && n.area === 'frost') { this.story.frost.talkSeren(n); return; }
     if (s.spireDone && this.story.sea && n.area === 'sea') { this.story.sea.talkSeren(n); return; }
     if (s.titanRaid && this.story.chronicle) { this.story.chronicle.talkSeren(n); return; }
     if (!s.talked.seren) {

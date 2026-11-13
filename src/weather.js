@@ -10,6 +10,9 @@ export const WEATHER = {
   storm: { name: 'Thunderstorm', rain: 1.35, fog: 0.3, over: 1, bolts: 3.2, strikes: true },
   fog: { name: 'Fog', rain: 0, fog: 1, over: 0.55, bolts: 0.15, strikes: false },
   haze: { name: 'Sand haze', rain: 0, fog: 0.75, over: 0.3, bolts: 0, strikes: false, haze: true },
+  // 0.16: norr om The Galecrown snöar det i stället
+  snow: { name: 'Snow', rain: 0, snow: 1, fog: 0.35, over: 0.6, bolts: 0, strikes: false },
+  blizzard: { name: 'Blizzard', rain: 0, snow: 2.2, fog: 0.85, over: 0.9, bolts: 0, strikes: false, cold: true },
 };
 
 // Hur ofta varje väder kommer i olika delar av världen
@@ -17,9 +20,11 @@ const CLIMATE = {
   world: [['calm', 5], ['rain', 2], ['storm', 1.2], ['fog', 1.6]],
   stormreach: [['calm', 2.5], ['rain', 2], ['storm', 3.2], ['fog', 1]],
   desert: [['calm', 7], ['haze', 3]],
+  frost: [['calm', 2.5], ['snow', 3], ['blizzard', 1.6], ['fog', 1]],
 };
 // Vädret är samma över hela riket, men öknen är torr: regn blir lugnt, dimma blir sanddis
-const LOCAL = { desert: { rain: 'calm', storm: 'calm', fog: 'haze' } };
+const LOCAL = { desert: { rain: 'calm', storm: 'calm', fog: 'haze' }, frost: { rain: 'snow', storm: 'blizzard', haze: 'calm' } };
+const FLAKES = 1800;
 
 const DROPS = 1400, BOX = 34, HALF = BOX / 2, TOP = 14, FALL = 24;
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -56,6 +61,33 @@ export class Weather {
     this.rain.visible = false;
     this.rain.renderOrder = 5;
     scene.add(this.rain);
+
+    // 0.16: snön: flingor som faller långsamt och vajar runt kameran
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(FLAKES * 3), 3));
+    this.flakeSeeds = new Float32Array(FLAKES * 4);
+    for (let i = 0; i < FLAKES; i++) {
+      this.flakeSeeds[i * 4] = Math.random() * BOX - HALF;
+      this.flakeSeeds[i * 4 + 1] = Math.random() * (TOP * 2) - TOP;
+      this.flakeSeeds[i * 4 + 2] = Math.random() * BOX - HALF;
+      this.flakeSeeds[i * 4 + 3] = Math.random() * 6.28;
+    }
+    const fc = document.createElement('canvas');
+    fc.width = fc.height = 32;
+    const fg = fc.getContext('2d');
+    const grd = fg.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grd.addColorStop(0, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.5, 'rgba(240,246,255,0.6)');
+    grd.addColorStop(1, 'rgba(240,246,255,0)');
+    fg.fillStyle = grd;
+    fg.fillRect(0, 0, 32, 32);
+    this.snowMat = new THREE.PointsMaterial({ size: 0.16, map: new THREE.CanvasTexture(fc), transparent: true, opacity: 0, depthWrite: false, fog: true, sizeAttenuation: true });
+    this.snow = new THREE.Points(sg, this.snowMat);
+    this.snow.frustumCulled = false;
+    this.snow.visible = false;
+    this.snow.renderOrder = 5;
+    scene.add(this.snow);
+    this.snowT = 0;
 
     // Blixten som slår ner nära Cello, och ringen på marken som varnar
     const bg = new THREE.BufferGeometry();
@@ -109,7 +141,7 @@ export class Weather {
 
   setRegion(region, outdoor) {
     const before = this.local;
-    this.region = region === 'desert' ? 'desert' : region === 'stormreach' ? 'stormreach' : 'world';
+    this.region = region === 'desert' ? 'desert' : region === 'stormreach' ? 'stormreach' : region === 'frost' ? 'frost' : 'world';
     this.outdoor = outdoor;
     if (this.local !== before) this.snap();
     if (!outdoor) {
@@ -148,7 +180,8 @@ export class Weather {
     const target = WEATHER[this.local];
     if (this.blend < 1) this.blend = Math.min(1, this.blend + dt * this.blendRate);
     const k = this.blend * this.blend * (3 - 2 * this.blend);
-    for (const key of ['rain', 'fog', 'over', 'bolts']) this.cur[key] = lerp(this.from[key], target[key], k);
+    for (const key of ['rain', 'fog', 'over', 'bolts', 'snow']) this.cur[key] = lerp(this.from[key] ?? 0, target[key] ?? 0, k);
+    this.cur.cold = !!target.cold && k > 0.5;
     this.cur.strikes = target.strikes && k > 0.6;
     this.cur.haze = target.haze ? k : (this.from.haze ? 1 - k : 0);
     const out = this.outdoor;
@@ -175,6 +208,29 @@ export class Weather {
         p[o + 3] = cx + x + slant * len; p[o + 4] = cy + y + len; p[o + 5] = cz + z;
       }
       this.rain.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // Snön
+    const snow = out ? this.cur.snow || 0 : 0;
+    this.snow.visible = snow > 0.02;
+    if (this.snow.visible) {
+      this.snowT += dt;
+      this.snowMat.opacity = Math.min(0.95, 0.75 * snow);
+      this.snowMat.size = 0.12 + 0.05 * snow;
+      const p = this.snow.geometry.attributes.position.array, sd = this.flakeSeeds;
+      const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
+      const fall = 1.6 + snow * 1.4, wind = (snow - 1) * 4.5;
+      for (let i = 0; i < FLAKES; i++) {
+        let y = sd[i * 4 + 1] - fall * dt;
+        if (y < -TOP) y += TOP * 2;
+        sd[i * 4 + 1] = y;
+        sd[i * 4] += wind * dt;
+        const ph = sd[i * 4 + 3] + this.snowT * 1.3;
+        const x = (((sd[i * 4] + Math.sin(ph) * 0.6 - cx) % BOX) + BOX * 1.5) % BOX - HALF;
+        const z = (((sd[i * 4 + 2] + Math.cos(ph * 0.8) * 0.6 - cz) % BOX) + BOX * 1.5) % BOX - HALF;
+        p[i * 3] = cx + x; p[i * 3 + 1] = cy + y; p[i * 3 + 2] = cz + z;
+      }
+      this.snow.geometry.attributes.position.needsUpdate = true;
     }
 
     this.charged = Math.max(0, this.charged - dt);

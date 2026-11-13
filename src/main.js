@@ -29,6 +29,8 @@ import { loadPack } from './skinned.js';
 import { WIND } from './build.js';
 import { Chronicle } from './chronicle.js';
 import { SeaStory } from './seastory.js';
+import { FrostStory } from './froststory.js';
+import { ShadowDouble } from './shadow.js';
 import { WATER } from './water.js';
 
 const PIXEL_LINES = 360; // retroläge: spelet ritas i ungefär så här många rader
@@ -62,7 +64,7 @@ function start(saved = {}) {
   // 0.11: dygnet och vädret
   const ENV = {
     nightSky: new THREE.Color(0x4a5a8a), duskSky: new THREE.Color(0xd8956a), nightMoon: new THREE.Color(0x7d8fcf), duskMoon: new THREE.Color(0xffa36a),
-    nightFog: new THREE.Color(0x0b0e18), duskFog: new THREE.Color(0x5a3b30), fogGrey: new THREE.Color(0x6a7078), haze: new THREE.Color(0x9a7a52),
+    nightFog: new THREE.Color(0x0b0e18), duskFog: new THREE.Color(0x5a3b30), fogGrey: new THREE.Color(0x6a7078), haze: new THREE.Color(0x9a7a52), snowFog: new THREE.Color(0xd4dce6),
   };
 
   const sky = createSky(scene);
@@ -197,6 +199,11 @@ function start(saved = {}) {
   const chronicle = new Chronicle({ story, world, areas, player, hud, sfx, fx, rig, folk, inventory, combat, music });
   // 0.15: havet (Seren följer med, simlektionen, pärlorna, fyren, templet och det tredje valet)
   const seaStory = new SeaStory({ story, world, areas, player, hud, sfx, fx, rig, folk, inventory, combat, music });
+  // 0.16: norr (Rimeholt, renarna, fiskaren, gapet, Loke och det fjärde valet) och Lokis skugga
+  const frostStory = new FrostStory({ story, world, areas, player, hud, sfx, fx, rig, folk, inventory, combat, music });
+  const shadow = new ShadowDouble({ scene, player, collider, fx, sfx, hud });
+  for (const dg of Object.values(world.dungeons)) dg.game.shadow = shadow;
+  player.onGlide = (k) => { if (k === 'start') sfx.play('glide', { vol: 0.7 }); else sfx.play('stomp', { vol: 0.35 }); };
   const world2 = { player, fx, sfx, onBlocked() {}, onPlayerHit() {} };
 
   // ---------- skärvor, hjärtan och vad fiender och krukor lämnar efter sig ----------
@@ -382,6 +389,8 @@ function start(saved = {}) {
   player.onWallRun = (on) => { if (on) sfx.play('wallrun'); };
   // 0.15: vatten och simning
   player.waterAt = (x, z) => (areas.cur ? areas.cur.waterAt(x, z) : null);
+  player.iceAt = (p) => (areas.cur?.ices.length ? areas.cur.iceAt(p) : null);
+  player.iceLane = (p) => (areas.cur?.ices.length ? areas.cur.iceRegion(p) : null);
   player.bubbleAt = (p) => !!areas.cur?.airAt(p);
   player.onSplash = (fall) => {
     sfx.play('splash', { vol: Math.min(1, 0.35 + fall / 14) });
@@ -576,14 +585,15 @@ function start(saved = {}) {
       return { id: 'march' };
     }
     // Fästningens och pyramidens nya delar
-    const wing = bastion.wingAt(here) ?? pyramid.wingAt(here) ?? world.necropolis.wingAt(here) ?? world.spire.wingAt(here) ?? world.temple.wingAt(here);
+    const wing = bastion.wingAt(here) ?? pyramid.wingAt(here) ?? world.necropolis.wingAt(here) ?? world.spire.wingAt(here) ?? world.temple.wingAt(here) ?? world.maw.wingAt(here);
     if (wing) {
       if (wing.bossFight) return { id: 'warlord', now: true };
       if (wing.trap) return { id: 'march', now: true };
       if (here === 'nthrone' && world.necropolis.state.cleared.ammit) return { id: 'dawn' };
       if (here === 'scrown' && world.spire.state.cleared.typhon) return { id: 'dawn' };
       if (here === 'tthrone' && world.temple.state.cleared.ketos) return { id: 'dawn' };
-      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull', pdepths: 'whispers', pbarque: 'skull', pascent: 'march', papex: 'skull', ncrypts: 'whispers', nhall: 'skull', nduat: 'whispers', nthrone: 'skull', sgate: 'march', shall: 'march', sweb: 'skull', scrown: 'skull', tgate: 'whispers', tdeep: 'whispers', tgrotto: 'skull', tthrone: 'skull' }[here] };
+      if (here === 'fthrone' && world.maw.state.cleared.thrym) return { id: 'dawn' };
+      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull', pdepths: 'whispers', pbarque: 'skull', pascent: 'march', papex: 'skull', ncrypts: 'whispers', nhall: 'skull', nduat: 'whispers', nthrone: 'skull', sgate: 'march', shall: 'march', sweb: 'skull', scrown: 'skull', tgate: 'whispers', tdeep: 'whispers', tgrotto: 'skull', tthrone: 'skull', fgate: 'whispers', flab: 'march', fwolf: 'skull', fthrone: 'skull' }[here] };
     }
     // Natten (0.11): byarna somnar och fälten blir kusliga
     if (clock.isNight && outdoorArea(areas.cur)) {
@@ -602,7 +612,7 @@ function start(saved = {}) {
     // Fältet: ett långsamt spår i moll (Elias ville ha något kusligare än galoppen)
     const byArea = {
       home: 'fieldsdawn', house: 'fieldsdawn', ranch: 'greenroad', pass: 'quiet', field: 'forgotten', willowmere: 'willowmere',
-      shop: 'willowmere', stormreach: 'march', cave: 'whispers', sea: 'ballad',
+      shop: 'willowmere', stormreach: 'march', cave: 'whispers', sea: 'ballad', frost: 'quiet',
     };
     if (here === 'pass' && P.z < -62) return { id: 'ballad' };
     return { id: byArea[here] };
@@ -718,6 +728,11 @@ function start(saved = {}) {
         player.breathPause = blocked;
         player.update(sim, pin, rig.yaw);
         if (player.state === 'dash') dashHits();
+        // Lokis mask: kasta skuggan, eller byt plats med den
+        if (pin.mask && player.hasMask && player.state === 'move' && !player.swimming && !player.mount) {
+          shadow.use(areas.id);
+        }
+        shadow.update(sim, areas.id);
         goat.update(sim);
         if (!talking && !story.shown) enemies.update(sim, world2);
         combat.update(sim, pin);
@@ -766,6 +781,7 @@ function start(saved = {}) {
         if (respawn.t > 1.3) respawn = null;
       }
       rig.indoor = (inDungeon() && areas.id === 'bastion' && player.feet.z < -150) || !!areas.cur?.indoor;
+      rig.extra = areas.id === 'fthrone' && world.maw.wingAt('fthrone')?.bossFight ? 4.5 : 0;
       rig.update(dt, blocked ? input.empty : inp, player);
       player.model.root.visible = (rig.cur > 0.95 || rig.fallLock || !!rig.cinematic) && player.visibleBlink;
       hud.setDungeon(inRooms()?.state ?? null);
@@ -784,9 +800,11 @@ function start(saved = {}) {
     realm.update(dt);
     chronicle.update(dt);
     seaStory.update(dt);
+    frostStory.update(dt);
     const flash = sky.update(dt, t, camera) * base.flash;
     applyEnv(flash);
     applyWater(dt);
+    applyCold(dt);
     world.update(t, dt);
     // 0.13: gräset vajar, mer i regn och åska
     WIND.time.value = t;
@@ -798,6 +816,35 @@ function start(saved = {}) {
     sfx.ambience(dt, story.ambienceState());
     updateMusic(dt);
     hud.frame(dt, player);
+  }
+
+  // 0.16: kylan i norr. Ute i The Frostmarch fryser Cello sakta (fort i snöstorm), om han inte har lyktan tänd,
+  // står nära en eld eller bär Frostjättens välsignelse. Helt nedkyld tappar han ett halvt hjärta i taget.
+  let coldHurtT = 4, coldHinted = false;
+  function applyCold(dt) {
+    const a = areas.cur, P = player, s = story.state;
+    const blocked = story.dialog.active || story.cinematic || story.fade || !hud.started || story.phase !== 'free';
+    if (!a?.cold || blocked || P.state === 'dead') {
+      if (!a?.cold) P.cold = Math.max(0, (P.cold || 0) - dt / 4);
+      hud.setFrost(P.cold || 0);
+      return;
+    }
+    const nearFire = (a.rests ?? []).some((r) => Math.hypot(r.pos.x - P.feet.x, r.pos.z - P.feet.z) < 8) || (a.warm ?? []).some((w) => Math.hypot(w.x - P.feet.x, w.z - P.feet.z) < w.r);
+    const warm = inventory.lit || nearFire || s.frostBlessing;
+    const rate = (weather.cur.cold ? 1 / 16 : (weather.cur.snow || 0) > 0.5 ? 1 / 40 : 1 / 70) * (s.furCloak ? 0.5 : 1);
+    P.cold = Math.max(0, Math.min(1, (P.cold || 0) + (warm ? -dt / 5 : dt * rate * (P.swimming ? 4 : 1))));
+    hud.setFrost(P.cold);
+    if (P.cold >= 1) {
+      if (!coldHinted) { coldHinted = true; hud.toast('Cello is freezing! Light the lantern, or find a fire to warm up.', 4200); }
+      coldHurtT -= dt;
+      if (coldHurtT <= 0) {
+        coldHurtT = 5;
+        P.hp = Math.max(0, P.hp - 1);
+        P.onHurt?.(P.hp);
+        sfx.play('hurt', { vol: 0.6 });
+        if (P.hp <= 0) P.setState('dead');
+      }
+    } else coldHurtT = Math.min(coldHurtT + dt, 4);
   }
 
   // 0.15: kameran under ytan (blått och dimmigt), luftmätaren och bubblor från Cello
@@ -863,7 +910,7 @@ function start(saved = {}) {
     hemi.color.copy(base.sky).lerp(ENV.nightSky, n * 0.7).lerp(ENV.duskSky, dusk * 0.45);
     moon.color.copy(base.moonColor).lerp(ENV.nightMoon, n * 0.8).lerp(ENV.duskMoon, dusk * 0.6);
     _c.copy(fogBase).lerp(ENV.nightFog, n * 0.78).lerp(ENV.duskFog, dusk * 0.35);
-    if (fog > 0) _c.lerp(haze > 0.5 ? ENV.haze : ENV.fogGrey, fog * (0.25 + 0.3 * day));
+    if (fog > 0) _c.lerp(haze > 0.5 ? ENV.haze : (wx.snow || 0) > 0.3 ? ENV.snowFog : ENV.fogGrey, fog * (0.25 + 0.3 * day) * ((wx.snow || 0) > 0.3 ? 1.6 : 1));
     // Lugnt dagsljus: allt glider mot de varma färgerna (stormar och natt behåller sina)
     const warm = out ? Math.max(0, day * 1.15 - 0.15) * (1 - dusk * 0.7) * (1 - over) * (1 - fog * 0.8) : 0;
     hemi.color.lerp(TP.sky, warm * 0.65);
@@ -888,7 +935,7 @@ function start(saved = {}) {
   // Handtag för felsökning i webbläsarens konsol
   window.__realm = {
     player, rig, world, areas, input, hud, scene, camera, enemies, combat, fx, sfx, story, dialog, bastion, pyramid, lights, collider, renderer,
-    culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs, realm, necropolis: world.necropolis, spire: world.spire, chronicle, temple: world.temple, seaStory,
+    culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs, realm, necropolis: world.necropolis, spire: world.spire, chronicle, temple: world.temple, seaStory, maw: world.maw, frostStory, shadow,
     tick: (dt, inp) => update(dt, { ...input.empty, ...inp }),
   };
   requestAnimationFrame(frame);

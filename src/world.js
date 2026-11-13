@@ -28,6 +28,8 @@ import { buildGalecrown } from './regions/galecrown.js';
 import { Spire, buildSpire } from './spire.js';
 import { buildSea } from './regions/sea.js';
 import { Temple, buildTemple } from './temple.js';
+import { buildFrost } from './regions/frost.js';
+import { Maw, buildMaw } from './maw.js';
 import { Pyramid, OX as PYR_X } from './pyramid.js';
 
 const AZ = -78; // Aetherias mittpunkt i z
@@ -884,6 +886,8 @@ export function buildWorld(scene, lights) {
   const gale = buildGalecrown(B, areas);
   // 0.15: The Shattered Sea (x 21000) och The Drowned Temple (x 23000–24800)
   const sea = buildSea(B, areas);
+  // 0.16: The Frostmarch (x 26000) och Frostgiant's Maw (x 28000–29800)
+  const frost = buildFrost(B, areas);
 
   // =====================================================================
   // The Sun-Scorched Pyramid (x 9000)
@@ -931,6 +935,10 @@ export function buildWorld(scene, lights) {
   temple.areas = areas;
   const templeWings = buildTemple(B, areas, temple);
   const TEMPLE_IDS = new Set(templeWings.map((w) => w.id));
+  const maw = new Maw();
+  maw.areas = areas;
+  const mawWings = buildMaw(B, areas, maw);
+  const MAW_IDS = new Set(mawWings.map((w) => w.id));
 
   const world = {
     areas,
@@ -964,7 +972,7 @@ export function buildWorld(scene, lights) {
     prologue: { refugee: V(4.6, 12.4), titanHome: V(-16.5, 9) },
     east: field.east,
     paths: { north: paths.north, east: field.eastPath },
-    ranch, pass, field, willow, reach, interiors, desert, gale, sea,
+    ranch, pass, field, willow, reach, interiors, desert, gale, sea, frost,
     // 0.11: stenarna som öppnas med Waking Chant (kistorna under dem registreras nu)
     songStones: defineSongStones({ pass: pass?.H, field: field?.H, desert: desert?.H }, B.chests),
     bastion,
@@ -972,15 +980,17 @@ export function buildWorld(scene, lights) {
     necropolis,
     spire,
     temple,
+    maw,
     // Fängelsehålorna: samma gränssnitt (state, interactions, trap, update, combatTargets ...)
-    dungeons: { bastion, pyramid, necropolis, spire, temple },
-    dungeonAt: (id) => (BASTION_IDS.has(id) ? bastion : PYRAMID_IDS.has(id) ? pyramid : NECRO_IDS.has(id) ? necropolis : SPIRE_IDS.has(id) ? spire : TEMPLE_IDS.has(id) ? temple : null),
+    dungeons: { bastion, pyramid, necropolis, spire, temple, maw },
+    dungeonAt: (id) => (BASTION_IDS.has(id) ? bastion : PYRAMID_IDS.has(id) ? pyramid : NECRO_IDS.has(id) ? necropolis : SPIRE_IDS.has(id) ? spire : TEMPLE_IDS.has(id) ? temple : MAW_IDS.has(id) ? maw : null),
     necroIds: NECRO_IDS,
     spireIds: SPIRE_IDS,
     templeIds: TEMPLE_IDS,
+    mawIds: MAW_IDS,
     pyramidIds: PYRAMID_IDS,
     bastionIds: BASTION_IDS,
-    wingAt: (id) => bastion.wingAt(id) ?? pyramid.wingAt(id) ?? necropolis.wingAt(id) ?? spire.wingAt(id) ?? temple.wingAt(id),
+    wingAt: (id) => bastion.wingAt(id) ?? pyramid.wingAt(id) ?? necropolis.wingAt(id) ?? spire.wingAt(id) ?? temple.wingAt(id) ?? maw.wingAt(id),
     inPyramid: () => PYRAMID_IDS.has(areas.id),
     slamGate: field.slamGate,
     setSunGate: field.setSunGate,
@@ -1005,6 +1015,7 @@ export function buildWorld(scene, lights) {
       necropolis.wingAt(id)?.enter();
       spire.wingAt(id)?.enter();
       temple.wingAt(id)?.enter();
+      maw.wingAt(id)?.enter();
     },
     // Ett eldfat har tänts
     onTorch(id, story) {
@@ -1014,6 +1025,7 @@ export function buildWorld(scene, lights) {
       if (necropolis.onTorch(id)) return true;
       if (spire.onTorch(id)) return true;
       if (temple.onTorch(id)) return true;
+      if (maw.onTorch(id)) return true;
       return false;
     },
     connect(collider) {
@@ -1029,6 +1041,7 @@ export function buildWorld(scene, lights) {
       for (const w of necroWings) necropolis.interactions.push(...w.interactions);
       for (const w of spireWings) spire.interactions.push(...w.interactions);
       for (const w of templeWings) temple.interactions.push(...w.interactions);
+      for (const w of mawWings) maw.interactions.push(...w.interactions);
     },
     slamEast: field.slamEast,
     lightEast: field.lightEast,
