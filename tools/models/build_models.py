@@ -16,6 +16,7 @@ def main():
     entries = []
     h = hero.build()
     entries.append(entry('cello', h['body']))
+    print('shield', {k: (v.round(4).tolist() if hasattr(v, 'round') else round(v, 4)) for k, v in h['shield'].items()})
     entries.append(entry('celloguard', h['swordguard']))
     entries.append(entry('celloblade', h['swordblade']))
     import people

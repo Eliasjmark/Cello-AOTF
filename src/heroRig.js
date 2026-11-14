@@ -102,6 +102,11 @@ export function sculptHero(p) {
   if (p.tridentHand) move(p.tridentHand, B.handR, 0, 0.0, 0.02).scale.setScalar(0.85);
   move(p.lantern, hips, -0.25, 0.0, 0.1);
 
+  // 0.17: skölden och vänster underarm. I skulpturen var skölden ihopsmält med armen och bröstet, så de
+  // sträcktes ut och såg trasiga ut när armen rörde sig. Nu är de klippta ur skulpturen (tools/models/hero.py)
+  // och byggs här som fasta delar på underarmen: de följer armen utan att något töjs.
+  const shieldArm = buildShieldArm(B, body, torso);
+
   // Delar som rörelsekoden rör men som skulpturen inte har
   const shield = new THREE.Group();
   torso.add(shield);
@@ -121,6 +126,116 @@ export function sculptHero(p) {
   return {
     ...p, root, body, hips, torso, head, tail, scarf, armL: B.armL, armR: B.armR, elbowL: B.elbowL, elbowR: B.elbowR,
     legL: lL.g, legR: lR.g, kneeL: lL.knee, kneeR: lR.knee, skirt, sword, shield, eyes, lids,
-    blade, tip, jag, bladeY, recolor, sculpt: true, skinned: sk.mesh,
+    blade, tip, jag, bladeY, recolor, sculpt: true, skinned: sk.mesh, shieldMesh: shieldArm.sh, updateShield: shieldArm.update,
   };
+}
+
+// Sköldens läge i skulpturen (spelets enheter, kroppens ram), mätt av tools/models/hero.py
+const SHIELD = { center: [-0.2565, 1.0111, -0.0432], normal: [-0.9843, -0.0063, -0.1764], radius: 0.3264 };
+
+function buildShieldArm(B, body, torso) {
+  const lam = (color) => new THREE.MeshLambertMaterial({ color, flatShading: false });
+  const skin = lam(HERO_PALETTE.skin), bracer = lam(HERO_PALETTE.bracer), leather = lam(HERO_PALETTE.leatherDark);
+  const wood = lam(HERO_PALETTE.wood), woodDark = lam(0x5e3e24), iron = lam(HERO_PALETTE.iron), boss = lam(HERO_PALETTE.boss);
+  const el = B.elbowL, hand = B.handL;
+  body.updateWorldMatrix(true, true);
+  const toLocal = (arr) => el.worldToLocal(body.localToWorld(new THREE.Vector3(...arr)));
+  // Underarmen: från armbågen till handen, med en läderkrage
+  const handPos = hand ? hand.position.clone() : new THREE.Vector3(0, -0.26, 0);
+  const len = handPos.length();
+  const dir = handPos.clone().normalize();
+  const fore = new THREE.Group();
+  fore.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
+  el.add(fore);
+  const seg = (r0, r1, y0, y1, m) => {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, y1 - y0, 12), m);
+    c.position.y = -(y0 + y1) / 2;
+    fore.add(c);
+    return c;
+  };
+  fore.add(new THREE.Mesh(new THREE.SphereGeometry(0.052, 12, 10), bracer));
+  seg(0.05, 0.043, 0, len * 0.3, skin);
+  seg(0.056, 0.05, len * 0.28, len * 0.92, bracer);
+  for (const k of [0.4, 0.62, 0.84]) seg(0.058, 0.058, len * k, len * k + 0.012, leather);
+  // Handen: en knuten näve runt sköldens handtag
+  const fist = new THREE.Mesh(new THREE.SphereGeometry(0.048, 12, 10), skin);
+  fist.scale.set(0.95, 1.1, 1.25);
+  fist.position.y = -len - 0.02;
+  fore.add(fist);
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.015, 0.035, 4, 8), skin);
+  thumb.position.set(0.035, -len - 0.005, 0.03);
+  thumb.rotation.z = 0.6;
+  fore.add(thumb);
+
+  // Skölden: en rund sköld av plankor med järnkant, en buckla i mitten och nitar
+  const R = SHIELD.radius, T = 0.035;
+  const sh = new THREE.Group();
+  const face = new THREE.Group(); // +Z = sköldens framsida
+  sh.add(face);
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(R, R, T, 40), wood);
+  disc.rotation.x = Math.PI / 2;
+  face.add(disc);
+  // plankorna: mörka fogar över framsidan
+  for (let k = -3; k <= 3; k++) {
+    const x = k * (R / 3.6);
+    const h = 2 * Math.sqrt(Math.max(0, R * R - x * x)) * 0.96;
+    if (h < 0.05) continue;
+    const g = new THREE.Mesh(new THREE.BoxGeometry(0.006, h, 0.004), woodDark);
+    g.position.set(x + R / 7.2, 0, T / 2 + 0.001);
+    face.add(g);
+  }
+  // två järnband tvärs över
+  for (const y of [-R * 0.48, R * 0.48]) {
+    const w = 2 * Math.sqrt(R * R - y * y) * 0.98;
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, 0.03, 0.008), iron);
+    b.position.set(0, y, T / 2 + 0.003);
+    face.add(b);
+  }
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.017, 8, 48), iron);
+  face.add(rim);
+  const bossM = new THREE.Mesh(new THREE.SphereGeometry(R * 0.26, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), boss);
+  bossM.rotation.x = Math.PI / 2;
+  bossM.position.z = T / 2;
+  face.add(bossM);
+  const bossRim = new THREE.Mesh(new THREE.TorusGeometry(R * 0.27, 0.01, 6, 24), iron);
+  bossRim.position.z = T / 2 + 0.002;
+  face.add(bossRim);
+  for (let k = 0; k < 10; k++) {
+    const a = (k / 10) * Math.PI * 2;
+    const r = new THREE.Mesh(new THREE.SphereGeometry(0.011, 6, 4), iron);
+    r.position.set(Math.cos(a) * R * 0.88, Math.sin(a) * R * 0.88, T / 2 + 0.004);
+    face.add(r);
+  }
+  // baksidan: läderremmar och handtaget
+  for (const y of [-0.07, 0.07]) {
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(R * 1.3, 0.035, 0.01), leather);
+    strap.position.set(0, y, -T / 2 - 0.006);
+    face.add(strap);
+  }
+  // Läget: samma som skölden hade i skulpturen, räknat i underarmens ram
+  const c = toLocal(SHIELD.center);
+  const n = toLocal(SHIELD.center.map((v, i) => v + SHIELD.normal[i])).sub(c).normalize();
+  sh.position.copy(c);
+  sh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
+  el.add(sh);
+  // När Cello håller upp skölden: den vrids så att framsidan pekar rakt fram och täcker bröstet
+  const restP = sh.position.clone(), restQ = sh.quaternion.clone();
+  const tOff = torso.worldToLocal(body.localToWorld(new THREE.Vector3(-0.03, 1.2, 0.36)));
+  const tQ = torso.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(body.getWorldQuaternion(new THREE.Quaternion()));
+  const _p = new THREE.Vector3(), _f = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Quaternion();
+  const update = (s) => {
+    if (s < 0.001) { sh.position.copy(restP); sh.quaternion.copy(restQ); return; }
+    torso.updateWorldMatrix(true, true);
+    torso.getWorldQuaternion(_q).multiply(tQ);
+    // Skölden sitter framför näven (handen håller i handtaget på baksidan)
+    if (hand) hand.getWorldPosition(_p); else { _p.copy(tOff); torso.localToWorld(_p); }
+    _f.set(0, 0, 1).applyQuaternion(_q);
+    _p.addScaledVector(_f, 0.075);
+    el.worldToLocal(_p);
+    el.getWorldQuaternion(_e).invert();
+    _q.premultiply(_e);
+    sh.position.lerpVectors(restP, _p, s);
+    sh.quaternion.slerpQuaternions(restQ, _q, s);
+  };
+  return { sh, update };
 }

@@ -1567,10 +1567,11 @@ export class Player {
     if (m.sculpt && a.shield > 0.01) {
       const s = a.shield;
       // överarmen framåt och inåt, underarmen tvärs över bröstet: skölden täcker bålen
-      P.armLx = P.armLx * (1 - s) - 1.0 * s;
-      P.armLz = P.armLz * (1 - s);
-      P.armLy = -1.4 * s;
-      P.elbowL = P.elbowL * (1 - s) - 1.2 * s;
+      // 0.17: näven framför bröstet (skölden sätts framför näven i heroRig.js)
+      P.armLx = P.armLx * (1 - s) - 0.6 * s;
+      P.armLz = P.armLz * (1 - s) + 0.3 * s;
+      P.armLy = 0;
+      P.elbowL = P.elbowL * (1 - s) - 1.8 * s;
     }
     // Rullning och volt ska inte "spola tillbaka" när de tar slut
     if (this.state !== 'dodge') m.hips.rotation.x = wrap(m.hips.rotation.x);
@@ -1595,6 +1596,8 @@ export class Player {
     ap(m.kneeR.rotation, 'x', P.kneeR + sqk * 0.9);
     ap(m.elbowL.rotation, 'x', P.elbowL);
     ap(m.elbowR.rotation, 'x', P.elbowR);
+    // 0.17: skulpturens sköld är en fast del på underarmen; uppe framför bröstet när Cello skyddar sig
+    m.updateShield?.(a.shield);
     // Tunikans fåll följer benen, och fladdrar ut lite när han springer
     m.skirt.rotation.x = approach(m.skirt.rotation.x, (m.legL.rotation.x + m.legR.rotation.x) * 0.25 - a.run * 0.08, 20, dt);
     // Benen isär när han rider

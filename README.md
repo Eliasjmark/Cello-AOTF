@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.17 · Steel & Shadow (svårare fiender med nya sorter och livmätare, konturer, riktiga skuggor och mer liv i luften)
+**Version:** prototyp 0.17.1 · Steel & Shadow (svårare fiender med nya sorter och livmätare, konturer, riktiga skuggor och mer liv i luften)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -33,6 +33,10 @@ python3 tools/models/dump_fbx.py Boss1.fbx:boss1 ...   # FBX → tools/models/sr
 python3 tools/models/build_models.py                    # → models/pack.bin
 python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
 ```
+
+## 0.17.1: Cellos sköld
+
+Skölden satt ihopsmält med vänster arm och bröstet i skulpturen, så den töjdes ut och såg trasig ut när armen rörde sig. Nu klipps skölden och vänster underarm bort ur skulpturen (`tools/models/hero.py`), och byggs i spelet som fasta delar på underarmen (`src/heroRig.js`): en rund sköld av plankor med järnkant, buckla och nitar, och en underarm med läderkrage och näve. När Cello håller upp skölden vrids den så att framsidan pekar rakt fram, framför näven.
 
 ## Vad är nytt i 0.17: Steel & Shadow
 

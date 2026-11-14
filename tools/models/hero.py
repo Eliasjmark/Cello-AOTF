@@ -37,6 +37,9 @@ def build(target=32000, debug=None):
     rad = np.linalg.norm((V - sc) - np.outer(d, sn), axis=1)
     R = 13.6
     shield = (rad < R + 0.5) & (d > -1.3) & (d < 3.2)
+    # 0.17: allt i sköldens skiva (skölden, och underarmen och handen bakom den) klipps bort ur kroppen.
+    # Skölden och vänster underarm byggs i spelet i stället (src/heroRig.js), så att de rör sig rätt.
+    slab_full = (rad < R + 1.0) & (d > -2.2) & (d < 3.4)
     paint(shield & (rad > 12.0), 'iron')
     paint(shield & (rad < 2.6) & (d > 0.6), 'boss')
     paint(shield, 'wood')
@@ -172,6 +175,24 @@ def build(target=32000, debug=None):
     lab[shield_v] = I['elbowL']
     body, keepv = cut_bridges(body, lab, sk)
     lab = lab[keepv]; reg = reg[keepv]; shield_v = shield_v[keepv]
+    # 0.17: klipp bort skölden och vänster underarm (hörn på elbowL, och allt i sköldens skiva)
+    slab_b = slab_full[used][keepv]
+    gone = (lab == I['elbowL']) | shield_v | slab_b
+    Fb = body.faces
+    keepf = ~gone[Fb].any(1)
+    t = trimesh.Trimesh(body.vertices, Fb[keepf], process=False)
+    comps = trimesh.graph.connected_components(t.face_adjacency, nodes=np.arange(keepf.sum()), min_len=1)
+    big = np.zeros(keepf.sum(), bool)
+    for c in comps:
+        if len(c) >= 40: big[c] = True
+    f2 = Fb[keepf][big]
+    u2 = np.unique(f2); rm = -np.ones(len(body.vertices), int); rm[u2] = np.arange(len(u2))
+    body = trimesh.Trimesh(body.vertices[u2], rm[f2], process=False)
+    lab = lab[u2]; reg = reg[u2]; shield_v = shield_v[u2]
+    # sköldens läge i spelets enheter (före speglingen i X): mitt, normal och radie
+    sc_g = to_game(np.array([sc]))[0]
+    sn_g = to_body(np.array([sc + sn]))[0] - to_body(np.array([sc]))[0]; sn_g /= np.linalg.norm(sn_g)
+    out['shield'] = dict(center=sc_g * [-1, 1, 1], normal=sn_g * [-1, 1, 1], radius=R * S, elbow=J['L'][1] * [-1, 1, 1], hand=J['L'][3] * [-1, 1, 1])
     # Händerna vilar mot bältet i skulpturen: lås dem helt till underarmen, annars drar höften i fingrarna
     Bv2 = body.vertices
     hand_v = np.zeros(len(Bv2), bool)
