@@ -17,6 +17,7 @@ export function sculptHero(p) {
   const root = p.root;
   const sk = skinnedModel('cello', HERO_PALETTE);
   const B = sk.bones;
+  cutLeftUpperArm(sk.mesh);
   const body = new THREE.Group();
   root.remove(p.body);
   root.add(body);
@@ -130,6 +131,49 @@ export function sculptHero(p) {
   };
 }
 
+// 0.20.1: vänster överarm. I skulpturen hänger armen tätt intill sidan med armbågen vid bältet, och när
+// underarmen och skölden klipptes bort (0.17) blev överarmen kvar som trasiga bitar ihopsydda med bröstet och
+// bältet. När Cello lyfte skölden drogs de ut i långa bruna trådar mot näven. Nu klipps överarmen också bort
+// (trianglarna i en kapsel från axeln till armbågen) och byggs i buildShieldArm som fasta delar, precis som
+// underarmen. Hörn utanför kapseln som ändå hade armens vikt (bröst, remmar, bälte) får följa bålen.
+function cutLeftUpperArm(mesh) {
+  const geo = mesh.geometry, sk = mesh.skeleton, names = sk.bones.map((b) => b.name);
+  const iA = names.indexOf('armL'), iT = names.indexOf('torso');
+  const P = geo.attributes.position, si = geo.attributes.skinIndex, sw = geo.attributes.skinWeight;
+  if (iA < 0 || iT < 0 || !si || !sw || !geo.index || geo.userData.armCut) return;
+  geo.userData.armCut = true;
+  const bindPos = (nm) => new THREE.Vector3().setFromMatrixPosition(sk.boneInverses[names.indexOf(nm)].clone().invert());
+  const s0 = bindPos('armL'), d = bindPos('elbowL').sub(s0);
+  const v = new THREE.Vector3(), q = new THREE.Vector3();
+  const cut = new Uint8Array(P.count);
+  for (let n = 0; n < P.count; n++) {
+    let kA = -1;
+    for (let k = 0; k < 4; k++) if (si.getComponent(n, k) === iA && sw.getComponent(n, k) > 0) kA = k;
+    if (kA < 0) continue;
+    v.fromBufferAttribute(P, n);
+    const t = q.copy(v).sub(s0).dot(d) / d.lengthSq();
+    const dist = q.copy(s0).addScaledVector(d, Math.max(0, Math.min(1, t))).distanceTo(v);
+    const w = sw.getComponent(n, kA);
+    // axelkulan (t < 0.18) får vara kvar och följa armen som förut
+    if (t < 0.18) continue;
+    if (w > 0.4 && dist < 0.068 && t < 1.25) { cut[n] = 1; continue; }
+    // ett hörn på bålen som bara låg nära armen: all armens vikt till bålen
+    let kT = -1;
+    for (let k = 0; k < 4; k++) if (si.getComponent(n, k) === iT) kT = k;
+    if (kT < 0) { si.setComponent(n, kA, iT); continue; }
+    sw.setComponent(n, kT, sw.getComponent(n, kT) + w);
+    sw.setComponent(n, kA, 0);
+  }
+  const idx = geo.index.array, keep = [];
+  for (let i = 0; i < idx.length; i += 3) {
+    if (cut[idx[i]] || cut[idx[i + 1]] || cut[idx[i + 2]]) continue;
+    keep.push(idx[i], idx[i + 1], idx[i + 2]);
+  }
+  geo.setIndex(new THREE.BufferAttribute(P.count > 65535 ? new Uint32Array(keep) : new Uint16Array(keep), 1));
+  si.needsUpdate = true;
+  sw.needsUpdate = true;
+}
+
 // Sköldens läge i skulpturen (spelets enheter, kroppens ram), mätt av tools/models/hero.py
 const SHIELD = { center: [-0.2565, 1.0111, -0.0432], normal: [-0.9843, -0.0063, -0.1764], radius: 0.3264 };
 
@@ -140,6 +184,26 @@ function buildShieldArm(B, body, torso) {
   const el = B.elbowL, hand = B.handL;
   body.updateWorldMatrix(true, true);
   const toLocal = (arr) => el.worldToLocal(body.localToWorld(new THREE.Vector3(...arr)));
+  // 0.20.1: överarmen, från axeln till armbågen: bar hud och en läderskiva på axeln (som högra armen)
+  {
+    const up = new THREE.Group(), elPos = el.position.clone(), ulen = elPos.length();
+    up.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), elPos.clone().normalize());
+    B.armL.add(up);
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.05, ulen, 14), skin);
+    c.position.y = -ulen / 2;
+    up.add(c);
+    const sh = new THREE.Mesh(new THREE.SphereGeometry(0.066, 14, 10), skin);
+    sh.scale.set(1, 0.95, 1);
+    up.add(sh);
+    const pad = new THREE.Mesh(new THREE.SphereGeometry(0.078, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.42), lam(HERO_PALETTE.leather));
+    pad.position.y = -0.01;
+    pad.scale.set(1, 0.9, 1.05);
+    up.add(pad);
+    const strap = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.011, 6, 18), leather);
+    strap.rotation.x = Math.PI / 2;
+    strap.position.y = -ulen * 0.42;
+    up.add(strap);
+  }
   // Underarmen: från armbågen till handen, med en läderkrage
   const handPos = hand ? hand.position.clone() : new THREE.Vector3(0, -0.26, 0);
   const len = handPos.length();
