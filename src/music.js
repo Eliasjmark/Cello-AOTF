@@ -147,7 +147,8 @@ export class Music {
     const id = this.enabled ? this.want : null;
     if (id && !this.deckFor(id)) this.start(id);
     // Sänkningen: lite under samtal (talkDuck), mycket under fanfarer (duckFor)
-    const base = this.talkDuck ?? 1;
+    // 0.19: pausmenyn har sin egen låt; spelets musik tystnar under tiden
+    const base = this.paused ? 0 : this.talkDuck ?? 1;
     if (this.duckT > 0) {
       this.duckT -= dt;
       this.duckTarget = Math.min(this.duckLevel, base);

@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.18 · Sound & Feel (svårare fiender med nya sorter och livmätare, konturer, riktiga skuggor och mer liv i luften)
+**Version:** prototyp 0.19 · Hearth Lullaby (svårare fiender med nya sorter och livmätare, konturer, riktiga skuggor och mer liv i luften)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -33,6 +33,14 @@ python3 tools/models/dump_fbx.py Boss1.fbx:boss1 ...   # FBX → tools/models/sr
 python3 tools/models/build_models.py                    # → models/pack.bin
 python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
 ```
+
+## Vad är nytt i 0.19: Hearth Lullaby (pausmenyn)
+
+- **Pausmenyn** (`src/pause.js`): öppnas med <kbd>Esc</kbd>, <kbd>P</kbd> eller den runda knappen uppe till höger (och när musen släpps med Esc). Spelet står helt stilla medan den är öppen.
+  - *Resume*, *Save Game* (sparar i den fil man spelar), *Options* (musik- och ljudvolym, retroläge, konturer, skuggor; ändringarna sparas direkt), *Controls* (alla tangenter) och *Quit to Title* (med frågan *Save and Quit* / *Quit without Saving*).
+  - Den visar var Cello är och hur länge man har spelat. Samma klick- och reglageljud som startmenyn.
+- **Pausmenyns egen låt** (`src/pausetheme.js`): *Hearth Lullaby*, en vaggvisa i 3/4-takt i d-moll, 76 slag i minuten, sexton takter som går runt. En speldosa spelar melodin, en harpa plockar ackorden (Dm, B♭, F, C, Dm, Gm, B♭, A …) och en mjuk stråkmatta ligger under, med efterklang. Allt spelas med kod. Spelets egen musik tystnar så länge menyn är öppen.
+- <kbd>P</kbd> öppnar nu pausmenyn; retroläget slås på och av i *Options*.
 
 ## Vad är nytt i 0.18: Sound & Feel
 
@@ -427,6 +435,8 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/temple.js` | The Drowned Temple (0.15): templets fyra delar och tillståndet (nycklar, dörrar, kistor, vattennivåer) |
 | `src/templekit.js` | Templets byggdelar (0.15): bassänger, tidvattenhjul och altaren, sigill, bubbelkällor, spröd korall, sjöborrar, Karkinos och Ketos |
 | `src/seastory.js` | Berättelsen i 0.15: Seren vid havet, simlektionen, pärlorna, fyren, templet, det tredje valet och slutet |
+| `src/pause.js` | Pausmenyn (0.19): Resume, Save Game, Options, Controls, Quit to Title |
+| `src/pausetheme.js` | Pausmenyns låt (0.19): *Hearth Lullaby*, spelad med kod |
 | `tools/audio/build_sfx.py` | Gör om ljudpaketet till `sounds/sfx.json` (0.18): vilka klipp, trimning, normalisering och MP3 |
 | `src/foes.js` | Fiendernas nivåer (0.17), de nya sorterna (Brute, Venomfang, Ramhorn, Tide Reaver, Rimeling), livmätarna och bossens mätare |
 | `src/post.js` | Efterbehandlingen (0.17): konturer, skuggor i vrår och vinjett |

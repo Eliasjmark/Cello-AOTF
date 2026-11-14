@@ -78,10 +78,16 @@ export class Input {
       this.mdx += dx;
       this.mdy += dy;
     });
+    // 0.19: när spelet självt släpper musen (menyer, väskan) ska pausmenyn inte öppnas
+    const exitLock = document.exitPointerLock?.bind(document);
+    if (exitLock) document.exitPointerLock = () => { this.selfUnlockT = performance.now(); return exitLock(); };
     document.addEventListener('pointerlockchange', () => {
+      const was = this.locked;
       this.locked = document.pointerLockElement === canvas;
       this.skipMoves = 2;
       if (!this.locked) this.mouseShield = false;
+      // Esc släpper musen (webbläsaren tar själva tangenttrycket): då öppnas pausmenyn
+      if (was && !this.locked && performance.now() - (this.selfUnlockT ?? -1e9) > 400) this.onLockLost?.();
     });
 
     // Pekskärm: vänster sida är en spak, höger sida styr kameran
@@ -217,7 +223,7 @@ export class Input {
       // 0.15: Shift hålls nere = dyk nedåt under vattnet
       diveHeld: k.has('ShiftLeft') || k.has('ShiftRight') || !!pad.diveHeld || !!v.diveHeld,
       lock: this.clicks.lock || p.has('KeyQ') || pad.lock || v.lock,
-      togglePixel: p.has('KeyP'),
+      pausePress: p.has('KeyP'),
       toggleHelp: p.has('KeyH'),
       toggleInfo: p.has('KeyI'),
       toggleMute: p.has('KeyM'),

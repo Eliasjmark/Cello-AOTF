@@ -75,6 +75,8 @@ const SAMPLES = {
   dialogNext: { s: ['ui_pop2'], vol: 0.28, jit: 0.06 },
   menu: { s: ['ui_pop4'], vol: 0.6, also: [{ s: ['cloth1'], vol: 0.3 }] },
   bagClose: { s: ['ui_close'], vol: 0.6 },
+  pauseOpen: { s: ['ui_open'], vol: 0.7, also: [{ s: ['ui_pop1'], vol: 0.4, delay: 0.05 }] },
+  pauseClose: { s: ['ui_close'], vol: 0.6 },
   select: { s: ['ui_pop3'], vol: 0.6, jit: 0.05 },
   equip: { s: ['equip'], vol: 0.75 },
   mapOpen: { s: ['ui_map_open'], vol: 0.75 },

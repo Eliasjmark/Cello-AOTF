@@ -772,7 +772,7 @@ export class TitleScreen {
       <p class="panel-sub">Swimming: hold <kbd>Space</kbd> to swim up and <kbd>Shift</kbd> to swim down. Swim into a ledge to climb out.</p>
       <p class="panel-sub">In the cold north, keep your lantern lit or stay near a fire. On glide ice Cello slides until something stops him. Loki's Mask throws your shadow ahead: press again to swap places with it.</p>
       <p class="panel-sub">The deeper you go, the tougher the Ashlings: Brutes with iron clubs, poisonous Venomfangs, charging Ramhorns, spear-wielding Tide Reavers and freezing Rimelings. A potion or a rest by the fire cures poison. Outlines and shadows can be turned off in Options.</p>
-      <p class="panel-sub">The first click captures the mouse, <kbd>Esc</kbd> releases it. <kbd>M</kbd> sound, <kbd>N</kbd> music, <kbd>P</kbd> Retro mode. Gamepad: A jump, X sword, B roll, RT shield, LT lock on, Y talk, RB, LB and D-pad right items, Start item menu, Back map.</p>
+      <p class="panel-sub">The first click captures the mouse, <kbd>Esc</kbd> releases it. <kbd>Esc</kbd> or <kbd>P</kbd> opens the pause menu (save, options, quit). <kbd>M</kbd> sound, <kbd>N</kbd> music. Gamepad: A jump, X sword, B roll, RT shield, LT lock on, Y talk, RB, LB and D-pad right items, Start item menu, Back map.</p>
       <div class="panel-back" id="title-howto"></div>`, 'panel-howto');
     this.list(document.getElementById('title-howto'), [{ label: 'Back', cls: 'back-btn', run: () => this.back() }]);
   }

@@ -35,6 +35,7 @@ import { WATER } from './water.js';
 import { Post } from './post.js';
 import { applyTiers, HealthBars, BossBar } from './foes.js';
 import { Motes } from './motes.js';
+import { PauseMenu } from './pause.js';
 import { SunShadows, markShadows } from './shadows.js';
 
 const PIXEL_LINES = 360; // retroläge: spelet ritas i ungefär så här många rader
@@ -340,6 +341,15 @@ function start(saved = {}) {
     onSettings: (s) => applySettings(s),
     onStart: (mode, slot) => hud.begin(false, mode, slot),
   });
+  // 0.19: pausmenyn (Esc, P eller knappen uppe till höger)
+  const pause = new PauseMenu({
+    sfx, music, settings, story, hud, input,
+    apply: (S) => { applySettings(S); storeSettings(S); },
+    areaName: () => areas.cur?.name ?? '',
+    canPause: () => hud.started && !title.active,
+    quit: () => location.reload(),
+  });
+  input.onLockLost = () => { if (hud.started && !title.active && !inventory.open && !hud.mapOpen && !dialog.active && !songs.active) pause.show(); };
   hud.onBegin = (mode, slot) => {
     unlockAudio();
     title.close();
@@ -676,6 +686,14 @@ function start(saved = {}) {
       title.render();
       return;
     }
+    pause.btn.hidden = !(hud.started && !title.active);
+    // 0.19: pausmenyn: spelet står stilla, bara menyn och musiken lever
+    if (pause.open) {
+      pause.update(dt, input.poll(dt));
+      updateMusic(dt);
+      post.render(scene, camera, { pixel: pixel && !title.active });
+      return;
+    }
     if (!window.__realm?.hold) update(dt, input.poll(dt));
     post.enabled = settings.outlines !== false;
     post.render(scene, camera, { pixel: pixel && !title.active });
@@ -683,12 +701,12 @@ function start(saved = {}) {
 
   // All spellogik för en bildruta (utan ritning), så att den även går att testa snabbt
   function update(dt, inp) {
-    if (inp.togglePixel) {
-      pixel = !pixel;
-      settings.pixel = pixel;
-      storeSettings(settings);
-      resize();
-      hud.toast(pixel ? 'Retro mode on' : 'Retro mode off');
+    // 0.19: Esc eller P öppnar pausmenyn (om ingen annan meny är öppen; då stänger Esc den)
+    if ((inp.pausePress || (inp.cancel && !inventory.open && !hud.mapOpen && !songs.active && !dialog.active)) && hud.started) {
+      if (hud.mapOpen) toggleMap(false);
+      if (inventory.open) inventory.toggle(false);
+      pause.show();
+      return;
     }
     if (inp.toggleHelp) hud.toggleHelp();
     if (inp.toggleInfo) hud.toggleInfo();
@@ -1008,7 +1026,7 @@ function start(saved = {}) {
 
   // Handtag för felsökning i webbläsarens konsol
   window.__realm = {
-    player, rig, world, areas, input, hud, scene, camera, enemies, post, sun, bars, bossBar, combat, fx, sfx, story, dialog, bastion, pyramid, lights, collider, renderer,
+    player, rig, world, areas, input, hud, scene, camera, enemies, post, sun, bars, bossBar, pause, combat, fx, sfx, story, dialog, bastion, pyramid, lights, collider, renderer,
     culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs, realm, necropolis: world.necropolis, spire: world.spire, chronicle, temple: world.temple, seaStory, maw: world.maw, frostStory, shadow,
     tick: (dt, inp) => update(dt, { ...input.empty, ...inp }),
   };

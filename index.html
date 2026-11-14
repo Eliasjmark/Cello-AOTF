@@ -86,6 +86,35 @@
   @keyframes bump { 40% { transform: scale(1.12); } }
   @keyframes pulse { 50% { transform: scale(1.15); } }
 
+  /* 0.19: pausmenyn */
+  .pause-btn {
+    align-self: flex-end; width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid rgba(201,162,79,.75); cursor: pointer;
+    background: radial-gradient(circle at 50% 35%, rgba(40,44,54,.95), rgba(12,15,21,.92)); box-shadow: 0 2px 8px rgba(0,0,0,.6);
+    display: flex; align-items: center; justify-content: center; gap: 5px; padding: 0; pointer-events: auto; transition: transform .15s ease, border-color .15s ease;
+  }
+  .pause-btn span { width: 4px; height: 14px; border-radius: 1px; background: #f0dca8; }
+  .pause-btn:hover { transform: scale(1.08); border-color: #f6d48a; }
+  .pause {
+    position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; pointer-events: auto;
+    background: radial-gradient(ellipse at center, rgba(8,10,16,.55), rgba(4,5,8,.88)); backdrop-filter: blur(3px) saturate(.7);
+    animation: pausein .25s ease both;
+  }
+  @keyframes pausein { from { opacity: 0; } }
+  .pause-panel {
+    width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow: auto; box-sizing: border-box; padding: 26px 22px 18px;
+    background: linear-gradient(rgba(18,20,28,.94), rgba(10,12,18,.96)); border: 1px solid rgba(201,162,79,.45); border-radius: 6px;
+    box-shadow: 0 0 0 4px rgba(0,0,0,.4), 0 18px 60px rgba(0,0,0,.7); animation: rise .35s ease both;
+  }
+  .pause-kicker { margin: 0; font: 600 .72rem var(--font-ui); letter-spacing: .3em; text-transform: uppercase; color: var(--dim); text-align: center; }
+  .pause-title { margin: 4px 0 2px; font: 700 clamp(1.6rem, 4vw, 2.1rem) var(--font-display); letter-spacing: .2em; text-transform: uppercase; color: #f6d48a; text-align: center; text-shadow: 0 2px 0 #000, 0 0 18px rgba(255,180,90,.35); }
+  .pause-where { margin: 0 0 14px; font: 500 .85rem var(--font-ui); color: var(--dim); text-align: center; min-height: 1.2em; }
+  .pause-list { display: flex; flex-direction: column; gap: 2px; }
+  .pause-list .title-item { font-size: clamp(.95rem, 1.6vw, 1.12rem); }
+  .pause-note { margin: 12px 4px 0; font: 500 .9rem/1.45 var(--font-ui); color: #d8cdb8; text-align: center; min-height: 1.3em; }
+  .pause-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; text-align: left; font-size: .85rem; }
+  .pause-hint { margin: 14px 0 0; font: 500 .75rem var(--font-ui); color: var(--dim); text-align: center; }
+  .touch-device .pause-hint { display: none; }
+
   /* 0.17: förgiftad (hjärtan blir gröna) och långsam av kyla */
   .hearts.poison .heart .full { fill: #6ad04a; }
   .hearts.poison .heart .shine { fill: #c8ff9a; }
@@ -609,7 +638,7 @@
   <div class="topright">
     <div class="badge">
       <span class="badge-name">Cello: Ashes of the Fallen</span>
-      <span class="badge-sub">Prototype 0.18 · Sound &amp; Feel</span>
+      <span class="badge-sub">Prototype 0.19 · Hearth Lullaby</span>
     </div>
     <div class="items" id="items" hidden></div>
     <pre class="info" id="info" hidden></pre>
@@ -634,6 +663,7 @@
     <span><kbd>F</kbd><kbd>G</kbd><kbd>V</kbd> items</span>
     <span><kbd>Tab</kbd> item menu</span>
     <span><kbd>K</kbd> map</span>
+    <span><kbd>Esc</kbd> menu</span>
     <span><kbd>H</kbd> hide</span>
   </div>
   <p class="prompt" id="prompt" hidden><kbd>E</kbd><span id="prompt-text"></span></p>
@@ -669,7 +699,7 @@
       <div class="title-panel" id="title-panel" hidden></div>
       <p class="title-press" id="title-press"><span class="press-key">Press any key</span><span class="press-touch">Tap to begin</span></p>
     </div>
-    <p class="title-foot"><span>Prototype 0.18</span><span>Music by Treblo</span></p>
+    <p class="title-foot"><span>Prototype 0.19</span><span>Music by Treblo</span></p>
     <p class="sr" id="title-live" aria-live="polite"></p>
   </section>
   <div class="map" id="map" hidden role="dialog" aria-label="Map">
