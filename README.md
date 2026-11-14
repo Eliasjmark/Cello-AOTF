@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.17.1 · Steel & Shadow (svårare fiender med nya sorter och livmätare, konturer, riktiga skuggor och mer liv i luften)
+**Version:** prototyp 0.18 · Sound & Feel (svårare fiender med nya sorter och livmätare, konturer, riktiga skuggor och mer liv i luften)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -33,6 +33,19 @@ python3 tools/models/dump_fbx.py Boss1.fbx:boss1 ...   # FBX → tools/models/sr
 python3 tools/models/build_models.py                    # → models/pack.bin
 python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
 ```
+
+## Vad är nytt i 0.18: Sound & Feel
+
+Nästan alla ljud är nu riktiga inspelningar ur ljudpaketet Elias skickade (*400 Sounds Pack*), plus klippet *dad-potato-hello* (freesound). `tools/audio/build_sfx.py` trimmar, normaliserar och gör om dem till MP3 i `sounds/sfx.json` (119 klipp, ungefär 0,8 MB), som bakas in i den fristående versionen. `src/audio.js` spelar inspelningen när det finns en, och kodens eget ljud annars (eller båda, i lager).
+
+- **Menyer**: klick, hovring, tillbaka och nej på startskärmen; av/på-knappar låter som strömbrytare; reglagen för musik och ljud klickar i en ton som stiger med värdet. Väskan öppnas och stängs som en bok, föremålen poppar i stigande toner, kartan prasslar.
+- **Mummel**: när någon pratar spelas korta röststavelser (man_0–man_10) i figurens tonläge, en i taget. Varje figur har sina egna stavelser; barn är ljusa, jättar och gudar djupa och mörka (med ett murrande lager), andar och Loke har eko. Hollis, Gull, Bjarke, Hamid och Fenwick säger "hello" när man börjar prata med dem.
+- **Cello**: korta rop när han slår, hoppar och skadas; han rapar efter en dryck (och om han står still länge), och hostar när han fryser.
+- **Strid**: svischar, hugg, klang mot sköldar, smällar och puffar när asklingar försvinner.
+- **Världen**: fotsteg efter underlaget (gräs, snö, trä, grus, sten), dörrar, lås och nycklar, kistor, krukor, vatten, tändstickor, sten som skrapar, is och glas.
+- **Jinglar**: föremål, hjärtan, sparande, vila vid elden, uppdrag (nya och klara), sånger och när Cello faller.
+
+Röstklippen ur *LEGO Star Wars: The Skywalker Saga* används inte: de är inspelningar ur ett köpt spel, och får inte läggas in i ett spel som delas. Mumlet görs i stället av röstklippen i ljudpaketet.
 
 ## 0.17.1: Cellos sköld
 
@@ -414,6 +427,7 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/temple.js` | The Drowned Temple (0.15): templets fyra delar och tillståndet (nycklar, dörrar, kistor, vattennivåer) |
 | `src/templekit.js` | Templets byggdelar (0.15): bassänger, tidvattenhjul och altaren, sigill, bubbelkällor, spröd korall, sjöborrar, Karkinos och Ketos |
 | `src/seastory.js` | Berättelsen i 0.15: Seren vid havet, simlektionen, pärlorna, fyren, templet, det tredje valet och slutet |
+| `tools/audio/build_sfx.py` | Gör om ljudpaketet till `sounds/sfx.json` (0.18): vilka klipp, trimning, normalisering och MP3 |
 | `src/foes.js` | Fiendernas nivåer (0.17), de nya sorterna (Brute, Venomfang, Ramhorn, Tide Reaver, Rimeling), livmätarna och bossens mätare |
 | `src/post.js` | Efterbehandlingen (0.17): konturer, skuggor i vrår och vinjett |
 | `src/shadows.js` | Skuggorna från solen och månen (0.17) |

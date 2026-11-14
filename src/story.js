@@ -523,6 +523,7 @@ export class Story {
 
   // Text utan talare: inskriptioner, skyltar, brev
   read(lines, onEnd) {
+    this.sfx.play('page');
     this.dialog.start(lines.map((text) => ({ who: '', text })), { onEnd });
   }
 
@@ -813,6 +814,7 @@ export class Story {
 
   // until: timmen Cello vaknar (null = en timme senare)
   rest(entry = null, text = 'Cello rests by the fire...', until = null) {
+    this.sfx.play('rest');
     this.startFade(1.6, text, () => {
       const P = this.player;
       P.hp = P.maxHp;

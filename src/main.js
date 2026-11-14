@@ -359,7 +359,21 @@ function start(saved = {}) {
   player.onJump = () => sfx.play('hup');
   player.onAutoJump = () => sfx.play('hup', { vol: 0.7 });
   player.onLand = (impact) => { if (impact > 6) sfx.play(player.heavy ? 'heavystep' : 'land', { vol: Math.min(1, impact / 18) }); };
-  player.onStep = (k) => (k < 0 ? sfx.play('heavystep', { vol: 0.8 }) : sfx.play('step', { vol: 0.5 + k * 0.5 }));
+  // 0.18: fotstegen låter efter underlaget (gräs, snö, trä, grus, sten)
+  const surfaceAt = () => {
+    const a = areas.cur, id = a?.id ?? '';
+    if (player.swimming) return null;
+    if (!a) return 'grass';
+    if (id === 'frost' || id.startsWith('f') && world.mawIds?.has(id)) return 'snow';
+    if (id === 'desert') return 'gravel';
+    if (['home', 'house', 'shop', 'inn'].includes(id) || a.interior) return 'wood';
+    if (!outdoorArea(a) || a.indoor) return 'stone';
+    // på broar och bryggor (en bit över marken där ute)
+    const g = a.H?.(player.feet.x, player.feet.z);
+    if (typeof g === 'number' && player.feet.y > g + 0.35) return 'wood';
+    return 'grass';
+  };
+  player.onStep = (k) => (k < 0 ? sfx.play('heavystep', { vol: 0.8 }) : sfx.play('step', { vol: 0.5 + k * 0.5, surface: surfaceAt() }));
   player.onAttack = (i) => {
     sfx.play('swing', { vol: i === 2 ? 1.2 : 1 });
     sfx.play(i === 2 ? 'hyah' : 'hah');
@@ -555,7 +569,7 @@ function start(saved = {}) {
   };
   const toggleMap = (on) => {
     hud.showMap(on, drawMap);
-    sfx.play('choice');
+    sfx.play(on ? 'mapOpen' : 'mapClose');
   };
   hud.el.map.addEventListener('click', () => toggleMap(false));
 
@@ -767,6 +781,7 @@ function start(saved = {}) {
       }
       if (!respawn && player.state === 'dead' && player.stateT > 1.4) {
         respawn = { t: 0, kind: 'death' };
+        sfx.play('defeat');
         hud.fade(true, 'Cello fell in battle');
       }
       if (respawn) {
@@ -925,8 +940,16 @@ function start(saved = {}) {
 
   // 0.17: gift och kyla från de nya asklingarna
   let poisonFx = 0;
+  // 0.18: Cello rapar ibland när han står still länge, och hostar när han fryser
+  let idleT = 0, burped = false, coughT = 4;
   function statusEffects(dt) {
     const P = player;
+    const still = P.state === 'move' && P.grounded && Math.hypot(P.vel.x, P.vel.z) < 0.2 && !dialog.active && !story.cinematic;
+    idleT = still ? idleT + dt : 0;
+    if (idleT < 1) burped = false;
+    if (idleT > 38 && !burped) { burped = true; sfx.play('belch', { vol: 0.8 }); hud.toast('*burp*', 1400); }
+    coughT -= dt;
+    if (coughT <= 0) { coughT = 5 + Math.random() * 6; if ((P.cold ?? 0) > 0.8 && P.state !== 'dead' && !P.swimming) sfx.play('cough'); }
     if (P.slowT > 0) P.slowT = Math.max(0, P.slowT - dt);
     if (P.poisonT > 0 && P.state !== 'dead') {
       P.poisonT -= dt;

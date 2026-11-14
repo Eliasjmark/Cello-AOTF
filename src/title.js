@@ -729,18 +729,19 @@ export class TitleScreen {
     };
     const level = (k, label, f) => ({
       label: `${label}${bar(S[k])}`, cls: 'opt',
-      adjust: (d) => { const v = Math.max(0, Math.min(10, S[k] + d)); if (v === S[k]) { this.sfx.play('menuDeny'); return; } apply(k, v, f); this.sfx.play('menuMove'); },
-      run: () => { apply(k, S[k] >= 10 ? 0 : S[k] + 1, f); this.sfx.play('menuMove'); },
+      // 0.18: ett klick som stiger i ton med värdet
+      adjust: (d) => { const v = Math.max(0, Math.min(10, S[k] + d)); if (v === S[k]) { this.sfx.play('menuDeny'); return; } apply(k, v, f); this.sfx.play('slider', { rate: 0.75 + v * 0.06 }); },
+      run: () => { apply(k, S[k] >= 10 ? 0 : S[k] + 1, f); this.sfx.play('slider', { rate: 0.75 + S[k] * 0.06 }); },
     });
     this.list(document.getElementById('title-options'), [
       level('music', 'Music', 0),
       level('sound', 'Sound', 1),
       { label: `Retro mode<span class="val toggle">${S.pixel ? 'On' : 'Off'}</span>`, cls: 'opt', sub: 'Low resolution and big, chunky pixels',
-        adjust: () => { apply('pixel', !S.pixel, 2); this.sfx.play('menuMove'); }, run: () => { apply('pixel', !S.pixel, 2); this.sfx.play('menuSelect'); } },
+        adjust: () => { this.sfx.play(S.pixel ? 'toggleOff' : 'toggleOn'); apply('pixel', !S.pixel, 2); }, run: () => { this.sfx.play(S.pixel ? 'toggleOff' : 'toggleOn'); apply('pixel', !S.pixel, 2); } },
       { label: `Outlines<span class="val toggle">${S.outlines !== false ? 'On' : 'Off'}</span>`, cls: 'opt', sub: 'Ink lines around everything, and soft shading in corners',
-        adjust: () => { apply('outlines', S.outlines === false, 3); this.sfx.play('menuMove'); }, run: () => { apply('outlines', S.outlines === false, 3); this.sfx.play('menuSelect'); } },
+        adjust: () => { this.sfx.play(S.outlines !== false ? 'toggleOff' : 'toggleOn'); apply('outlines', S.outlines === false, 3); }, run: () => { this.sfx.play(S.outlines !== false ? 'toggleOff' : 'toggleOn'); apply('outlines', S.outlines === false, 3); } },
       { label: `Shadows<span class="val toggle">${S.shadows !== false ? 'On' : 'Off'}</span>`, cls: 'opt', sub: 'Real shadows from the sun and moon (turn off on slow computers)',
-        adjust: () => { apply('shadows', S.shadows === false, 4); this.sfx.play('menuMove'); }, run: () => { apply('shadows', S.shadows === false, 4); this.sfx.play('menuSelect'); } },
+        adjust: () => { this.sfx.play(S.shadows !== false ? 'toggleOff' : 'toggleOn'); apply('shadows', S.shadows === false, 4); }, run: () => { this.sfx.play(S.shadows !== false ? 'toggleOff' : 'toggleOn'); apply('shadows', S.shadows === false, 4); } },
       { label: 'Back', cls: 'back-btn', run: () => this.back() },
     ], focus);
   }

@@ -261,6 +261,8 @@ export class Inventory {
       P.poisonT = 0; // 0.17: drycken botar också gift
       this.hud.setHearts(P.hp, P.maxHp);
       this.sfx.play('drink');
+      // 0.18: ...och så kommer rapen
+      if (Math.random() < 0.7) setTimeout(() => this.sfx.play('belch'), 900 + Math.random() * 400);
       this.fx.burst('spark', P.feet.clone().setY(P.feet.y + 1.2), 14, 0xff8a7a);
       this.hud.toast('Cello drinks a Healing Draught.', 2000);
       if (!this.s.potions) this.s.slots = this.s.slots.map((x) => (x === 'potion' ? null : x));
@@ -326,7 +328,7 @@ export class Inventory {
     if (on && !this.owned().length && this.story.phase === 'intro') return;
     this.open = on;
     this.el.bag.hidden = !on;
-    this.sfx.play('menu', { vol: on ? 1 : 0 });
+    this.sfx.play(on ? 'menuOpen' : 'bagClose');
     if (on) {
       try { document.exitPointerLock?.(); } catch { /* ignoreras */ }
       this.sel = Math.min(this.sel, Math.max(0, this.owned().length - 1));
@@ -342,7 +344,8 @@ export class Inventory {
       const move = (inp.right || inp.down ? 1 : 0) - (inp.left || inp.up ? 1 : 0);
       if (move) {
         this.sel = (this.sel + move + items.length) % items.length;
-        this.sfx.play('select');
+        // 0.18: tonen stiger med platsen i listan
+        this.sfx.play('select', { rate: 0.9 + this.sel * 0.05 });
         this.renderBag();
       }
       ['item1', 'item2', 'item3'].forEach((key, i) => { if (inp[key]) this.assign(items[this.sel], i); });
@@ -354,7 +357,7 @@ export class Inventory {
     if (!id) return;
     const sl = this.s.slots;
     const prev = sl.indexOf(id);
-    if (prev === slot) { sl[slot] = null; this.sfx.play('select'); }
+    if (prev === slot) { sl[slot] = null; this.sfx.play('bagClose'); }
     else {
       if (prev >= 0) sl[prev] = sl[slot];
       sl[slot] = id;
@@ -398,8 +401,16 @@ export class Inventory {
       const b = e.target.closest('[data-item]');
       if (!b) return;
       this.sel = Number(b.dataset.index);
-      this.sfx.play('select');
+      this.sfx.play('select', { rate: 0.9 + this.sel * 0.05 });
       this.renderBag();
+    });
+    // 0.18: ett svagt ljud när musen glider över ett föremål eller en knapp
+    let hovered = null;
+    bag.addEventListener('pointerover', (e) => {
+      const b = e.target.closest('[data-item],[data-slot],.bag-close');
+      if (b === hovered) return;
+      hovered = b;
+      if (b) this.sfx.play('menuHover');
     });
     this.el.assign.addEventListener('click', (e) => {
       const b = e.target.closest('[data-slot]');

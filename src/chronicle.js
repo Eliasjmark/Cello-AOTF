@@ -266,7 +266,7 @@ export class Chronicle {
   }
 
   questToast(name, text, done = false) {
-    this.sfx.play(done ? 'secret' : 'menuSelect');
+    this.sfx.play(done ? 'quest' : 'questNew');
     this.hud.toast(`${done ? 'Quest' : 'New quest'}: ${name}. ${text}`, 4200);
   }
 

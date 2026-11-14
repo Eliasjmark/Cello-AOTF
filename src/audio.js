@@ -1,5 +1,7 @@
-// Alla ljudeffekter skapas med kod (Web Audio). Musiken är riktiga inspelningar (music.js).
-// Röster är korta grymtningar, i stil med klassiska äventyrsspel och de gamla LEGO-spelen.
+// Ljudeffekterna (Web Audio). Musiken är riktiga inspelningar (music.js).
+// 0.18: de flesta ljud är nu inspelningar ur ljudpaketet Elias skickade (sounds/sfx.json, se tools/audio/build_sfx.py).
+// Ljud utan inspelning skapas med kod, som förut. Röster i textrutorna är ett mumlande av korta röstklipp
+// (stavelser), uppspelade i varje figurs tonläge, i stil med de gamla LEGO-spelen.
 // Röster för textrutorna: grundton, vågform och formanter (vokalfärg)
 export const VOICES = {
   maren: { f: 290, wave: 'triangle', form: [[650, 4], [1300, 5]], breath: 0.5 },
@@ -54,6 +56,118 @@ export const VOICES = {
 const STEPS = [1, 9 / 8, 5 / 4, 4 / 3, 3 / 2];
 const FANFARE = [[523.25, 0], [659.25, 0.13], [783.99, 0.26], [1046.5, 0.39], [987.77, 0.62], [1046.5, 0.78]];
 
+// 0.18: spelets ljudnamn → inspelningar. s: klipp (ett väljs slumpvis), vol, rate (tonhöjd), jit (slumpad tonhöjd),
+// synth: true = koden spelar sitt eget ljud också (lager), also: fler klipp samtidigt eller efter en stund
+const SAMPLES = {
+  // menyerna
+  menuMove: { s: ['ui_move'], vol: 0.55, jit: 0.04 },
+  menuSelect: { s: ['ui_select'], vol: 0.75, also: [{ s: ['ui_pop3'], vol: 0.35, delay: 0.03 }] },
+  menuBack: { s: ['ui_back'], vol: 0.6 },
+  menuDeny: { s: ['ui_deny'], vol: 0.55 },
+  menuOpen: { s: ['ui_open'], vol: 0.7 },
+  menuStart: { s: ['ui_start'], vol: 0.7, also: [{ s: ['unsheath'], vol: 0.55, delay: 0.05 }] },
+  menuErase: { s: ['ui_erase'], vol: 0.7 },
+  menuHover: { s: ['ui_move2'], vol: 0.32, jit: 0.05 },
+  toggleOn: { s: ['ui_toggle_on'], vol: 0.75 },
+  toggleOff: { s: ['ui_toggle_off'], vol: 0.75 },
+  slider: { s: ['ui_pop1'], vol: 0.55 },
+  choice: { s: ['ui_move2'], vol: 0.5, jit: 0.03 },
+  dialogNext: { s: ['ui_pop2'], vol: 0.28, jit: 0.06 },
+  menu: { s: ['ui_pop4'], vol: 0.6, also: [{ s: ['cloth1'], vol: 0.3 }] },
+  bagClose: { s: ['ui_close'], vol: 0.6 },
+  select: { s: ['ui_pop3'], vol: 0.6, jit: 0.05 },
+  equip: { s: ['equip'], vol: 0.75 },
+  mapOpen: { s: ['ui_map_open'], vol: 0.75 },
+  mapClose: { s: ['ui_map_close'], vol: 0.7 },
+  page: { s: ['ui_page'], vol: 0.6, jit: 0.06 },
+  // jinglar
+  item: { s: ['jg_item'], vol: 0.75 },
+  save: { s: ['jg_save'], vol: 0.6 },
+  heartbig: { s: ['jg_heart'], vol: 0.7, synth: true },
+  songok: { s: ['jg_songok'], vol: 0.7 },
+  songbad: { s: ['jg_songbad'], vol: 0.6 },
+  quest: { s: ['jg_quest'], vol: 0.7 },
+  questNew: { s: ['jg_mystery'], vol: 0.55 },
+  rest: { s: ['jg_rest'], vol: 0.65 },
+  defeat: { s: ['jg_defeat'], vol: 0.7 },
+  denied: { s: ['jg_deny'], vol: 0.55 },
+  // pengar och saker
+  shard: { s: ['coin', 'gem'], vol: 0.6, jit: 0.08 },
+  buy: { s: ['coins'], vol: 0.75 },
+  heart: { s: ['heart'], vol: 0.65 },
+  chest: { s: ['chest_creak'], vol: 0.6, also: [{ s: ['wood_hollow'], vol: 0.6, delay: 0.25 }] },
+  drink: { s: ['slurp'], vol: 0.75 },
+  pour: { s: ['gurgle'], vol: 0.6 },
+  lantern: { s: ['match'], vol: 0.7 },
+  torch: { s: ['fire_light'], vol: 0.7, synth: true },
+  // strid
+  swing: { s: ['swipe', 'whoosh1', 'whoosh2'], vol: 0.55, jit: 0.1 },
+  hit: { s: ['slice'], vol: 0.6, jit: 0.08, synth: true, also: [{ s: ['punch1', 'punch2', 'punch3'], vol: 0.45, jit: 0.1 }] },
+  clang: { s: ['clash1', 'clash2'], vol: 0.7, jit: 0.06 },
+  ehurt: { s: ['punch2', 'punch3', 'kick'], vol: 0.55, jit: 0.1, synth: true },
+  edie: { s: ['poof'], vol: 0.6, jit: 0.1, synth: true, also: [{ s: ['crunch'], vol: 0.35 }] },
+  slam: { s: ['thud'], vol: 0.8, synth: true },
+  stomp: { s: ['thud'], vol: 0.6, rate: 0.8, synth: true },
+  shieldbreak: { s: ['metal_clang'], vol: 0.7, synth: true },
+  potbreak: { s: ['pottery'], vol: 0.75, jit: 0.1 },
+  snap: { s: ['snap'], vol: 0.6 },
+  // Cellos röst (stavelser i ett ljusare tonläge) och kropp
+  hah: { s: ['man6', 'man10'], vol: 0.42, rate: 1.28, jit: 0.06 },
+  hyah: { s: ['man2'], vol: 0.55, rate: 1.22, jit: 0.04 },
+  hup: { s: ['man8'], vol: 0.38, rate: 1.38, jit: 0.06 },
+  hurt: { s: ['man4', 'man7'], vol: 0.65, rate: 1.26, jit: 0.05, also: [{ s: ['punch1'], vol: 0.45 }] },
+  fall: { s: ['man0'], vol: 0.6, rate: 1.15 },
+  belch: { s: ['belch1', 'belch2', 'belch3'], vol: 0.7, rate: 1.12, jit: 0.06 },
+  cough: { s: ['cough1', 'cough2'], vol: 0.45, rate: 1.15, jit: 0.04 },
+  whistle: { s: ['whistle'], vol: 0.6 },
+  roll: { s: ['cloth1', 'cloth2'], vol: 0.6, jit: 0.1, also: [{ s: ['whoosh2'], vol: 0.25 }] },
+  land: { s: ['cloththud'], vol: 0.6, jit: 0.1 },
+  // dörrar, lås, sten, vatten
+  door: { s: ['door_open'], vol: 0.7, also: [{ s: ['door_creak'], vol: 0.35 }] },
+  unlock: { s: ['lock_unlock'], vol: 0.75, also: [{ s: ['keys'], vol: 0.4 }] },
+  keyturn: { s: ['lock_unlock'], vol: 0.8, also: [{ s: ['keys'], vol: 0.45 }] },
+  lock: { s: ['lock_lock'], vol: 0.75 },
+  stonegrind: { s: ['stone_long'], vol: 0.7, jit: 0.05 },
+  boulder: { s: ['stone_med'], vol: 0.7, jit: 0.05, synth: true },
+  crumble: { s: ['stone_short'], vol: 0.5, jit: 0.1, synth: true },
+  crystal: { s: ['glass_big'], vol: 0.55, jit: 0.05, synth: true },
+  chime: { s: ['glass_small'], vol: 0.5, jit: 0.05 },
+  icecrack: { s: ['ice'], vol: 0.6, synth: true },
+  hourglass: { s: ['clock'], vol: 0.55 },
+  splash: { s: ['splash'], vol: 0.7, jit: 0.08 },
+  dive: { s: ['drop'], vol: 0.6, rate: 0.8 },
+  surface: { s: ['drop'], vol: 0.55, rate: 1.2 },
+  bubble: { s: ['drop_syn'], vol: 0.35, jit: 0.2 },
+};
+// Ljud som koden kan spela själv (om ett klipp saknas)
+const SYNTH_HAS = new Set(['swing','hah','hyah','hup','hurt','fall','hit','clang','roll','land','step','lock','unlock','heart','alert','growl','ehurt','edie','crackle','anvil','roar','stomp','sandrush','sandfall','boulder','crystal','rotor','hourglass','menuMove','menuSelect','menuBack','menuDeny','menuOpen','menuStart','menuErase','choice','save','item','thunder','slam','zap','pulse','door','keyturn','chest','fanfare','secret','heartbig','gust','heavystep','heavyon','heavyoff','fizzle','bat','shieldbreak','crumble','crack','bigroar','potbreak','shard','grass','buy','denied','snap','lantern','lanternoff','drink','pour','menu','select','equip','goat','moo','neigh','chime','swifton','swiftoff','wallrun','typhoon','realmdown','realmup','splash','tide','dash','dive','surface','stroke','choke','shadowcast','shadowswap','shadowland','glide','icecrack','howl','bubble','note','songok','songbad','huff','sniff','hoof','ram','horn','stonegrind','sunchime','sizzle','veilburn','prismup','prismdown','hiss','shriek','scarab','flip','cluck','torch','portal']);
+// Fotstegen efter underlaget
+const STEPS_ON = { grass: 'st_grass', snow: 'st_snow', wood: 'st_wood', gravel: 'st_gravel', stone: 'st_stone' };
+// Mummel: vilka stavelser (man0–man10) och vilket tonläge varje röst har. Annars räknas det fram ur grundtonen.
+const MUMBLE = {
+  kronos: { g: [0, 4, 7, 9], rate: 0.52, low: 900, synth: 1 },
+  typhon: { g: [1, 4, 9], rate: 0.6, low: 1200, synth: 1 },
+  apophis: { g: [3, 5, 9], rate: 0.5, low: 900, synth: 1, echo: 0.3 },
+  ammit: { g: [1, 4, 7], rate: 0.6, low: 1100, synth: 1 },
+  anubis: { g: [0, 5, 9], rate: 0.7, low: 1800, echo: 0.35 },
+  thrym: { g: [0, 4, 7], rate: 0.5, low: 800, synth: 1 },
+  spirit: { g: [3, 5, 9], rate: 1.5, echo: 0.45, high: 500 },
+  loki: { g: [2, 6, 8, 10], rate: 1.35, echo: 0.25 },
+  ilo: { g: [2, 6, 8], rate: 2.05 }, mira: { g: [2, 6, 10], rate: 2.1 }, tob: { g: [1, 6, 8], rate: 2.0 }, sabi: { g: [2, 8, 10], rate: 2.0 },
+  hollis: { g: [0, 3, 5, 9], rate: 0.92, hello: 0.82 }, gull: { g: [0, 5, 7, 9], rate: 0.95, hello: 0.78 },
+  bjarke: { g: [0, 4, 7, 9], rate: 0.88, hello: 0.74 }, hamid: { g: [1, 3, 5, 9], rate: 0.98, hello: 0.86 },
+  fenwick: { g: [0, 3, 7], rate: 1.05, hello: 0.9 }, garrick: { g: [1, 4, 5, 7], rate: 1.0 },
+};
+function mumbleFor(id, v) {
+  const m = MUMBLE[id] ?? {};
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  // Fem stavelser per röst, valda efter namnet, så att varje figur låter lite olika
+  const g = m.g ?? [0, 1, 2, 3, 4].map((k) => (h + k * 3 + (h >> (k + 2))) % 11).filter((x, i, a) => a.indexOf(x) === i);
+  const rate = m.rate ?? Math.max(0.6, Math.min(2.1, (v?.f ?? 140) / 128));
+  return { ...m, g, rate };
+}
+
 export class Sfx {
   constructor() {
     this.ctx = null;
@@ -91,6 +205,7 @@ export class Sfx {
         b[i] = last * 3.5;
       }
       this.brown = brown;
+      this.loadSamples();
       // Vinden: brus genom ett bandpassfilter, som en evig storm
       const wind = c.createBufferSource();
       wind.buffer = brown;
@@ -204,12 +319,94 @@ export class Sfx {
     o.stop(t0 + dur + 0.05);
   }
 
+  // 0.18: inspelningarna (sounds/sfx.json, eller inbakade i den fristående versionen)
+  async loadSamples() {
+    if (this.buf || this.loading) return;
+    this.loading = true;
+    try {
+      let map = globalThis.CELLO_SFX;
+      if (!map) {
+        const r = await fetch('sounds/sfx.json');
+        if (!r.ok) throw new Error(r.status);
+        map = await r.json();
+      }
+      const buf = {};
+      await Promise.all(Object.entries(map).map(async ([k, b64]) => {
+        const bin = atob(b64), u = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+        try { buf[k] = await this.ctx.decodeAudioData(u.buffer); } catch { /* ett trasigt klipp hoppas över */ }
+      }));
+      this.buf = buf;
+    } catch (err) {
+      console.warn('Sound samples not loaded, using the synthesized sounds', err);
+      this.buf = {};
+    }
+  }
+
+  // Spelar ett klipp. Returnerar källan (eller null om klippet inte finns).
+  sample(key, { vol = 1, rate = 1, delay = 0, dest = this.fx, filter = null } = {}) {
+    const b = this.buf?.[key];
+    if (!b) return null;
+    const c = this.ctx, t = c.currentTime + delay;
+    const src = c.createBufferSource();
+    src.buffer = b;
+    src.playbackRate.value = rate;
+    const g = c.createGain();
+    g.gain.value = vol;
+    let node = src;
+    if (filter) { node.connect(filter); node = filter; }
+    node.connect(g);
+    g.connect(dest);
+    src.start(t);
+    return src;
+  }
+
+  playSpec(spec, v, opt) {
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    const one = (sp, extraDelay = 0) => {
+      const rate = (sp.rate ?? 1) * (opt.rate ?? 1) * (1 + (Math.random() - 0.5) * 2 * (sp.jit ?? 0.03));
+      return this.sample(pick(sp.s), { vol: (sp.vol ?? 1) * v, rate, delay: (opt.delay || 0) + (sp.delay || 0) + extraDelay });
+    };
+    const ok = one(spec);
+    for (const a of spec.also ?? []) one(a);
+    return !!ok;
+  }
+
+  // Ett "hello" när man börjar prata med vissa glada gubbar (klippet Elias skickade)
+  greet(voiceId) {
+    if (!this.ok || !this.buf) return;
+    const m = MUMBLE[voiceId];
+    if (!m?.hello) return;
+    this.sample('hello', { vol: 0.55, rate: m.hello * (1 + (Math.random() - 0.5) * 0.04) });
+    this.mumbleUntil = this.ctx.currentTime + 1.1 / m.hello;
+  }
+
   // Mummel när någon pratar i en textruta
   blip(voiceId) {
     if (!this.ok) return;
     const v = VOICES[voiceId];
     if (!v) return;
     const t = this.ctx.currentTime;
+    // 0.18: en stavelse ur röstklippen i figurens tonläge (en i taget, så att det blir ett mummel, inte ett sorl)
+    if (this.buf?.man0) {
+      if (t < (this.mumbleUntil ?? 0)) return;
+      const m = mumbleFor(voiceId, v);
+      const k = m.g[Math.floor(Math.random() * m.g.length)];
+      const rate = m.rate * STEPS[Math.floor(Math.random() * 3)] * (1 + (Math.random() - 0.5) * 0.06);
+      let filter = null;
+      if (m.low || m.high) {
+        filter = this.ctx.createBiquadFilter();
+        filter.type = m.low ? 'lowpass' : 'highpass';
+        filter.frequency.value = m.low || m.high;
+      }
+      const dest = m.echo ? this.echoBus(m.echo) : this.fx;
+      const src = this.sample(`man${k}`, { vol: 0.5, rate, dest, filter });
+      if (src) {
+        const len = src.buffer.duration / rate;
+        this.mumbleUntil = t + len * (0.62 + Math.random() * 0.2);
+        if (!m.synth) return;
+      }
+    }
     const f = v.f * STEPS[Math.floor(Math.random() * STEPS.length)] * (v.wobble ? 1 + Math.sin(t * 30) * 0.04 : 1);
     const g = this.gain(t, 0.008, 0.11, 0.07);
     const o = this.ctx.createOscillator();
@@ -235,6 +432,21 @@ export class Sfx {
     for (let i = 0; i < count; i++) setTimeout(() => this.blip(voiceId), i * 85 + Math.random() * 30);
   }
 
+  // Ett eko (för andar och gudar)
+  echoBus(fb) {
+    this.echoes = this.echoes || {};
+    const k = fb.toFixed(2);
+    if (this.echoes[k]) return this.echoes[k];
+    const c = this.ctx, inp = c.createGain(), d = c.createDelay(1), f = c.createGain(), lp = c.createBiquadFilter();
+    d.delayTime.value = 0.17;
+    f.gain.value = fb;
+    lp.type = 'lowpass';
+    lp.frequency.value = 2600;
+    inp.connect(this.fx);
+    inp.connect(d); d.connect(lp); lp.connect(f); f.connect(d); lp.connect(this.fx);
+    return (this.echoes[k] = inp);
+  }
+
   // Vind och knastrande eld. Anropas varje bildruta. (Musiken sköts av music.js.)
   ambience(dt, s) {
     if (!this.ctx || this.ctx.state !== 'running') return;
@@ -257,6 +469,17 @@ export class Sfx {
     if (!this.ok) return;
     const t = this.ctx.currentTime + (opt.delay || 0);
     const v = opt.vol ?? 1;
+    // 0.18: inspelningar först (fotsteg efter underlaget)
+    if (this.buf) {
+      if (name === 'step' && opt.surface && STEPS_ON[opt.surface]) {
+        const base = STEPS_ON[opt.surface];
+        this.stepK = ((this.stepK ?? 0) + 1 + Math.floor(Math.random() * 2)) % 4;
+        if (this.sample(`${base}${this.stepK + 1}`, { vol: 0.45 * v, rate: 1 + (Math.random() - 0.5) * 0.12 })) return;
+      }
+      const spec = SAMPLES[name];
+      if (spec && this.playSpec(spec, v, opt) && !spec.synth) return;
+      if (spec && !this.buf[spec.s[0]] && !SYNTH_HAS.has(name)) return;
+    }
     const r = 1 + (Math.random() - 0.5) * 0.14;
     switch (name) {
       case 'swing':

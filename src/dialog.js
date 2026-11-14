@@ -37,10 +37,13 @@ export class Dialog {
     this.focus = focus;
     this.onEnd = onEnd;
     this.el.box.hidden = false;
-    this.advance();
+    this.greeted = false;
+    this.advance(true);
   }
 
-  advance() {
+  advance(first = false) {
+    // 0.18: ett litet ljud när man bläddrar vidare
+    if (!first) this.sfx.play('dialogNext');
     this.i++;
     while (this.steps && this.i < this.steps.length && this.steps[this.i].run) {
       this.steps[this.i].run();
@@ -74,6 +77,8 @@ export class Dialog {
     this.shown = 0;
     this.wait = 0;
     this.blipCount = 0;
+    // 0.18: vissa glada gubbar säger "hello" när man börjar prata med dem
+    if (!this.greeted && s.voice) { this.greeted = true; this.sfx.greet?.(s.voice); }
   }
 
   renderChoices() {
