@@ -1,9 +1,13 @@
 // Cello: rörelse, hopp, svärd, sköld, undanmanöver, skada, Mjölnirs skärva och en klossfigur.
 import * as THREE from 'three';
+
 import { Capsule } from 'three/addons/math/Capsule.js';
 import { buildHammer, buildTrident, ITEM_MATS } from './items.js';
 import { mergeRigid } from './geom.js';
 import { heroAvailable, sculptHero } from './heroRig.js';
+
+// Var Marens höft ligger när Cello bär henne (Cellos egna koordinater, före hans skala)
+const CARRY_SEAT = { x: 0.14, y: 0.9, z: 0.46 };
 
 const R = 0.35, HEIGHT = 1.7;
 export const RUN_SPEED = 6.6;
@@ -477,21 +481,44 @@ export class Player {
   carry(npc) {
     if (npc) {
       this.carried = npc;
-      const r = npc.model.root;
+      const m = npc.model, r = m.root;
       this.model.root.add(r);
-      r.position.set(0, 0.98, 0.42);
+      // 0.20: Maren ligger i Cellos famn, tvärs över hans underarmar. Hon "sitter" med benen över hans
+      // högra arm och ryggen mot den vänstra, lutad bakåt så att huvudet vilar mot hans axel.
       r.rotation.set(0, Math.PI / 2, 0);
-      npc.model.body.rotation.x = -Math.PI / 2;
-      npc.model.legL.rotation.x = 0.2;
-      npc.model.legR.rotation.x = 0.1;
-      npc.model.armL.rotation.z = -0.3;
-      npc.model.head.rotation.set(0, 0, 0);
+      r.position.set(0, 0, 0);
+      r.scale.setScalar(0.86 / this.model.root.scale.x); // samma storlek som när hon står (Cellos skala ärvs)
+      m.body.rotation.set(-1.2, 0, 0);
+      m.hips.position.y = 0.86;
+      m.torso.rotation.set(-0.15, 0, 0);
+      m.legL.rotation.set(-0.95, 0, 0.04);
+      m.legR.rotation.set(-1.05, 0, -0.04);
+      m.kneeL.rotation.x = 1.55;
+      m.kneeR.rotation.x = 1.4;
+      m.armL.rotation.set(-0.5, 0, -0.35);
+      m.armR.rotation.set(-1.2, 0, 0.5);
+      m.elbowL.rotation.x = -0.4;
+      m.elbowR.rotation.x = -1.3;
+      m.head.rotation.set(0.25, -0.45, 0);
+      m.sync?.();
+      // Flytta henne så att höften hamnar i hans famn (räknat i Cellos koordinater)
+      this.model.root.updateMatrixWorld(true);
+      const hip = new THREE.Vector3();
+      m.hips.getWorldPosition(hip);
+      this.model.root.worldToLocal(hip);
+      r.position.set(CARRY_SEAT.x - hip.x, CARRY_SEAT.y - hip.y, CARRY_SEAT.z - hip.z);
       this.shielding = false;
     } else if (this.carried) {
-      const r = this.carried.model.root;
+      const m = this.carried.model, r = m.root;
       (this.carried.parentGroup ?? this.scene).add(r);
       r.rotation.set(0, 0, 0);
       r.scale.setScalar(0.86);
+      m.torso.rotation.set(0, 0, 0);
+      m.legL.rotation.set(0, 0, 0);
+      m.legR.rotation.set(0, 0, 0);
+      m.armL.rotation.y = 0;
+      m.armR.rotation.y = 0;
+      m.head.rotation.z = 0;
       this.carried = null;
     }
   }
@@ -790,6 +817,7 @@ export class Player {
         break;
       }
       case 'itemget':
+      case 'sleep': // 0.20: ligger i sängen i början av spelet
         accel = 30;
         break;
       case 'dash': {
@@ -1427,9 +1455,9 @@ export class Player {
     }
 
     if (this.carried && this.state === 'move') {
-      P.armLx = P.armRx = -1.25;
-      P.elbowL = P.elbowR = -0.65;
-      P.armLz = 0.25; P.armRz = -0.25;
+      P.armLx = P.armRx = -1.05;
+      P.elbowL = P.elbowR = -0.85;
+      P.armLz = 0.12; P.armRz = -0.12;
       P.torsoX = -0.05; P.torsoY = 0;
       P.swordX = -0.2;
     }
@@ -1518,6 +1546,12 @@ export class Player {
       rate = 25;
       P.torsoX = -0.45; P.headX = 0.3; P.armLx = -0.6; P.armRx = -0.6; P.armLz = -0.7; P.armRz = 0.7;
       P.elbowL = P.elbowR = -0.6; P.kneeL = P.kneeR = 0.35;
+    } else if (this.state === 'sleep') {
+      // På rygg i sängen, armarna längs sidorna och huvudet på kudden
+      rate = 40;
+      P.bodyX = -Math.PI / 2; P.torsoX = 0; P.torsoY = 0; P.headX = -0.35;
+      P.armLx = P.armRx = 0.05; P.armLz = -0.12; P.armRz = 0.12; P.elbowL = P.elbowR = -0.35;
+      P.legL = 0.04; P.legR = -0.02; P.kneeL = 0.12; P.kneeR = 0.06; P.swordX = -0.2;
     } else if (this.state === 'dead') {
       rate = 6;
       P.bodyX = -1.45; P.armLz = -1.2; P.armRz = 1.2; P.torsoX = 0; P.legL = 0.1; P.legR = -0.1;
@@ -1591,6 +1625,8 @@ export class Player {
     ap(m.head.rotation, 'x', P.headX);
     ap(m.sword.rotation, 'x', P.swordX, 30);
     ap(m.body.rotation, 'x', P.bodyX);
+    // I sängen ligger han på madrassen (lite ovanför sängramen han står på)
+    m.body.position.y = approach(m.body.position.y, this.state === 'sleep' ? 0.22 : 0, this.state === 'sleep' ? 40 : 8, dt);
     const sqk = a.land * a.land;
     ap(m.kneeL.rotation, 'x', P.kneeL + sqk * 0.9);
     ap(m.kneeR.rotation, 'x', P.kneeR + sqk * 0.9);

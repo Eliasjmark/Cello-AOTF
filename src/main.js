@@ -18,6 +18,7 @@ import { LightPool } from './lights.js';
 import { Music } from './music.js';
 import { Pots } from './pots.js';
 import { Inventory } from './inventory.js';
+import { HomeHouse } from './home.js';
 import { Folk } from './folk.js';
 import { Goat } from './goat.js';
 import { Clock } from './clock.js';
@@ -165,6 +166,8 @@ function start(saved = {}) {
   story.inventory = inventory;
   const folk = new Folk({ story, world, inventory, sfx, hud, fx, lights, music, enemies });
   story.folk = folk;
+  // 0.20: grytan, slipstenen, oljetunnan, relikhyllan och gåvokorgen i Cellos hus
+  story.homeHouse = new HomeHouse({ story, world, areas, inventory, sfx, hud, fx, player, M: B.M });
   // Grumble, getabocken man kan rida på
   const goat = new Goat({ areas, scene, player, sfx, fx, hud, story, groundAt, M: B.M });
   if (world.ranch.grumble) goat.setTether(world.ranch.grumble.pos, world.ranch.grumble.facing);
@@ -346,7 +349,7 @@ function start(saved = {}) {
     sfx, music, settings, story, hud, input,
     apply: (S) => { applySettings(S); storeSettings(S); },
     areaName: () => areas.cur?.name ?? '',
-    canPause: () => hud.started && !title.active,
+    canPause: () => hud.started && !title.active && !story.crawl.active,
     quit: () => location.reload(),
   });
   input.onLockLost = () => { if (hud.started && !title.active && !inventory.open && !hud.mapOpen && !dialog.active && !songs.active) pause.show(); };
@@ -602,7 +605,7 @@ function start(saved = {}) {
     const ph = story.phase, P = player.feet, s = story.state, here = areas.id;
     if (ph === 'blackout') return { id: null, now: true };
     if (ph === 'titan') return { id: 'warlord', now: true };
-    if (ph === 'intro') return { id: story.introRoar ? 'whispers' : 'fieldsdawn', now: story.introRoar };
+    if (ph === 'intro') return { id: story.introRoar || story.introAlarm ? 'whispers' : 'fieldsdawn', now: story.introRoar || story.introAlarm };
     if (ph === 'prologue') return { id: 'fieldsdawn', now: true };
     if (ph === 'carry') return { id: world.inAetheria(P.x, P.z) || story.arriving ? 'hearth' : 'whispers' };
     if (here === 'pyramid') {

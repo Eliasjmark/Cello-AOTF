@@ -18,6 +18,7 @@
 //   → R5 dörren österut till The Thunder Spire och The Storm Crown (Stormnyckeln)
 //   → virveln ner till R4 → R9 Hrungnir
 import * as THREE from 'three';
+import { animateLid } from './chestlid.js';
 import { box, cyl, rockGeo, place, hash2 } from './geom.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { IronWarden, Hrungnir } from './bosses.js';
@@ -1194,8 +1195,7 @@ export class Bastion {
     }
     // Kistor
     for (const c of Object.values(this.chests)) {
-      if (c.open && c.lidT < 1) c.lidT = Math.min(1, c.lidT + dt * 2.2);
-      c.lid.rotation.x = -c.lidT * 1.9;
+      animateLid(c, c.open, dt);
     }
     // Buren lyfts när kondensatorn är laddad
     this.cage.y += Math.sign(this.cage.target - this.cage.y) * Math.min(Math.abs(this.cage.target - this.cage.y), dt * 1.5);

@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.19 · Hearth Lullaby (svårare fiender med nya sorter och livmätare, konturer, riktiga skuggor och mer liv i luften)
+**Version:** prototyp 0.20 · Homecoming (öppningsscen, Cello vaknar i sin säng, nya saker i huset, bättre kistor och Maren i famnen)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -34,7 +34,20 @@ python3 tools/models/build_models.py                    # → models/pack.bin
 python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
 ```
 
-## Vad är nytt i 0.19: Hearth Lullaby (pausmenyn)
+## Vad är nytt i 0.20: Homecoming
+
+- **Öppningen.** Ett nytt spel börjar med en berättelse över svart bakgrund, sida för sida: gudarna som lämnade världen, reliker som fortfarande har kraft, titanerna som kom ur stormen, och Cello, pojken på ön vid skogsbrynet söder om Hollowbrook. Enter visar nästa sida, Esc hoppar över allt. Sedan ligger Cello och sover i sin säng tills en explosion skakar huset. Skärmen blixtrar, damm faller från taket, han far upp, ett skrik hörs från byn ("HELP! Somebody... please, help us!") och fönstren lyser orange av elden. Efter det styr spelaren själv och går ut genom dörren.
+- **Maren i famnen.** I prologen svävade Maren i luften bredvid Cello. Nu ligger hon tvärs över hans underarmar: benen över den ena armen, ryggen mot den andra och huvudet mot hans axel. Hennes höft räknas ut så att hon hamnar i hans famn oavsett figurens mått.
+- **Kistorna.** Locket vreds förut nästan två radianer runt sin nedre bakkant och for bakåt genom väggen bakom kistan, på alla kistor. Nu vrids det runt gångjärnet på ovansidan och stannar en bit före lodrätt (ungefär 75 grader), så ingen del hamnar bakom kistans rygg. Öppningen har också blivit bättre: locket skallrar till, slår upp med en liten överstegring och studsar mot gångjärnet, och ett gyllene sken stiger ur kistan. Samma kod (`src/chestlid.js`) används av alla kistor: i världen, fästningen, pyramiden och alla nya fängelsehålor.
+- **Cellos hus är värt att komma hem till:**
+  - *Grytan över härden*: en gång om dagen kokar Cello svampsoppa. Fulla hjärtan, och resten hälls i en flaska (en Healing Draught).
+  - *Slipstenen* vid dörren: slipar svärdet till fullt, gratis. En bruten klinga går inte att laga.
+  - *Oljetunnan*: en gång om dagen fyller han lyktan och en tom oljeflaska med kådolja.
+  - *Relikhyllan* på högra väggen: varje relik Cello hittar (hammaren, sandalerna, prismat, treudden, masken) står där sedan.
+  - *Korgen vid dörren*: efter varje avklarad fängelsehåla lämnar någon en gåva med ett brev, skärvor och en dryck. Kommer Cello hem till ön när en gåva väntar säger spelet till.
+  - Sängen finns kvar som förut: vila, spara och sova till morgonen.
+
+## Vad var nytt i 0.19: Hearth Lullaby (pausmenyn)
 
 - **Pausmenyn** (`src/pause.js`): öppnas med <kbd>Esc</kbd>, <kbd>P</kbd> eller den runda knappen uppe till höger (och när musen släpps med Esc). Spelet står helt stilla medan den är öppen.
   - *Resume*, *Save Game* (sparar i den fil man spelar), *Options* (musik- och ljudvolym, retroläge, konturer, skuggor; ändringarna sparas direkt), *Controls* (alla tangenter) och *Quit to Title* (med frågan *Save and Quit* / *Quit without Saving*).
@@ -437,6 +450,9 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/seastory.js` | Berättelsen i 0.15: Seren vid havet, simlektionen, pärlorna, fyren, templet, det tredje valet och slutet |
 | `src/pause.js` | Pausmenyn (0.19): Resume, Save Game, Options, Controls, Quit to Title |
 | `src/pausetheme.js` | Pausmenyns låt (0.19): *Hearth Lullaby*, spelad med kod |
+| `src/opening.js` | Öppningens berättelse (0.20): texten sida för sida och explosionens ljusblixt |
+| `src/home.js` | Cellos hus (0.20): grytan, slipstenen, oljetunnan, relikhyllan och gåvokorgen |
+| `src/chestlid.js` | Kistlocket (0.20): öppningen för alla kistor, runt gångjärnet och med ett sken |
 | `tools/audio/build_sfx.py` | Gör om ljudpaketet till `sounds/sfx.json` (0.18): vilka klipp, trimning, normalisering och MP3 |
 | `src/foes.js` | Fiendernas nivåer (0.17), de nya sorterna (Brute, Venomfang, Ramhorn, Tide Reaver, Rimeling), livmätarna och bossens mätare |
 | `src/post.js` | Efterbehandlingen (0.17): konturer, skuggor i vrår och vinjett |

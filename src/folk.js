@@ -2,6 +2,7 @@
 // byborna i Willowmere, spåkvinnan som vet nästa uppdrag och spejaren i Stormreach.
 // Här finns också butikerna, kistorna, eldfaten som tänds med lyktan, djuren och övningsdockan.
 import * as THREE from 'three';
+import { animateLid } from './chestlid.js';
 import { Npc } from './npcs.js';
 import { SWORD_MAX } from './player.js';
 import { box, cyl } from './geom.js';
@@ -271,8 +272,9 @@ export class Folk {
           if (ch.box) ch.box.enabled = show;
         }
         const open = !!story.state.opened[c.id];
-        ch.lidT = open ? Math.min(1, ch.lidT + dt * 2.2) : 0;
-        ch.lid.rotation.x = -ch.lidT * 1.9;
+        // Kistor som öppnades i ett tidigare spel står bara öppna (ingen öppning spelas upp igen)
+        if (open && !ch.hinge?.age && !ch.justOpened) ch.lidT = 1;
+        animateLid(ch, open, dt);
       });
     }
     // Kistornas kollisionslådor (world.connect har redan körts i main.js)
@@ -493,6 +495,7 @@ export class Folk {
   openChest(ch) {
     const story = this.story;
     story.state.opened[ch.id] = true;
+    ch.justOpened = true;
     this.sfx.play('chest');
     story.cinematic = true;
     story.after(0.7, () => {

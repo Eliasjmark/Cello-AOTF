@@ -5,6 +5,7 @@
 // Faser:  intro → prologue → (carry → Aetheria)  eller  (titan → vaknar i Aetheria) → free
 // Valen sparas i `state` och styr vad folk säger, hur Cello ser ut och vad han får.
 import * as THREE from 'three';
+import { Crawl } from './opening.js';
 import { Npc } from './npcs.js';
 import { Titan } from './titan.js';
 import { buildItem, ITEM_TEXT } from './items.js';
@@ -275,6 +276,8 @@ export class Story {
     this.shown = null; // föremålet Cello håller upp
     this.state = freshState();
     this.phase = 'intro';
+    this.crawl = new Crawl(this.sfx);
+    this.opening = false;
   }
 
   // Ett visst musikspår under en stund (filmscener och berättelsens stora ögonblick)
@@ -321,13 +324,18 @@ export class Story {
     this.weather?.load(this.state);
     this.songs?.stop();
     this.songs?.load();
-    // Startskärmen visar den brinnande byn; ett nytt spel börjar vid Cellos hus
-    const start = silent ? this.areas.get('village') : this.areas.get('home');
+    // Startskärmen visar den brinnande byn. Ett nytt spel börjar (0.20) i Cellos säng, efter berättelsen
+    // om vad som har hänt (skipOpening: som förut, utanför huset; används av äldre tester)
+    const inBed = !silent && !this.skipOpening && !!this.world.interiors?.house;
+    const start = this.areas.get(silent ? 'village' : inBed ? 'house' : 'home');
     this.areas.activate(start.id);
-    const sp = silent ? start.entry('south') : start.entry('start');
+    const entry = silent ? 'south' : inBed ? 'bed' : 'start';
+    const sp = start.entry(entry);
     P.revive(sp.pos, sp.facing);
     this.state.area = start.id;
-    this.state.entry = silent ? 'south' : 'start';
+    this.state.entry = entry;
+    this.introOut = !inBed;
+    this.introAlarm = false;
     this.enemies.setActive(false);
     this.enemies.cleared.clear();
     this.bastion.applyState(null);
@@ -363,11 +371,102 @@ export class Story {
     this.world.aetheria.grave.visible = false;
     this.hud.setHearts(P.hp, P.maxHp);
     this.hud.setItems(P);
-    if (!silent) this.startIntro();
+    if (!silent) {
+      if (inBed) this.startOpening();
+      else this.startIntro();
+    }
+  }
+
+  // ---------- öppningen (0.20) ----------
+  // Först texten om gudarna, titanerna och Cello. Sedan ligger han och sover i sin säng tills en
+  // explosion och ett skrik från byn väcker honom.
+  startOpening() {
+    const P = this.player, H = this.world.interiors.house, bed = H.bed;
+    this.opening = true;
+    this.cinematic = true;
+    this.holdMusic('hymn', 9999);
+    P.teleport(V(bed.x, bed.y, bed.z + 0.85));
+    P.facing = 0;
+    P.vel.set(0, 0, 0);
+    P.setState('sleep');
+    this.rig.cinematic = { pos: V(bed.x + 2.6, 2.5, bed.z + 3.1), look: V(bed.x, 0.75, bed.z + 0.2), speed: 0.35 };
+    this.rig.snap?.(P);
+    this.crawl.start(() => this.wakeUp());
+  }
+
+  wakeUp() {
+    const P = this.player, H = this.world.interiors.house, bed = H.bed;
+    this.holdMusic('quiet', 9999);
+    // Kameran glider sakta närmare medan den svarta bakgrunden tonar bort
+    this.rig.cinematic = { pos: V(bed.x + 1.5, 1.8, bed.z + 1.6), look: V(bed.x, 0.7, bed.z - 0.1), speed: 0.7 };
+    this.after(0.9, () => this.sfx.play('huff', { vol: 0.35, rate: 0.8 }));
+    this.after(3.0, () => {
+      // BOM: något exploderar i byn
+      this.holdMusic(null);
+      this.introAlarm = true;
+      this.sfx.play('thunder', { vol: 1 });
+      this.sfx.play('slam', { vol: 0.9 });
+      this.after(0.25, () => this.sfx.play('roar', { vol: 0.45 }));
+      this.crawl.flash();
+      this.rig.shake(1);
+      this.fx.burst('ash', V(bed.x + 1.5, 3.2, bed.z + 1.5), 26);
+      this.fx.burst('ash', V(bed.x + 4.5, 3.2, bed.z + 3.0), 18);
+      // Cello far upp ur sängen
+      P.setState('move');
+      P.teleport(V(bed.x + 1.35, 0, bed.z + 0.7));
+      P.facing = Math.PI * 0.85;
+      P.vel.set(0, 3.2, 0);
+      this.sfx.play('hup', { vol: 0.8 });
+      this.rig.cinematic = { pos: V(bed.x + 3.6, 1.7, bed.z + 3.4), look: V(bed.x + 1.0, 1.1, bed.z + 0.2), speed: 2.2 };
+      this.rig.cinematic.cut = true;
+    });
+    this.after(4.3, () => {
+      this.sfx.speak('maren', 9);
+      this.hud.caption('"HELP! Somebody... please, help us!"', 3200);
+    });
+    this.after(5.6, () => {
+      // Han går fram till fönstret och tittar ut mot byn
+      this.rig.cinematic = { pos: V(H.window.x + 1.4, 1.75, H.window.z + 3.2), look: V(H.window.x, 1.6, H.window.z), speed: 0.9 };
+      P.autoWalk = { yaw: Math.atan2(H.window.x - P.feet.x, H.window.z - P.feet.z), speed: 0.45 };
+    });
+    this.after(6.7, () => { P.autoWalk = null; P.vel.set(0, P.vel.y, 0); });
+    this.after(7.0, () => {
+      this.sfx.play('roar', { vol: 0.3, rate: 0.85 });
+      this.rig.shake(0.3);
+      this.hud.caption('An orange glow flickers in the window. The scream came from Hollowbrook.', 3800);
+    });
+    this.after(10.6, () => {
+      this.rig.cinematic = null;
+      this.cinematic = false;
+      this.opening = false;
+      P.facing = Math.PI;
+      this.rig.snap(P);
+      this.hud.toast('Something is terribly wrong in Hollowbrook! Hurry outside, and follow the path north.', 5200);
+    });
+  }
+
+  // Öppningen avbryts (ett sparat spel laddas)
+  stopOpening() {
+    if (this.crawl.active) this.crawl.cancel();
+    if (!this.opening) return;
+    this.opening = false;
+    this.cinematic = false;
+    this.rig.cinematic = null;
+    if (this.player.state === 'sleep') this.player.setState('move');
+    this.player.autoWalk = null;
   }
 
   // Cello kommer hem från skogen och ser röken över byn
   startIntro() {
+    this.introOut = true;
+    if (this.introAlarm) {
+      // 0.20: efter öppningen i huset
+      this.after(0.8, () => this.hud.caption('Black smoke is rising over Hollowbrook, to the north.', 4000));
+      this.after(5.0, () => {
+        if (this.phase === 'intro' && this.areas.id === 'home') this.hud.toast('Follow the path north to the bridge.', 3600);
+      });
+      return;
+    }
     this.after(0.7, () => this.hud.caption('Cello lived at the edge of the forest, a short walk south of Hollowbrook.', 4200));
     this.after(5.3, () => this.hud.caption('That morning, smoke was rising over the village.', 4000));
     this.after(10.5, () => {
@@ -376,6 +475,7 @@ export class Story {
   }
 
   loadGame(save) {
+    this.stopOpening();
     this.state = { ...freshState(), ...save.state };
     const s = this.state;
     s.items = { ...freshState().items, ...(s.items || {}) };
@@ -862,6 +962,8 @@ export class Story {
     this.rig.snap(P);
     if (a.card && !this.state.seen[to]) this.after(1.1, () => { if (this.areas.cur === a) this.hud.card(a.name, a.sub, 3800); });
     this.state.seen[to] = true;
+    if (this.phase === 'intro' && to === 'home' && !this.introOut) this.startIntro();
+    if (to === 'home') this.homeHouse?.enterHome();
     if (this.phase === 'free') this.save(true);
   }
 
@@ -1494,6 +1596,15 @@ export class Story {
     const P = this.player;
     const here = this.areas.id;
     for (const n of Object.values(this.npcs)) if (n !== P.carried && (!n.area || n.area === here)) n.update(dt, P, this.groundAt);
+    this.crawl.update(dt);
+    // Under öppningen lyser husets fönster orange och fladdrar av elden i byn
+    const hw = this.world.interiors?.house?.windowMat;
+    if (hw && here === 'house') {
+      const fire = this.phase === 'intro' && this.introAlarm;
+      this.windowT = (this.windowT ?? 0) + dt;
+      if (fire) hw.color.setHex(0xff7a2a).multiplyScalar(0.75 + 0.25 * Math.sin(this.windowT * 7.3) * Math.sin(this.windowT * 3.1 + 1));
+      else hw.color.setHex(0x6a7488);
+    }
 
     if (this.musicHold && !this.dialog.active && !this.cinematic && (this.musicHold.t -= dt) <= 0) this.musicHold = null;
 

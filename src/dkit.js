@@ -6,6 +6,7 @@
 // Allt anges i flygelns lokala koordinater (x, z) och flyttas till världen med flygelns ox.
 // Läget (dörrar, kistor, lösta pussel, växlarnas lägen) delas med resten av fängelsehålan (dungeon.state).
 import * as THREE from 'three';
+import { animateLid } from './chestlid.js';
 import { box, cyl, place, hash2, rockGeo } from './geom.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildItem, shardWord } from './items.js';
@@ -866,8 +867,7 @@ export class Wing {
         c.g.visible = true;
         g.fx.burst('ash', new THREE.Vector3(c.x, c.y + 0.6, c.z), 16);
       }
-      if (c.open && c.lidT < 1) c.lidT = Math.min(1, c.lidT + dt * 2.2);
-      c.lid.rotation.x = -c.lidT * 1.9;
+      animateLid(c, c.open, dt);
     }
     for (const cg of Object.values(this.cages)) {
       cg.y += Math.sign(cg.target - cg.y) * Math.min(Math.abs(cg.target - cg.y), dt * 1.5);

@@ -162,9 +162,10 @@ export function buildInteriors(B, areas) {
     log.rotation.set(0, dx * 2, Math.PI / 2, 'YXZ');
     B.deco(log, hearth.x, 0.1, hearth.z + 0.75);
   }
-  // Sängen
+  // Sängen (0.20: här vaknar Cello när ett nytt spel börjar)
+  const bed = V3(HX - 3.4, 0.5, -HD / 2 + 1.5);
   {
-    const bx = HX - 3.4, bz = -HD / 2 + 1.5;
+    const bx = bed.x, bz = bed.z;
     B.solid(place(new THREE.Mesh(box(1.4, 0.5, 2.4, 1), M.wood), bx, 0.25, bz));
     B.deco(new THREE.Mesh(box(1.3, 0.14, 2.2, 1), M.linen), bx, 0.56, bz);
     B.deco(new THREE.Mesh(box(1.32, 0.12, 1.4, 1), M.clothRed), bx, 0.63, bz + 0.35);
@@ -192,12 +193,20 @@ export function buildInteriors(B, areas) {
   B.deco(new THREE.Mesh(box(0.5, 0.06, 0.35, 1), M.clothBlue), HX - 0.2, 1.88, -HD / 2 + 0.25);
   for (const z of [1.0, 2.2]) B.deco(new THREE.Mesh(box(0.16, 0.16, 0.16, 1), M.woodDark), HX - HW / 2 + 0.15, 1.6, z);
   B.barrel(HX + 4.1, 0, 2.8);
+  // 0.20: en vägglykta vid slipstenen och relikhyllan (de nya sakerna i huset, se home.js)
+  for (const [lx, lz, dx] of [[HX - HW / 2 + 0.2, 1.6, 0.18], [HX + HW / 2 - 0.2, 1.9, -0.18]]) {
+    B.deco(new THREE.Mesh(box(0.3, 0.06, 0.08, 1), M.woodDark), lx + dx * 0.4, 2.35, lz);
+    B.deco(new THREE.Mesh(box(0.2, 0.26, 0.2, 1), M.lamp), lx + dx, 2.18, lz);
+    B.lights.add({ x: lx + dx * 2.5, y: 2.1, z: lz, color: 0xffc070, power: 9, range: 7, flicker: 0.3 });
+  }
   B.crate(HX + 3.0, 0, 3.2, 0.7, 0.4);
   // Cellos kista vid sängen
   B.chest('homeChest', HX - 1.6, 0, -HD / 2 + 0.9, 0, { shards: 10 });
   // Fönster med stormljus
+  // (0.20: fönstren lyser orange av elden i byn under öppningen, se story.js)
+  const windowMat = new THREE.MeshBasicMaterial({ color: 0x6a7488 });
   for (const x of [HX - 2.4, HX + 1.4]) {
-    B.deco(new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), new THREE.MeshBasicMaterial({ color: 0x6a7488 })), x, 1.9, -HD / 2 + 0.01);
+    B.deco(new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), windowMat), x, 1.9, -HD / 2 + 0.01);
     B.deco(new THREE.Mesh(box(0.9, 0.08, 0.1, 1), M.woodDark), x, 2.32, -HD / 2 + 0.05);
     B.deco(new THREE.Mesh(box(0.06, 0.8, 0.08, 1), M.woodDark), x, 1.9, -HD / 2 + 0.05);
   }
@@ -211,6 +220,7 @@ export function buildInteriors(B, areas) {
     npcs: {
       pell: { area: 'shop', pos: V3(SX - 0.6, 0, counterZ - 1.1), face: 0 },
     },
+    house: { bed, window: V3(HX - 2.4, 1.9, -HD / 2), door: r2.door.clone(), windowMat },
     shop: {
       lantern: V3(standX - 1.0, 0, standZ),
       sword: V3(rackX - 1.1, 0, rackZ),

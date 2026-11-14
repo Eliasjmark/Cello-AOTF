@@ -17,6 +17,7 @@
 //   schakt och två solögon på en gång öppnar trappan ner) → de fyra nya delarna (pyramidwings.js) upp till toppen,
 //   där Solnyckeln ligger → ljusrännan ner till P4 bossdörren → P7 Apophis
 import * as THREE from 'three';
+import { animateLid } from './chestlid.js';
 import { box, cyl, rockGeo, place, hash2 } from './geom.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Beams, BEAM_Y } from './beams.js';
@@ -1056,8 +1057,7 @@ export class Pyramid {
       if (d.barsY >= 4.19 && d.barsTarget >= 4.19) d.bars.visible = false;
     }
     for (const c of Object.values(this.chests)) {
-      if (c.open && c.lidT < 1) c.lidT = Math.min(1, c.lidT + dt * 2.2);
-      c.lid.rotation.x = -c.lidT * 1.9;
+      animateLid(c, c.open, dt);
     }
     for (const cg of Object.values(this.cages)) {
       cg.y += Math.sign(cg.target - cg.y) * Math.min(Math.abs(cg.target - cg.y), dt * 1.5);
