@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.20.2 · Homecoming (öppningsscen, Cello vaknar i sin säng, nya saker i huset, bättre kistor och Maren i famnen)
+**Version:** prototyp 0.21 · The Crown of Othrys (spelets final: Mount Othrys, den sista fängelsehålan, Kronos och slutet) (öppningsscen, Cello vaknar i sin säng, nya saker i huset, bättre kistor och Maren i famnen)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -34,7 +34,34 @@ python3 tools/models/build_models.py                    # → models/pack.bin
 python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
 ```
 
-## Vad är nytt i 0.20: Homecoming
+## Vad är nytt i 0.21: The Crown of Othrys (finalen)
+
+Spelet har nu ett slut. Efter Frostgiant's Maw går Kronos österut, och isbron på The Frostmarchs östra sida leder dit.
+
+- **Mount Othrys** (`src/regions/othrys.js`, x 32000): titanernas berg, kal sten under ett evigt åskväder. Seren följer med.
+  - *Rheas härd*: ett läger vid bergets fot med en eld att vila och spara vid. Där väntar **Rhea**, titaninnan som en gång var Kronos drottning och gömde sitt yngsta barn för honom. Hon berättar vem Kronos är och hur han kan besegras.
+  - *De fallna titanerna*: fyra brutna kolosser längs vägen (Typhon, Oceanus, Atlas och Kronos själv) med inskrifter.
+  - *Sidouppdraget The Caged Hearts*: fem burar med hjärtan som titanerna tog från folket i byarna (Ida, Tomas bagaren, gamle Wilhelm, Saga och Eli). Varje hjärta säger något när buren öppnas, och flyger till Rheas härd. Alla fem ger en hjärtbehållare.
+  - Berget med en krona av svarta spetsar och lila ådror, och porten mellan två kolosser i dess västra fot.
+- **The Crown of Othrys** (`src/othrys.js`, `src/othryskit.js`): den sista fängelsehålan, där varje relik behövs.
+  - *The Titans' Stair*: ett ras av titansten (hammarens markslag krossar det) döljer den lilla nyckeln, och en vägg av lila stormkristall (treuddens anfall) döljer kartan. Bakom den låsta dörren: en klyfta på elva meter som bara går att ta sig över genom att springa längs väggen med sandalerna.
+  - *The Hall of Chains*: titanernas fängelse. Väster: rimfrost och en tryckplatta (masken). Öster: ljus genom ett hål i taket och en slöja av Kronos mörker som brinner upp när Cello står i ljuset och riktar prismat mot den. Där ligger Titan Key. En stormkristall till döljer 60 skärvor.
+  - *The Throne of Othrys*: toppen av berget, under öppen himmel.
+- **Kronos**, kungen av titanerna: en jätte av sten, storm, hav och is med en skära och en krona av is. Tre titanhjärtan skyddar honom, och varje hjärta krossas med en relik:
+  - *stormhjärtat* (gult) svävar lågt runt hans fötter: hammarens markslag;
+  - *havshjärtat* (grönt) far runt salen: treuddens anfall;
+  - *frosthjärtat* (vitt) står bakom rimfrost: kasta skuggan dit, byt plats och hugg.
+  - Han slår med skäran runt sig (hoppa eller rulla), kallar ner blixtar där Cello står och skickar vågor av havsvatten över golvet (hoppa över dem). När alla tre hjärtana är krossade faller han på knä, och kristallen i bröstet kommer inom räckhåll. Tre gånger.
+- **Det femte valet och slutet** (`src/othrysstory.js`, `src/ending.js`): Kronos krona ligger vid Cellos fötter, full av hjärtan. *Krossa kronan* eller *ta kronan*. Sedan berättas vad som hände, sida för sida, och det beror på alla valen: Maren (prologen), Typhon, Ketos, Loke och kronan. Det finns tre slut (*Dawn*, *Ashes* och *Crowned*). Sedan rullar eftertexterna, och Cello vaknar i sin säng hemma, som i början. Efteråt är Ida, Marens mor, hemma i Aetheria, åskan över berget har tystnat, och folk har nya saker att säga.
+
+### Polering i 0.21
+
+- **Fler sidouppdrag i byarna** (`src/sidequests.js`): *Button the Bear* (Mira i Willowmere har tappat sin nalle på The Stormvale) och *Pell's Lost Crate* (Pells låda med lyktolja föll av kärran vid den fallna kolossen).
+- **Mer liv** (`src/barks.js`): när Cello går förbi någon säger de något kort i en pratbubbla, med mummel. Vad de säger beror på hur långt in i berättelsen han har kommit. Flockar av fåglar cirklar över de fridfulla öarna, och vita måsar över havet.
+- **Kartan**: översikten över riket visar nu också The Galecrown, havet, The Frostmarch och Mount Othrys.
+- **Buggjakt**: ett nytt test går igenom alla ingångar i alla områden och kontrollerar att Cello står på marken, inte faller och inte sitter fast.
+
+## Vad var nytt i 0.20: Homecoming
 
 - **Öppningen.** Ett nytt spel börjar med en berättelse över svart bakgrund, sida för sida: gudarna som lämnade världen, reliker som fortfarande har kraft, titanerna som kom ur stormen, och Cello, pojken på ön vid skogsbrynet söder om Hollowbrook. Enter visar nästa sida, Esc hoppar över allt. Sedan ligger Cello och sover i sin säng tills en explosion skakar huset. Skärmen blixtrar, damm faller från taket, han far upp, ett skrik hörs från byn ("HELP! Somebody... please, help us!") och fönstren lyser orange av elden. Efter det styr spelaren själv och går ut genom dörren.
 - **Maren i famnen.** I prologen svävade Maren i luften bredvid Cello. Nu ligger hon tvärs över hans underarmar: benen över den ena armen, ryggen mot den andra och huvudet mot hans axel. Hennes höft räknas ut så att hon hamnar i hans famn oavsett figurens mått.
@@ -454,6 +481,13 @@ På mobil styr vänster halva av skärmen Cello och höger halva kameran; knappa
 | `src/pausetheme.js` | Pausmenyns låt (0.19): *Hearth Lullaby*, spelad med kod |
 | `src/opening.js` | Öppningens berättelse (0.20): texten sida för sida och explosionens ljusblixt |
 | `src/home.js` | Cellos hus (0.20): grytan, slipstenen, oljetunnan, relikhyllan och gåvokorgen |
+| `src/regions/othrys.js` | Mount Othrys (0.21): lägret, kolosserna, hjärtburarna, berget och porten |
+| `src/othrys.js` | The Crown of Othrys (0.21): de tre delarna av den sista fängelsehålan |
+| `src/othryskit.js` | Byggdelar för finalen (0.21): raset, stormkristallen, ljuset och slöjan, Kronos och titanhjärtana |
+| `src/othrysstory.js` | Sista kapitlet (0.21): Rhea, hjärtburarna, striden, det femte valet och slutet |
+| `src/ending.js` | Eftertexterna (0.21) |
+| `src/sidequests.js` | Fler sidouppdrag (0.21): Miras nalle och Pells låda |
+| `src/barks.js` | Pratbubblor och fåglar (0.21) |
 | `src/chestlid.js` | Kistlocket (0.20): öppningen för alla kistor, runt gångjärnet och med ett sken |
 | `tools/audio/build_sfx.py` | Gör om ljudpaketet till `sounds/sfx.json` (0.18): vilka klipp, trimning, normalisering och MP3 |
 | `src/foes.js` | Fiendernas nivåer (0.17), de nya sorterna (Brute, Venomfang, Ramhorn, Tide Reaver, Rimeling), livmätarna och bossens mätare |

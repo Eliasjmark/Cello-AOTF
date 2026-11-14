@@ -425,7 +425,7 @@ export class FrostStory {
       ], { onEnd: () => {
         story.cinematic = false;
         this.hud.card('Kronos has a body', 'He strides east, to Mount Othrys', 4600);
-        story.after(5, () => this.hud.toast('The road to Mount Othrys opens in the next version of the game.', 4600));
+        story.after(5, () => this.hud.toast('The ice bridge on the east side of the Frostmarch is open. It leads to Mount Othrys.', 4600));
         story.save(true);
       } });
     });

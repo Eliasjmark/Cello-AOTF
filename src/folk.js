@@ -45,6 +45,10 @@ const LOOKS = {
   // 0.16: Rimeholt i norr
   sigrun: { name: 'Sigrun', look: { skin: 0xd8b8a0, hair: 0xe8e4dc, hairStyle: 'long', top: 0x5a3a3a, shawl: 0xd8d0c0, robe: true, scale: 0.86, width: 1.05 } },
   ylva: { name: 'Ylva', look: { skin: 0xe0c0a8, hair: 0xd8b878, hairStyle: 'hood', hood: 0x8a3a2a, top: 0x8a3a2a, extraColor: 0xe8e0d0, scale: 0.86 } },
+  // 0.21: Rhea vid Mount Othrys, titaninnan som gömde sitt barn för Kronos
+  rhea: { name: 'Rhea', look: { skin: 0xc8a890, hair: 0xd8d4e0, hairStyle: 'long', top: 0x4a3a6a, shawl: 0x8a7ab0, robe: true, scale: 0.98, width: 1.05, extraColor: 0xc9a24f } },
+  // Folket från Hollowbrook som kommer hem när Kronos har fallit
+  ida: { name: 'Ida', look: { skin: 0xd8b090, hair: 0x6a3a1a, hairStyle: 'bun', top: 0x6a4a5a, apron: true, extraColor: 0xe0d8c4, robe: true, scale: 0.9 } },
   hakon: { name: 'Hakon', look: { sculpt: 'bybo', skin: 0xd0a888, hairStyle: 'hood', hood: 0x4a5a6a, beard: 0xb8783a, top: 0x5a4a3a, extraColor: 0xe8e0d0, width: 1.15, scale: 1.0 } },
 };
 
@@ -192,7 +196,7 @@ export class Folk {
     this.npcs = {};
     // Alla platser för folk som områdena har bestämt
     const spots = {};
-    for (const r of [world.ranch, world.pass, world.field, world.willow, world.reach, world.interiors, world.desert, world.sea, world.frost]) Object.assign(spots, r?.npcs || {});
+    for (const r of [world.ranch, world.pass, world.field, world.willow, world.reach, world.interiors, world.desert, world.sea, world.frost, world.othrys]) Object.assign(spots, r?.npcs || {});
     for (const [id, sp] of Object.entries(spots)) {
       const def = LOOKS[id];
       if (!def) continue;
@@ -237,6 +241,8 @@ export class Folk {
     talk('sigrun', (n) => this.story.frost?.talkSigrun(n));
     talk('ylva', (n) => this.story.frost?.talkYlva(n));
     talk('hakon', (n) => this.story.frost?.talkHakon(n));
+    talk('rhea', (n) => this.story.othrys?.talkRhea(n));
+    talk('ida', (n) => this.story.othrys?.talkIda(n));
 
     // Butiken: varorna på hyllorna
     const shop = world.interiors?.shop;
@@ -862,6 +868,7 @@ export class Folk {
   }
 
   talkPell(n) {
+    if (this.side?.talkPell(n)) return;
     const s = this.story.state;
     this.say(n, s.talked.pell
       ? this.rotate('pellN', [
@@ -900,7 +907,8 @@ export class Folk {
     if (!s.swim) return 'swim';
     if (!s.templeDone) return 'temple';
     if (!s.mawDone) return s.talked?.sigrun ? 'maw' : 'frost';
-    return 'othrys';
+    if (!s.crownDone) return s.talked?.rhea ? 'crown' : 'othrys';
+    return 'end';
   }
   goalText(key = this.story.state.hint) {
     return {
@@ -922,7 +930,9 @@ export class Folk {
       temple: 'Under the broken spear in the middle of the sea lies a temple. The tide there rises and falls at a will that is not the moon\'s. Dive, child.',
       frost: 'The king of the titans flies north, to the ice where the frost giants sleep. Cross the north bridge of the Galecrown, and carry fire with you. In Rimeholt, an old woman by the fire knows the giants.',
       maw: 'A dead giant lies in the ice with his mouth open, and something has climbed inside him. Walk into the mouth. The ice there does not let you stop... and someone in there laughs.',
-      othrys: 'Kronos walks on his own legs now, east, to Mount Othrys, where the titans were crowned. That road is not yet woven... Rest, child, while you can.',
+      othrys: 'Kronos walks on his own legs now, east, to Mount Othrys, where the titans were crowned. Cross the ice bridge on the east side of the Frostmarch. A woman older than the gods keeps a fire there.',
+      crown: 'Inside the mountain of the titans, every gift the gods left you will be needed: thunder, light, wings, the spear of the sea, and a shadow. At the top, the titan king waits on his throne.',
+      end: 'The threads are quiet now, child. For the first time in a long while, I cannot see the end of them. ...I think that means they are yours.',
     }[key] ?? null;
   }
 
@@ -985,6 +995,7 @@ export class Folk {
           { id: 'windmill', q: 'Is the windmill haunted?', a: ['Tob says the windmill is haunted. It is NOT. It is just the wind. Probably.'] },
           { id: 'grandma', q: 'Who is Grandma Ysolde?', a: ["She's not really my grandma. She's everybody's grandma. She knows what's going to happen before it happens.", 'She says the storm talks to her. I think she just likes thunder.'] },
           { id: 'night', q: 'Do you go out at night?', a: ["No! Mama makes us go in when the lamps are lit. That's when the Ashlings come to the shore."] },
+          ...(this.side?.miraTopics() ?? []),
         ],
         rude: { q: 'Tag is a baby game.', mood: 'sad', a: ['It is NOT!', "*sniff* I'm telling Grandma Ysolde!"] },
         bye: "Bye! You're still it!",
@@ -1037,6 +1048,7 @@ export class Folk {
   talkSeren(n) {
     const s = this.story.state;
     // 0.14: efter titanens anfall slår hon läger i The Galecrown
+    if (s.mawDone && this.story.othrys && n.area === 'othrys') { this.story.othrys.talkSeren(n); return; }
     if (s.templeDone && this.story.frost && n.area === 'frost') { this.story.frost.talkSeren(n); return; }
     if (s.spireDone && this.story.sea && n.area === 'sea') { this.story.sea.talkSeren(n); return; }
     if (s.titanRaid && this.story.chronicle) { this.story.chronicle.talkSeren(n); return; }

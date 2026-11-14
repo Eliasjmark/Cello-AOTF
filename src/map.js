@@ -430,7 +430,7 @@ export class MapView {
       for (const p of a.map.pois) {
         if (p.when && !st[p.when]) continue;
         const x = T.X(p.x), y = T.Z(p.z);
-        g.fillStyle = p.icon === 'fire' ? '#ff9a4a' : p.icon === 'shop' ? COL.gold : p.icon === 'seer' ? '#b08ad0' : p.icon === 'stone' ? COL.storm : COL.ink;
+        g.fillStyle = p.icon === 'heart' ? '#ff7a9a' : p.icon === 'fire' ? '#ff9a4a' : p.icon === 'shop' ? COL.gold : p.icon === 'seer' ? '#b08ad0' : p.icon === 'stone' ? COL.storm : COL.ink;
         g.beginPath();
         g.arc(x, y, 3.5 * dpr, 0, Math.PI * 2);
         g.fill();
@@ -471,11 +471,14 @@ export class MapView {
       field: [0.1, 0.42, 'The Stormvale'], willowmere: [0.55, 0.34, 'Willowmere'], pass: [0.1, 0.57, 'Galewind Pass'],
       ranch: [0.1, 0.7, 'Thistledown'], village: [0.1, 0.84, 'Hollowbrook'], home: [0.1, 0.97, "Cello's Home"],
       desert: [0.42, 0.5, 'Ember Wastes'], pyramid: [0.42, 0.62, 'Sun Pyramid'],
+      // 0.21: de senare öarna (förut saknades de i översikten)
+      galecrown: [0.34, 0.2, 'The Galecrown'], sea: [0.62, 0.2, 'Shattered Sea'], frost: [0.34, 0.06, 'Frostmarch'], othrys: [0.66, 0.06, 'Mount Othrys'],
     };
     const parent = { shop: 'willowmere', house: 'home' };
+    for (const [ids, p] of [[window.__realm?.world?.mawIds, 'frost'], [window.__realm?.world?.crownIds, 'othrys'], [window.__realm?.world?.templeIds, 'sea'], [window.__realm?.world?.spireIds, 'galecrown']]) for (const id of ids ?? []) parent[id] = p;
     const here = parent[areas.id] ?? areas.id;
     const E = [['home', 'village'], ['village', 'ranch'], ['ranch', 'pass'], ['pass', 'field'], ['field', 'willowmere'], ['field', 'stormreach'], ['stormreach', 'cave'], ['cave', 'bastion'],
-      ['field', 'desert'], ['desert', 'pyramid']];
+      ['field', 'desert'], ['desert', 'pyramid'], ['stormreach', 'galecrown'], ['galecrown', 'sea'], ['galecrown', 'frost'], ['frost', 'othrys']];
     const P = (id) => [box.x + N[id][0] * box.w, box.y + N[id][1] * box.h];
     g.fillStyle = 'rgba(12,15,21,0.75)';
     g.fillRect(box.x - 6 * dpr, box.y - 20 * dpr, box.w + 12 * dpr, box.h + 30 * dpr);

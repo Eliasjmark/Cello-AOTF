@@ -46,10 +46,11 @@ export function buildFrost(B, areas) {
   const MAW = { x: FX, z: -138 };
   const isl = B.island({
     cx: FX, cz: 0, baseR: 178, rNoise: 12, seed: 2601, amp: 1.0, hills: 6, hillFreq: 0.02,
-    keepAngles: [Math.PI / 2], depth: 85, rings: 56, segs: 160, label: 'The Frostmarch', mapCol: '#8a9cb0',
+    keepAngles: [Math.PI / 2, 0], depth: 85, rings: 56, segs: 160, label: 'The Frostmarch', mapCol: '#8a9cb0',
     topMat: M.snow, grass: 0,
     pads: [
       { x: FX, z: 172, r: 8, h: 0 }, // brofästet
+      { x: FX + 168, z: 0, r: 9, h: 0 }, // 0.21: isbron österut, mot Mount Othrys
       { x: VIL.x, z: VIL.z, r: 30, h: 0.6 },
       { x: LAKE.x, z: LAKE.z, r: LAKE.r + 4, h: -0.4 },
       { x: MAW.x, z: MAW.z + 24, r: 18, h: 1.2 },
@@ -64,6 +65,13 @@ export function buildFrost(B, areas) {
   a.entries = { south: { pos: V3(FX, DECK, 176), facing: Math.PI } };
   a.exits = [{ x0: FX - 3, x1: FX + 3, z0: 200, z1: 214, to: 'galecrown', entry: 'north' }];
   a.map.exits = [{ x: FX, z: 200, label: 'The Galecrown', to: 'galecrown' }];
+  // 0.21: isbron österut, mot Mount Othrys (Kronos gick den vägen; den öppnas efter Frostgiant's Maw)
+  B.bridge('x', FX + 174, FX + 206, 0, DECK, { rails: true });
+  B.mist(FX + 206, -3, 0, 9, 11, 9);
+  a.entries.east = { pos: V3(FX + 176, DECK, 0), facing: -Math.PI / 2 };
+  a.exits.push({ x0: FX + 204, x1: FX + 216, z0: -3, z1: 3, to: 'othrys', entry: 'west', othrys: true, label: 'Mount Othrys' });
+  a.map.exits.push({ x: FX + 204, z: 0, label: 'Mount Othrys', to: 'othrys' });
+  B.sign(FX + 168, H(FX + 168, 4), 4, -Math.PI / 2, ['Frost-runes, cut fresh into the stone:', '"EAST: OTHRYS. Where the titans were crowned."', 'Under it, giant footprints in the snow, each one as long as a cart.']);
   B.sign(FX + 3, H(FX + 3, 168), 168, Math.PI, ['A runestone, half buried in snow:', '"RIMEHOLT. Warm fires, warm furs, cold hearts."', '"Beyond the village the cold bites. Carry a light, stranger."']);
 
   // ---------- snötallar ----------
@@ -79,7 +87,7 @@ export function buildFrost(B, areas) {
   for (let k = 0; k < 150; k++) {
     const ang = rand() * Math.PI * 2, r = 30 + Math.sqrt(rand()) * 135;
     const x = FX + Math.cos(ang) * r, z = Math.sin(ang) * r;
-    if (Math.hypot(x - VIL.x, z - VIL.z) < 34 || Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r + 6 || Math.hypot(x - MAW.x, z - MAW.z) < 46 || Math.hypot(x - FX - 70, z - 70) < 16 || Math.abs(x - FX) < 6 && z > 120) continue;
+    if (Math.hypot(x - VIL.x, z - VIL.z) < 34 || Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r + 6 || Math.hypot(x - MAW.x, z - MAW.z) < 46 || Math.hypot(x - FX - 70, z - 70) < 16 || Math.abs(x - FX) < 6 && z > 120 || x > FX + 150 && Math.abs(z) < 10) continue;
     snowPine(x, z, 0.8 + rand() * 0.7);
   }
   for (let k = 0; k < 40; k++) {
@@ -247,7 +255,8 @@ export function buildFrost(B, areas) {
     dark.position.set(C.x, C.y + 4.6, C.z - 0.5);
     B.add(dark);
     B.solid(place(new THREE.Mesh(box(20, 12, 2, 2), FM.giantDark), C.x, C.y + 6, C.z - 1.6));
-    a.entries.maw = { pos: V3(C.x, by, C.z + 8), facing: 0 };
+    // 0.21: på marken framför gapet (förut på platåns höjd, en bit ovanför marken)
+    a.entries.maw = { pos: V3(C.x, H(C.x, C.z + 8) + 0.05, C.z + 8), facing: 0 };
     a.exits.push({ x0: C.x - 3, x1: C.x + 3, z0: C.z - 0.6, z1: C.z + 2, y: by, dy: 4, to: 'fgate', entry: 'entrance', maw: true, text: 'Cello steps between the frozen teeth, into the giant\'s throat...', label: "Frostgiant's Maw" });
     a.map.pois.push({ x: C.x, z: C.z, label: "Frostgiant's Maw", icon: 'ruin' });
   }

@@ -11,9 +11,9 @@
 // Här finns också livmätarna: en liten mätare över varje fiende, och en stor mätare nere på skärmen för bossar.
 import * as THREE from 'three';
 
-export const GROUP_TIER = { bastion: 1, pyramid: 2, necropolis: 2, spire: 3, temple: 4, maw: 5 };
-export const AREA_TIER = { village: 0, home: 0, ranch: 0, pass: 0, field: 0, willowmere: 1, stormreach: 1, cave: 1, desert: 2, galecrown: 3, sea: 4, frost: 5 };
-const TIER_HP = [6, 7, 8, 10, 11, 12];
+export const GROUP_TIER = { bastion: 1, pyramid: 2, necropolis: 2, spire: 3, temple: 4, maw: 5, crown: 6 };
+export const AREA_TIER = { village: 0, home: 0, ranch: 0, pass: 0, field: 0, willowmere: 1, stormreach: 1, cave: 1, desert: 2, galecrown: 3, sea: 4, frost: 5, othrys: 6 };
+const TIER_HP = [6, 7, 8, 10, 11, 12, 13];
 
 export const TRAITS = {
   brute: { name: 'Ashling Brute', hp: 1.6, dmg: 2, scale: 1.22, speed: 0.85 },
@@ -25,6 +25,8 @@ export const TRAITS = {
 
 // Vilken sorts askling blir fiende nummer k i ett område på nivå t?
 function traitFor(t, k) {
+  // 0.21: titanernas berg: alla sorter blandade
+  if (t >= 6) return ['brute', 'reaver', 'frost', 'ram', 'venom', null][k % 6];
   if (t >= 5) return k % 2 === 0 ? 'frost' : k % 3 === 1 ? 'brute' : k % 5 === 3 ? 'reaver' : null;
   if (t === 4) return k % 3 === 0 ? 'reaver' : k % 4 === 2 ? 'ram' : k % 5 === 4 ? 'venom' : null;
   if (t === 3) return k % 3 === 1 ? 'ram' : k % 4 === 3 ? 'brute' : k % 5 === 0 ? 'venom' : null;

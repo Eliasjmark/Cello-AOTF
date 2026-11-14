@@ -23,7 +23,11 @@ const CLIMATE = {
   frost: [['calm', 2.5], ['snow', 3], ['blizzard', 1.6], ['fog', 1]],
 };
 // Vädret är samma över hela riket, men öknen är torr: regn blir lugnt, dimma blir sanddis
-const LOCAL = { desert: { rain: 'calm', storm: 'calm', fog: 'haze' }, frost: { rain: 'snow', storm: 'blizzard', haze: 'calm' } };
+const LOCAL = {
+  desert: { rain: 'calm', storm: 'calm', fog: 'haze' }, frost: { rain: 'snow', storm: 'blizzard', haze: 'calm' },
+  // 0.21: över titanernas berg regnar det alltid, och ofta åskar det (tills Kronos är besegrad)
+  othrys: { calm: 'rain', fog: 'rain', haze: 'rain', snow: 'rain', blizzard: 'storm' },
+};
 const FLAKES = 1800;
 
 const DROPS = 1400, BOX = 34, HALF = BOX / 2, TOP = 14, FALL = 24;
@@ -141,7 +145,7 @@ export class Weather {
 
   setRegion(region, outdoor) {
     const before = this.local;
-    this.region = region === 'desert' ? 'desert' : region === 'stormreach' ? 'stormreach' : region === 'frost' ? 'frost' : 'world';
+    this.region = region === 'desert' ? 'desert' : region === 'stormreach' ? 'stormreach' : region === 'frost' ? 'frost' : region === 'othrys' ? (this.calmOthrys ? 'world' : 'othrys') : 'world';
     this.outdoor = outdoor;
     if (this.local !== before) this.snap();
     if (!outdoor) {

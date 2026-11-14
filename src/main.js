@@ -19,6 +19,8 @@ import { Music } from './music.js';
 import { Pots } from './pots.js';
 import { Inventory } from './inventory.js';
 import { HomeHouse } from './home.js';
+import { SideQuests } from './sidequests.js';
+import { Barks } from './barks.js';
 import { Folk } from './folk.js';
 import { Goat } from './goat.js';
 import { Clock } from './clock.js';
@@ -31,6 +33,7 @@ import { WIND } from './build.js';
 import { Chronicle } from './chronicle.js';
 import { SeaStory } from './seastory.js';
 import { FrostStory } from './froststory.js';
+import { OthrysStory } from './othrysstory.js';
 import { ShadowDouble } from './shadow.js';
 import { WATER } from './water.js';
 import { Post } from './post.js';
@@ -166,6 +169,10 @@ function start(saved = {}) {
   story.inventory = inventory;
   const folk = new Folk({ story, world, inventory, sfx, hud, fx, lights, music, enemies });
   story.folk = folk;
+  // 0.21: fler sidouppdrag i byarna (Miras nalle, Pells låda)
+  folk.side = new SideQuests({ story, world, areas, inventory, sfx, hud, fx });
+  // 0.21: pratbubblor när Cello går förbi folk, och fåglar över öarna
+  const barks = new Barks({ story, scene, sfx, areas });
   // 0.20: grytan, slipstenen, oljetunnan, relikhyllan och gåvokorgen i Cellos hus
   story.homeHouse = new HomeHouse({ story, world, areas, inventory, sfx, hud, fx, player, M: B.M });
   // Grumble, getabocken man kan rida på
@@ -216,6 +223,8 @@ function start(saved = {}) {
   const seaStory = new SeaStory({ story, world, areas, player, hud, sfx, fx, rig, folk, inventory, combat, music });
   // 0.16: norr (Rimeholt, renarna, fiskaren, gapet, Loke och det fjärde valet) och Lokis skugga
   const frostStory = new FrostStory({ story, world, areas, player, hud, sfx, fx, rig, folk, inventory, combat, music });
+  // 0.21: Mount Othrys, The Crown of Othrys, Kronos och slutet
+  const othrysStory = new OthrysStory({ story, world, areas, player, hud, sfx, fx, rig, folk, inventory, combat, music, weather });
   const shadow = new ShadowDouble({ scene, player, collider, fx, sfx, hud });
   for (const dg of Object.values(world.dungeons)) dg.game.shadow = shadow;
   player.onGlide = (k) => { if (k === 'start') sfx.play('glide', { vol: 0.7 }); else sfx.play('stomp', { vol: 0.35 }); };
@@ -349,7 +358,7 @@ function start(saved = {}) {
     sfx, music, settings, story, hud, input,
     apply: (S) => { applySettings(S); storeSettings(S); },
     areaName: () => areas.cur?.name ?? '',
-    canPause: () => hud.started && !title.active && !story.crawl.active,
+    canPause: () => hud.started && !title.active && !story.crawl.active && !othrysStory.credits.active,
     quit: () => location.reload(),
   });
   input.onLockLost = () => { if (hud.started && !title.active && !inventory.open && !hud.mapOpen && !dialog.active && !songs.active) pause.show(); };
@@ -378,6 +387,7 @@ function start(saved = {}) {
     if (player.swimming) return null;
     if (!a) return 'grass';
     if (id === 'frost' || id.startsWith('f') && world.mawIds?.has(id)) return 'snow';
+    if (id === 'othrys') return 'gravel';
     if (id === 'desert') return 'gravel';
     if (['home', 'house', 'shop', 'inn'].includes(id) || a.interior) return 'wood';
     if (!outdoorArea(a) || a.indoor) return 'stone';
@@ -623,7 +633,7 @@ function start(saved = {}) {
       return { id: 'march' };
     }
     // Fästningens och pyramidens nya delar
-    const wing = bastion.wingAt(here) ?? pyramid.wingAt(here) ?? world.necropolis.wingAt(here) ?? world.spire.wingAt(here) ?? world.temple.wingAt(here) ?? world.maw.wingAt(here);
+    const wing = bastion.wingAt(here) ?? pyramid.wingAt(here) ?? world.necropolis.wingAt(here) ?? world.spire.wingAt(here) ?? world.temple.wingAt(here) ?? world.maw.wingAt(here) ?? world.crown.wingAt(here);
     if (wing) {
       if (wing.bossFight) return { id: 'warlord', now: true };
       if (wing.trap) return { id: 'march', now: true };
@@ -631,7 +641,8 @@ function start(saved = {}) {
       if (here === 'scrown' && world.spire.state.cleared.typhon) return { id: 'dawn' };
       if (here === 'tthrone' && world.temple.state.cleared.ketos) return { id: 'dawn' };
       if (here === 'fthrone' && world.maw.state.cleared.thrym) return { id: 'dawn' };
-      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull', pdepths: 'whispers', pbarque: 'skull', pascent: 'march', papex: 'skull', ncrypts: 'whispers', nhall: 'skull', nduat: 'whispers', nthrone: 'skull', sgate: 'march', shall: 'march', sweb: 'skull', scrown: 'skull', tgate: 'whispers', tdeep: 'whispers', tgrotto: 'skull', tthrone: 'skull', fgate: 'whispers', flab: 'march', fwolf: 'skull', fthrone: 'skull' }[here] };
+      if (here === 'othrone' && world.crown.state.cleared.kronos) return { id: 'dawn' };
+      return { id: { bdepths: 'whispers', bfurnace: 'skull', bspire: 'march', bcrown: 'skull', pdepths: 'whispers', pbarque: 'skull', pascent: 'march', papex: 'skull', ncrypts: 'whispers', nhall: 'skull', nduat: 'whispers', nthrone: 'skull', sgate: 'march', shall: 'march', sweb: 'skull', scrown: 'skull', tgate: 'whispers', tdeep: 'whispers', tgrotto: 'skull', tthrone: 'skull', fgate: 'whispers', flab: 'march', fwolf: 'skull', fthrone: 'skull', ogate: 'march', ohall: 'skull', othrone: 'whispers' }[here] };
     }
     // Natten (0.11): byarna somnar och fälten blir kusliga
     if (clock.isNight && outdoorArea(areas.cur)) {
@@ -650,7 +661,7 @@ function start(saved = {}) {
     // Fältet: ett långsamt spår i moll (Elias ville ha något kusligare än galoppen)
     const byArea = {
       home: 'fieldsdawn', house: 'fieldsdawn', ranch: 'greenroad', pass: 'quiet', field: 'forgotten', willowmere: 'willowmere',
-      shop: 'willowmere', stormreach: 'march', cave: 'whispers', sea: 'ballad', frost: 'quiet',
+      shop: 'willowmere', stormreach: 'march', cave: 'whispers', sea: 'ballad', frost: 'quiet', othrys: story.state?.ending ? 'dawn' : 'whispers',
     };
     if (here === 'pass' && P.z < -62) return { id: 'ballad' };
     return { id: byArea[here] };
@@ -832,7 +843,7 @@ function start(saved = {}) {
       rig.indoor = (inDungeon() && areas.id === 'bastion' && player.feet.z < -150) || !!areas.cur?.indoor;
       sun.setEnabled(settings.shadows !== false);
       sun.update(player.feet, !outdoorArea(areas.cur) || !!areas.cur?.indoor, 1);
-      rig.extra = areas.id === 'fthrone' && world.maw.wingAt('fthrone')?.bossFight ? 4.5 : 0;
+      rig.extra = areas.id === 'fthrone' && world.maw.wingAt('fthrone')?.bossFight ? 4.5 : areas.id === 'othrone' && world.crown.wingAt('othrone')?.bossFight ? 5.5 : 0;
       rig.update(dt, blocked ? input.empty : inp, player);
       bars.update(dt, enemies.list, player, combat.lock, areas.id);
       {
@@ -863,6 +874,8 @@ function start(saved = {}) {
     chronicle.update(dt);
     seaStory.update(dt);
     frostStory.update(dt);
+    othrysStory.update(dt);
+    if (hud.started) barks.update(dt, player, camera);
     const flash = sky.update(dt, t, camera) * base.flash;
     applyEnv(flash);
     applyWater(dt);
@@ -1030,7 +1043,7 @@ function start(saved = {}) {
   // Handtag för felsökning i webbläsarens konsol
   window.__realm = {
     player, rig, world, areas, input, hud, scene, camera, enemies, post, sun, bars, bossBar, pause, combat, fx, sfx, story, dialog, bastion, pyramid, lights, collider, renderer,
-    culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs, realm, necropolis: world.necropolis, spire: world.spire, chronicle, temple: world.temple, seaStory, maw: world.maw, frostStory, shadow,
+    culled, cullS, music, pots, inventory, folk, goat, title, THREE, clock, weather, sky, songs, realm, necropolis: world.necropolis, spire: world.spire, chronicle, temple: world.temple, seaStory, maw: world.maw, frostStory, shadow, crown: world.crown, othrysStory,
     tick: (dt, inp) => update(dt, { ...input.empty, ...inp }),
   };
   // 0.17: skuggor på allt som är byggt (figurer, hus, träd, stenar, väggar) och konturer över bilden

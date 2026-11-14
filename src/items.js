@@ -83,8 +83,8 @@ export function buildTrident() {
 export function buildItem(kind) {
   const M = ITEM_MATS;
   const g = new THREE.Group();
-  if (kind === 'pmap' || kind === 'nmap' || kind === 'smap' || kind === 'tmap' || kind === 'fmap') kind = 'map';
-  else if (kind === 'pkey' || kind === 'nkey' || kind === 'skey' || kind === 'tkey' || kind === 'fkey') kind = 'key';
+  if (kind === 'pmap' || kind === 'nmap' || kind === 'smap' || kind === 'tmap' || kind === 'fmap' || kind === 'omap') kind = 'map';
+  else if (kind === 'pkey' || kind === 'nkey' || kind === 'skey' || kind === 'tkey' || kind === 'fkey' || kind === 'okey') kind = 'key';
   if (kind === 'prism') {
     g.add(buildPrism());
   } else if (kind === 'sunkey') {
@@ -267,6 +267,16 @@ export function buildItem(kind) {
     g.add(loop);
     g.add(B(0.07, 0.55, 0.06, ice, 0, -0.1, 0));
     g.add(B(0.18, 0.14, 0.06, lam(0xe8e4d8), 0.04, -0.33, 0));
+  } else if (kind === 'titankey') {
+    // 0.21: Titannyckeln: svart sten med lila ådror och ett ax som en liten krona
+    const stone = lam(0x2a2430, { emissive: 0x1a0828 });
+    const vein = lam(0xb070ff, { emissive: 0x6a2aa8 });
+    const loop = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.055, 6, 12), stone);
+    loop.position.y = 0.3;
+    g.add(loop);
+    g.add(B(0.08, 0.55, 0.07, stone, 0, -0.1, 0));
+    g.add(B(0.02, 0.5, 0.075, vein, 0, -0.1, 0));
+    for (const x of [-0.07, 0, 0.07]) g.add(B(0.05, 0.12 + (x === 0 ? 0.06 : 0), 0.07, vein, 0.05 + x, -0.34, 0));
   } else if (kind === 'reindeer' || kind === 'thaw') {
     g.add(B(0.2, 0.2, 0.2, lam(0xc8a878), 0, 0, 0));
   } else if (kind === 'tidekey') {
@@ -368,6 +378,9 @@ export const ITEM_TEXT = {
   fmap: ['You found the Labyrinth Map!', 'Press K to view it. Though the halls of the Maw may not stay where the map says...'],
   fkey: ['You got a Iron Key!', 'It opens a locked door somewhere in the Frostgiant\'s Maw.'],
   frostkey: ['You got the Frost Key!', 'Cut from blue ice that never melts. It opens the great door to the Giant\'s Heart.'],
+  omap: ['You found the Map of the Crown!', 'Press K to view it. The halls inside the mountain of the titans.'],
+  okey: ['You got a Iron Key!', 'It opens a locked door somewhere in the Crown of Othrys.'],
+  titankey: ['You got the Titan Key!', 'Black stone, warm as a heartbeat, veined with purple light. It opens the great door to the Throne of Othrys.'],
   mask: [
     "You got Loki's Mask!",
     'The face of the trickster god, gold and green, with horns that curl like smoke. It grins even when you do not.',

@@ -46,6 +46,8 @@ export const VOICES = {
   gull: { f: 125, wave: 'sawtooth', form: [[520, 3], [980, 4]], wobble: 0.9, breath: 0.4 },
   marlo: { f: 160, wave: 'sawtooth', form: [[600, 4], [1200, 5]] },
   // 0.16: Rimeholt och jättens gap
+  rhea: { f: 185, wave: 'triangle', form: [[600, 3], [1100, 4]], wobble: 0.45, breath: 0.5 },
+  ida: { f: 235, wave: 'triangle', form: [[700, 3], [1300, 4]], wobble: 0.3, breath: 0.3 },
   sigrun: { f: 205, wave: 'triangle', form: [[640, 3], [1200, 4]], wobble: 0.6, breath: 0.4 },
   ylva: { f: 330, wave: 'triangle', form: [[820, 4], [1650, 5]] },
   hakon: { f: 118, wave: 'sawtooth', form: [[500, 4], [1000, 5]], wobble: 0.3 },

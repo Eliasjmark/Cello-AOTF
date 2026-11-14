@@ -30,6 +30,8 @@ import { buildSea } from './regions/sea.js';
 import { Temple, buildTemple } from './temple.js';
 import { buildFrost } from './regions/frost.js';
 import { Maw, buildMaw } from './maw.js';
+import { buildOthrys } from './regions/othrys.js';
+import { Crown, buildCrown } from './othrys.js';
 import { Pyramid, OX as PYR_X } from './pyramid.js';
 
 const AZ = -78; // Aetherias mittpunkt i z
@@ -888,6 +890,8 @@ export function buildWorld(scene, lights) {
   const sea = buildSea(B, areas);
   // 0.16: The Frostmarch (x 26000) och Frostgiant's Maw (x 28000–29800)
   const frost = buildFrost(B, areas);
+  // 0.21: Mount Othrys (x 32000) och The Crown of Othrys (x 33000–34600)
+  const othrys = buildOthrys(B, areas);
 
   // =====================================================================
   // The Sun-Scorched Pyramid (x 9000)
@@ -939,6 +943,12 @@ export function buildWorld(scene, lights) {
   maw.areas = areas;
   const mawWings = buildMaw(B, areas, maw);
   const MAW_IDS = new Set(mawWings.map((w) => w.id));
+  // Ida, Marens mor, står vid Marens bädd i Aetheria när Kronos har fallit (othrysstory.js visar henne)
+  othrys.npcs.ida = { area: 'village', pos: V3(cotPos.x + 1.3, aeth.H(cotPos.x + 1.3, cotPos.z + 0.9), cotPos.z + 0.9), face: -2.4 };
+  const crown = new Crown();
+  crown.areas = areas;
+  const crownWings = buildCrown(B, areas, crown);
+  const CROWN_IDS = new Set(crownWings.map((w) => w.id));
 
   const world = {
     areas,
@@ -972,7 +982,7 @@ export function buildWorld(scene, lights) {
     prologue: { refugee: V(4.6, 12.4), titanHome: V(-16.5, 9) },
     east: field.east,
     paths: { north: paths.north, east: field.eastPath },
-    ranch, pass, field, willow, reach, interiors, desert, gale, sea, frost,
+    ranch, pass, field, willow, reach, interiors, desert, gale, sea, frost, othrys,
     // 0.11: stenarna som öppnas med Waking Chant (kistorna under dem registreras nu)
     songStones: defineSongStones({ pass: pass?.H, field: field?.H, desert: desert?.H }, B.chests),
     bastion,
@@ -981,16 +991,18 @@ export function buildWorld(scene, lights) {
     spire,
     temple,
     maw,
+    crown,
     // Fängelsehålorna: samma gränssnitt (state, interactions, trap, update, combatTargets ...)
-    dungeons: { bastion, pyramid, necropolis, spire, temple, maw },
-    dungeonAt: (id) => (BASTION_IDS.has(id) ? bastion : PYRAMID_IDS.has(id) ? pyramid : NECRO_IDS.has(id) ? necropolis : SPIRE_IDS.has(id) ? spire : TEMPLE_IDS.has(id) ? temple : MAW_IDS.has(id) ? maw : null),
+    dungeons: { bastion, pyramid, necropolis, spire, temple, maw, crown },
+    dungeonAt: (id) => (BASTION_IDS.has(id) ? bastion : PYRAMID_IDS.has(id) ? pyramid : NECRO_IDS.has(id) ? necropolis : SPIRE_IDS.has(id) ? spire : TEMPLE_IDS.has(id) ? temple : MAW_IDS.has(id) ? maw : CROWN_IDS.has(id) ? crown : null),
     necroIds: NECRO_IDS,
     spireIds: SPIRE_IDS,
     templeIds: TEMPLE_IDS,
     mawIds: MAW_IDS,
+    crownIds: CROWN_IDS,
     pyramidIds: PYRAMID_IDS,
     bastionIds: BASTION_IDS,
-    wingAt: (id) => bastion.wingAt(id) ?? pyramid.wingAt(id) ?? necropolis.wingAt(id) ?? spire.wingAt(id) ?? temple.wingAt(id) ?? maw.wingAt(id),
+    wingAt: (id) => bastion.wingAt(id) ?? pyramid.wingAt(id) ?? necropolis.wingAt(id) ?? spire.wingAt(id) ?? temple.wingAt(id) ?? maw.wingAt(id) ?? crown.wingAt(id),
     inPyramid: () => PYRAMID_IDS.has(areas.id),
     slamGate: field.slamGate,
     setSunGate: field.setSunGate,
@@ -1016,6 +1028,7 @@ export function buildWorld(scene, lights) {
       spire.wingAt(id)?.enter();
       temple.wingAt(id)?.enter();
       maw.wingAt(id)?.enter();
+      crown.wingAt(id)?.enter();
     },
     // Ett eldfat har tänts
     onTorch(id, story) {
@@ -1026,6 +1039,7 @@ export function buildWorld(scene, lights) {
       if (spire.onTorch(id)) return true;
       if (temple.onTorch(id)) return true;
       if (maw.onTorch(id)) return true;
+      if (crown.onTorch(id)) return true;
       return false;
     },
     connect(collider) {
@@ -1042,6 +1056,7 @@ export function buildWorld(scene, lights) {
       for (const w of spireWings) spire.interactions.push(...w.interactions);
       for (const w of templeWings) temple.interactions.push(...w.interactions);
       for (const w of mawWings) maw.interactions.push(...w.interactions);
+      for (const w of crownWings) crown.interactions.push(...w.interactions);
     },
     slamEast: field.slamEast,
     lightEast: field.lightEast,

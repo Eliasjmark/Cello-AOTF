@@ -114,6 +114,8 @@ const freshState = () => ({
   swim: false, temple: null, templeDone: false, choice3: null, charm: false,
   // 0.16: norr, labyrinten, Lokis mask och det fjärde valet
   maw: null, mawDone: false, choice4: null, frostBlessing: false,
+  // 0.21: Mount Othrys, The Crown of Othrys, Kronos och slutet
+  crown: null, crownDone: false, choice5: null, ending: null, embers: [],
 });
 
 export class Story {
@@ -125,6 +127,7 @@ export class Story {
     this.spire = this.world.spire;
     this.temple = this.world.temple;
     this.maw = this.world.maw;
+    this.crown = this.world.crown;
     this.areas = this.world.areas;
     // Porten till nekropolen är full av sand tills ormen i pyramiden har fallit
     const necroExit = this.areas.get('desert')?.exits.find((e) => e.necro);
@@ -350,9 +353,12 @@ export class Story {
     this.state.temple = this.temple.state;
     this.maw.applyState(null);
     this.state.maw = this.maw.state;
+    this.crown.applyState(null);
+    this.state.crown = this.crown.state;
     this.chronicle?.applyState();
     this.sea?.applyState();
     this.frost?.applyState();
+    this.othrys?.applyState();
     this.realm?.reset();
     this.world.setSunGate(false, true);
     this.goat?.load(this.state);
@@ -495,9 +501,12 @@ export class Story {
     s.temple = this.temple.state;
     this.maw.applyState(s.maw);
     s.maw = this.maw.state;
+    this.crown.applyState(s.crown);
+    s.crown = this.crown.state;
     this.chronicle?.applyState();
     this.sea?.applyState();
     this.frost?.applyState();
+    this.othrys?.applyState();
     this.realm?.reset();
     this.setupFree();
     this.enemies.resetAll();
@@ -586,6 +595,7 @@ export class Story {
     s.spire = this.spire.state;
     s.temple = this.temple.state;
     s.maw = this.maw.state;
+    s.crown = this.crown.state;
     s.spawnAt = this.world.inBastion() ? 'bastion' : 'aetheria';
     s.area = this.areas.id;
     if (entry) s.entry = entry;
@@ -1283,6 +1293,8 @@ export class Story {
       this.temple.grant(kind);
     } else if (kind === 'fmap' || kind === 'fkey' || kind === 'frostkey') {
       this.maw.grant(kind);
+    } else if (kind === 'omap' || kind === 'okey' || kind === 'titankey') {
+      this.crown.grant(kind);
     } else if (kind === 'mask') {
       s.items.mask = true;
       P.hasMask = true;

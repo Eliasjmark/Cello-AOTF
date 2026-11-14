@@ -87,7 +87,8 @@ export class SeaStory {
       ok: () => story.phase === 'free',
       run: () => this.rowTo('pier', 'The boat creaks back toward Brinehollow...'),
     });
-    sa.entries.pier = { pos: V3(pier.x, pier.y, pier.z1 + 1), facing: Math.PI };
+    // 0.21: på bryggan (förut en meter bortom dess ände, i vattnet)
+    sa.entries.pier = { pos: V3(pier.x, pier.y, pier.z1 - 1.5), facing: Math.PI };
     sa.updaters.push((t, dt) => this.updateProps(t, dt));
   }
 

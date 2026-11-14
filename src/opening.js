@@ -59,8 +59,10 @@ export class Crawl {
   }
 
   // onDone körs när texten är slut och den svarta bakgrunden börjar tona bort
-  start(onDone) {
+  // pages: sidorna (CRAWL om inget annat ges; slutet har egna)
+  start(onDone, pages = CRAWL) {
     this.build();
+    this.pages = pages;
     this.onDone = onDone;
     this.active = true;
     this.i = -1;
@@ -72,10 +74,10 @@ export class Crawl {
   // Sidan i: raderna tänds en i taget. Tiden en sida visas beror på hur mycket text den har.
   show(i) {
     this.i = i;
-    const lines = CRAWL[i], page = this.el.page;
+    const lines = this.pages[i], page = this.el.page;
     page.classList.remove('gone');
     page.innerHTML = lines.map((l) => `<p>${l}</p>`).join('');
-    if (i === CRAWL.length - 1) page.lastElementChild.classList.add('last');
+    if (i === this.pages.length - 1) page.lastElementChild.classList.add('last');
     this.lineT = lines.map((_, k) => 0.4 + k * 1.6);
     this.t = 0;
     this.hold = this.lineT[this.lineT.length - 1] + 1.4 + lines.join(" ").length * 0.032;
@@ -92,7 +94,7 @@ export class Crawl {
     if (this.leaving) {
       this.leaving -= dt;
       if (this.leaving <= 0) {
-        if (this.i + 1 < CRAWL.length) this.show(this.i + 1);
+        if (this.i + 1 < this.pages.length) this.show(this.i + 1);
         else this.finish();
       }
     } else if (this.t >= this.hold) this.turn();
