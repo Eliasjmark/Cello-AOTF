@@ -1600,12 +1600,13 @@ export class Player {
     P.armLy = 0;
     if (m.sculpt && a.shield > 0.01) {
       const s = a.shield;
-      // överarmen framåt och inåt, underarmen tvärs över bröstet: skölden täcker bålen
-      // 0.17: näven framför bröstet (skölden sätts framför näven i heroRig.js)
-      P.armLx = P.armLx * (1 - s) - 0.6 * s;
-      P.armLz = P.armLz * (1 - s) + 0.3 * s;
-      P.armLy = 0;
-      P.elbowL = P.elbowL * (1 - s) - 1.8 * s;
+      // 0.20: som en riktig sköldbärare. Överarmen lyfts framåt och ut åt sidan med armbågen ute,
+      // vriden så att underarmen går tvärs över bröstet i bröstets höjd. Näven hamnar framför bröstet
+      // och skölden framför den. (Förut pekade underarmen rakt fram från magen.)
+      P.armLx = P.armLx * (1 - s) - 0.8 * s;
+      P.armLz = P.armLz * (1 - s) - 0.6 * s;
+      P.armLy = 1.2 * s;
+      P.elbowL = P.elbowL * (1 - s) - 1.9 * s;
     }
     // Rullning och volt ska inte "spola tillbaka" när de tar slut
     if (this.state !== 'dodge') m.hips.rotation.x = wrap(m.hips.rotation.x);

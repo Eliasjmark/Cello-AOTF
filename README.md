@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.20 · Homecoming (öppningsscen, Cello vaknar i sin säng, nya saker i huset, bättre kistor och Maren i famnen)
+**Version:** prototyp 0.20.1 · Homecoming (öppningsscen, Cello vaknar i sin säng, nya saker i huset, bättre kistor och Maren i famnen)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -46,6 +46,7 @@ python3 tools/hero/paint.py                             # → models/cello-hero.
   - *Relikhyllan* på högra väggen: varje relik Cello hittar (hammaren, sandalerna, prismat, treudden, masken) står där sedan.
   - *Korgen vid dörren*: efter varje avklarad fängelsehåla lämnar någon en gåva med ett brev, skärvor och en dryck. Kommer Cello hem till ön när en gåva väntar säger spelet till.
   - Sängen finns kvar som förut: vila, spara och sova till morgonen.
+- **Sköldarmen (0.20.1).** När Cello höll upp skölden pekade underarmen rakt fram ur magen. Nu lyfts överarmen framåt och ut med armbågen åt sidan, och underarmen går tvärs över bröstet i bröstets höjd, som hos en riktig sköldbärare. Näven sitter framför bröstet och skölden framför den.
 
 ## Vad var nytt i 0.19: Hearth Lullaby (pausmenyn)
 
