@@ -39,8 +39,8 @@ python3 tools/hero/paint.py                             # → models/cello-hero.
 Nästan alla ljud är nu riktiga inspelningar ur ljudpaketet Elias skickade (*400 Sounds Pack*), plus klippet *dad-potato-hello* (freesound). `tools/audio/build_sfx.py` trimmar, normaliserar och gör om dem till MP3 i `sounds/sfx.json` (119 klipp, ungefär 0,8 MB), som bakas in i den fristående versionen. `src/audio.js` spelar inspelningen när det finns en, och kodens eget ljud annars (eller båda, i lager).
 
 - **Menyer**: klick, hovring, tillbaka och nej på startskärmen; av/på-knappar låter som strömbrytare; reglagen för musik och ljud klickar i en ton som stiger med värdet. Väskan öppnas och stängs som en bok, föremålen poppar i stigande toner, kartan prasslar.
-- **Mummel**: när någon pratar spelas korta röststavelser (man_0–man_10) i figurens tonläge, en i taget. Varje figur har sina egna stavelser; barn är ljusa, jättar och gudar djupa och mörka (med ett murrande lager), andar och Loke har eko. Hollis, Gull, Bjarke, Hamid och Fenwick säger "hello" när man börjar prata med dem.
-- **Cello**: korta rop när han slår, hoppar och skadas; han rapar efter en dryck (och om han står still länge), och hostar när han fryser.
+- **Mummel**: när någon pratar spelas korta korn (60–110 ms) ur vokalerna i röstklippen (man_0–man_10), varannan baklänges, i figurens tonläge och med lite melodi. (Klippen är en man som räknar, så de spelas aldrig hela: då hördes siffrorna, 0.18.1.) Varje figur har sina egna stavelser; barn är ljusa, jättar och gudar djupa och mörka (med ett murrande lager), andar och Loke har eko. Hollis, Gull, Bjarke, Hamid och Fenwick säger "hello" när man börjar prata med dem.
+- **Cello**: han rapar efter en dryck (och om han står still länge), och hostar när han fryser.
 - **Strid**: svischar, hugg, klang mot sköldar, smällar och puffar när asklingar försvinner.
 - **Världen**: fotsteg efter underlaget (gräs, snö, trä, grus, sten), dörrar, lås och nycklar, kistor, krukor, vatten, tändstickor, sten som skrapar, is och glas.
 - **Jinglar**: föremål, hjärtan, sparande, vila vid elden, uppdrag (nya och klara), sånger och när Cello faller.

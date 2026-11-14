@@ -111,12 +111,8 @@ const SAMPLES = {
   shieldbreak: { s: ['metal_clang'], vol: 0.7, synth: true },
   potbreak: { s: ['pottery'], vol: 0.75, jit: 0.1 },
   snap: { s: ['snap'], vol: 0.6 },
-  // Cellos röst (stavelser i ett ljusare tonläge) och kropp
-  hah: { s: ['man6', 'man10'], vol: 0.42, rate: 1.28, jit: 0.06 },
-  hyah: { s: ['man2'], vol: 0.55, rate: 1.22, jit: 0.04 },
-  hup: { s: ['man8'], vol: 0.38, rate: 1.38, jit: 0.06 },
-  hurt: { s: ['man4', 'man7'], vol: 0.65, rate: 1.26, jit: 0.05, also: [{ s: ['punch1'], vol: 0.45 }] },
-  fall: { s: ['man0'], vol: 0.6, rate: 1.15 },
+  // Cellos kropp (hans rop är kodens egna ljud)
+  hurt: { s: ['punch1'], vol: 0.4, synth: true },
   belch: { s: ['belch1', 'belch2', 'belch3'], vol: 0.7, rate: 1.12, jit: 0.06 },
   cough: { s: ['cough1', 'cough2'], vol: 0.45, rate: 1.15, jit: 0.04 },
   whistle: { s: ['whistle'], vol: 0.6 },
@@ -337,9 +333,49 @@ export class Sfx {
         try { buf[k] = await this.ctx.decodeAudioData(u.buffer); } catch { /* ett trasigt klipp hoppas över */ }
       }));
       this.buf = buf;
+      this.makeGrains();
     } catch (err) {
       console.warn('Sound samples not loaded, using the synthesized sounds', err);
       this.buf = {};
+    }
+  }
+
+  // 0.18.1: mumlet. Röstklippen (man_0–man_10) är en man som räknar (zero, one, two ...), så de kan inte spelas hela:
+  // då hörs siffrorna. I stället klipps korta korn (60–110 ms) ur vokalerna mitt i varje ord, med mjuka kanter,
+  // och varannan spelas baklänges. Ett mummel av sådana korn blir ett obegripligt "mhm-ehm-ohm" i stället för ord.
+  makeGrains() {
+    const c = this.ctx;
+    this.grains = [];
+    for (let k = 0; k <= 10; k++) {
+      const b = this.buf[`man${k}`];
+      if (!b) continue;
+      const d = b.getChannelData(0), sr = b.sampleRate, win = Math.floor(sr * 0.01);
+      // energin i 10 ms-fönster; vokalen är där den ligger över 45 % av toppen
+      const env = [];
+      for (let i = 0; i + win < d.length; i += win) {
+        let e = 0;
+        for (let j = 0; j < win; j++) e += d[i + j] * d[i + j];
+        env.push(Math.sqrt(e / win));
+      }
+      const top = Math.max(...env);
+      const loud = env.map((e, i) => (e > top * 0.45 ? i : -1)).filter((i) => i >= 0);
+      if (!loud.length) continue;
+      const a0 = loud[0] * win, a1 = (loud[loud.length - 1] + 1) * win;
+      const n = 3;
+      for (let q = 0; q < n; q++) {
+        const len = Math.floor(sr * (0.06 + Math.random() * 0.05));
+        const span = Math.max(1, a1 - a0 - len);
+        const st = a0 + Math.floor((span * (q + 0.5)) / n);
+        for (const rev of [false, true]) {
+          const g = c.createBuffer(1, len, sr), o = g.getChannelData(0);
+          for (let i = 0; i < len; i++) {
+            const x = i / (len - 1);
+            const w = Math.sin(Math.PI * Math.min(1, x * 1.6, (1 - x) * 1.6) / 2) ** 2; // mjuk in- och uttoning
+            o[i] = d[Math.min(d.length - 1, st + (rev ? len - 1 - i : i))] * w;
+          }
+          this.grains.push({ clip: k, buf: g });
+        }
+      }
     }
   }
 
@@ -388,11 +424,15 @@ export class Sfx {
     if (!v) return;
     const t = this.ctx.currentTime;
     // 0.18: en stavelse ur röstklippen i figurens tonläge (en i taget, så att det blir ett mummel, inte ett sorl)
-    if (this.buf?.man0) {
+    if (this.grains?.length) {
       if (t < (this.mumbleUntil ?? 0)) return;
       const m = mumbleFor(voiceId, v);
-      const k = m.g[Math.floor(Math.random() * m.g.length)];
-      const rate = m.rate * STEPS[Math.floor(Math.random() * 3)] * (1 + (Math.random() - 0.5) * 0.06);
+      const pool = this.grains.filter((gr) => m.g.includes(gr.clip));
+      const gr = (pool.length ? pool : this.grains)[Math.floor(Math.random() * (pool.length || this.grains.length))];
+      // tonläget: figurens grundton, lite melodi upp och ner som i ett riktigt prat
+      this.mumbleN = (this.mumbleN ?? 0) + 1;
+      const tune = 1 + Math.sin(this.mumbleN * 1.7) * 0.07 + (Math.random() - 0.5) * 0.08;
+      const rate = m.rate * tune;
       let filter = null;
       if (m.low || m.high) {
         filter = this.ctx.createBiquadFilter();
@@ -400,12 +440,21 @@ export class Sfx {
         filter.frequency.value = m.low || m.high;
       }
       const dest = m.echo ? this.echoBus(m.echo) : this.fx;
-      const src = this.sample(`man${k}`, { vol: 0.5, rate, dest, filter });
-      if (src) {
-        const len = src.buffer.duration / rate;
-        this.mumbleUntil = t + len * (0.62 + Math.random() * 0.2);
-        if (!m.synth) return;
-      }
+      const src = this.ctx.createBufferSource();
+      src.buffer = gr.buf;
+      src.playbackRate.setValueAtTime(rate, t);
+      src.playbackRate.linearRampToValueAtTime(rate * (Math.random() < 0.5 ? 0.94 : 1.05), t + gr.buf.duration / rate);
+      const gn = this.ctx.createGain();
+      gn.gain.value = 0.62;
+      let node = src;
+      if (filter) { node.connect(filter); node = filter; }
+      node.connect(gn);
+      gn.connect(dest);
+      src.start(t);
+      const len = gr.buf.duration / rate;
+      // en kort paus mellan stavelserna, ibland lite längre (som mellan ord)
+      this.mumbleUntil = t + len + 0.025 + (Math.random() < 0.22 ? 0.09 : Math.random() * 0.04);
+      if (!m.synth) return;
     }
     const f = v.f * STEPS[Math.floor(Math.random() * STEPS.length)] * (v.wobble ? 1 + Math.sin(t * 30) * 0.04 : 1);
     const g = this.gain(t, 0.008, 0.11, 0.07);
