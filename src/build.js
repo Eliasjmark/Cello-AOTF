@@ -806,7 +806,8 @@ export function createBuilder(scene, lights) {
             rail.rotation.y = ry;
             deco(rail, xm, H(xm, zm) + ry0, zm);
           }
-          if (o.collide) hidden(new THREE.BoxGeometry(l, 1.2, 0.3), xm, H(xm, zm) + 0.6, zm, 0, ry, 0);
+          // 0.21.2: alla staket stoppar Cello (förut bara de som bad om det)
+          if (o.collide !== false) hidden(new THREE.BoxGeometry(l, 1.4, 0.3), xm, H(xm, zm) + 0.6, zm, 0, ry, 0);
         }
       }
     }

@@ -262,6 +262,16 @@ function buildCave(B, areas) {
       B.solid(place(m, x, H(x, z) + hgt * 0.35, z));
     }
   }
+  // 0.21.2: en osynlig vägg i ett band precis utanför gångarna och salarna. Stenblocken ovan har glipor
+  // mellan sig, och genom dem kunde Cello gå ut i det mörka bergets inre (resten av grottans golv).
+  const bandBox = new THREE.BoxGeometry(1.15, 12, 1.15);
+  for (let gx = X0 - 46; gx <= X0 + 46; gx += 1.0) {
+    for (let gz = -104; gz <= 78; gz += 1.0) {
+      const d = freeDist(gx, gz);
+      if (d < 0.45 || d > 1.75) continue;
+      B.hidden(bandBox, gx, H(gx, gz) + 5, gz);
+    }
+  }
   // Taket: ett mörkt valv med droppstenar
   {
     const roof = new THREE.Mesh(new THREE.PlaneGeometry(100, 180), new THREE.MeshLambertMaterial({ color: 0x141312, side: THREE.DoubleSide }));

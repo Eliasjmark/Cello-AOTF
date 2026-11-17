@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.21.1 · The Crown of Othrys (spelets final: Mount Othrys, den sista fängelsehålan, Kronos och slutet; 0.21.1: spelet står på egna ben, utan lån från andra spel)
+**Version:** prototyp 0.21.2 · The Crown of Othrys (spelets final: Mount Othrys, den sista fängelsehålan, Kronos och slutet; 0.21.1: spelet står på egna ben, utan lån från andra spel)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -33,6 +33,14 @@ python3 tools/models/dump_fbx.py Boss1.fbx:boss1 ...   # FBX → tools/models/sr
 python3 tools/models/build_models.py                    # → models/pack.bin
 python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
 ```
+
+## Vad är nytt i 0.21.2: buggfixar
+
+- **The Hollow Cave är inhägnad.** Grottans väggar var stora stenblock med glipor emellan, och genom dem kunde Cello gå ut i bergets mörka inre. Nu går en osynlig vägg i ett band precis utanför alla gångar och salar.
+- **Grumble svävar inte längre.** Han letade bara efter marken 40 centimeter under sig, så när han sprang över en kant blev han hängande i luften. Nu letar han flera meter ner, går inte upp på staket, lådor eller väggar, går runt hinder när han kommer springande, och dyker upp bakom Cello om han fastnar.
+- **Djuren** (getter, kor, höns, hästen och kamelerna) står på det som faktiskt finns under dem och går inte igenom staket och lådor.
+- **Alla staket stoppar Cello.** Förut hade bara två av staketen kollision; resten gick att gå rakt igenom (trädgården hemma, åkern på ranchen, Willowmere och renfållan i Rimeholt). Öppningarna i staketen finns kvar.
+- Ett nytt test (`t122`) går ut i alla riktningar från tio platser i grottan, kontrollerar staketet hemma och kallar på Grumble från olika höjder.
 
 ## Vad är nytt i 0.21.1: på egna ben
 

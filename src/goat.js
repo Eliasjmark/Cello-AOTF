@@ -287,10 +287,22 @@ export class Goat {
         this.wait = 4;
       } else {
         sp = Math.min(10.5, 3 + d * 1.2);
-        this.pos.x += (dx / d) * sp * dt;
-        this.pos.z += (dz / d) * sp * dt;
         this.facing += wrap(Math.atan2(dx, dz) - this.facing) * (1 - Math.exp(-dt * 8));
-        moving = true;
+        // Går runt hinder: rakt fram, annars lite åt sidan. Fastnar han ändå kommer han fram bakom Cello.
+        let ok = false;
+        for (const off of [0, 0.6, -0.6, 1.2, -1.2]) {
+          const a = Math.atan2(dx, dz) + off;
+          if (this.stepTo(this.pos.x + Math.sin(a) * sp * dt, this.pos.z + Math.cos(a) * sp * dt)) { ok = true; break; }
+        }
+        this.stuck = ok ? 0 : (this.stuck ?? 0) + dt;
+        if (this.stuck > 1.5) {
+          this.stuck = 0;
+          const b = P.facing + Math.PI, x = P.feet.x + Math.sin(b) * 2.5, z = P.feet.z + Math.cos(b) * 2.5;
+          const gy = this.groundBelow(x, P.feet.y + 1, z);
+          if (gy !== null && Math.abs(gy - P.feet.y) < 1.5) this.pos.set(x, gy, z);
+          else this.pos.copy(P.feet);
+        }
+        moving = ok;
       }
     } else {
       // Betar och strövar runt där han är
@@ -298,10 +310,9 @@ export class Goat {
       const dx = this.target.x - this.pos.x, dz = this.target.z - this.pos.z, d = Math.hypot(dx, dz);
       if (this.wait <= 0 && d > 0.2) {
         sp = 0.9;
-        this.pos.x += (dx / d) * Math.min(d, sp * dt);
-        this.pos.z += (dz / d) * Math.min(d, sp * dt);
         this.facing += wrap(Math.atan2(dx, dz) - this.facing) * (1 - Math.exp(-dt * 4));
-        moving = true;
+        moving = this.stepTo(this.pos.x + (dx / d) * Math.min(d, sp * dt), this.pos.z + (dz / d) * Math.min(d, sp * dt));
+        if (!moving) { this.target.copy(this.pos); this.wait = 1; }
       } else if (this.wait <= 0) {
         this.wait = 3 + Math.random() * 5;
         const ang = Math.random() * Math.PI * 2, r = Math.random() * 3;
@@ -310,9 +321,10 @@ export class Goat {
         if (gy !== null && Math.abs(gy - this.home.y) < 1.5) this.target.set(x, gy, z);
       }
     }
-    if (moving) {
-      const gy = this.groundAt(this.pos.x, this.pos.y + 2, this.pos.z);
-      if (gy !== null) this.pos.y = approach(this.pos.y, gy, 14, dt);
+    // Står han still men marken under honom saknas (t.ex. när ett område laddats), faller han ner till den
+    if (!moving) {
+      const gy = this.groundBelow(this.pos.x, this.pos.y, this.pos.z);
+      if (gy !== null && Math.abs(gy - this.pos.y) > 0.05 && gy < this.pos.y + 0.55) this.pos.y = approach(this.pos.y, gy, 10, dt);
     }
     // Cello går inte igenom honom
     const px = P.feet.x - this.pos.x, pz = P.feet.z - this.pos.z, pd = Math.hypot(px, pz);
@@ -322,6 +334,26 @@ export class Goat {
     this.phase += dt * (2 + this.speed * 0.75);
     this.animate(dt, this.speed, true, this.phase, !moving);
     this.sync();
+  }
+
+  // 0.21.2: marken under en punkt, letad uppifrån och ner i flera steg (förut bara 0,4 m under honom,
+  // så när han gick över en kant blev han hängande i luften)
+  groundBelow(x, y, z) {
+    for (const from of [y + 0.7, y - 3, y - 7, y - 11, y - 15]) {
+      const gy = this.groundAt(x, from, z);
+      if (gy !== null) return gy;
+    }
+    return null;
+  }
+
+  // Ett steg till (x, z): går bara om marken där finns och inte är en vägg eller ett staket
+  stepTo(x, z) {
+    const gy = this.groundBelow(x, this.pos.y, z);
+    if (gy === null || gy > this.pos.y + 0.55 || gy < this.pos.y - 6) return false;
+    this.pos.x = x;
+    this.pos.z = z;
+    this.pos.y = gy;
+    return true;
   }
 
   sync() {

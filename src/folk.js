@@ -1313,11 +1313,19 @@ export class Folk {
       let moving = false;
       if (a.wait <= 0 && dist > 0.2) {
         const sp = (a.kind === 'chicken' ? 1.2 : 0.8) * (a.speedMul ?? 1);
-        a.pos.x += (dx / dist) * Math.min(dist, sp * dt);
-        a.pos.z += (dz / dist) * Math.min(dist, sp * dt);
+        const nx = a.pos.x + (dx / dist) * Math.min(dist, sp * dt), nz = a.pos.z + (dz / dist) * Math.min(dist, sp * dt);
         a.facing += wrap(Math.atan2(dx, dz) - a.facing) * (1 - Math.exp(-dt * 4));
-        moving = true;
-        if (a.groundAt) a.pos.y = a.groundAt(a.pos.x, a.pos.z);
+        // 0.21.2: djuren står på det som faktiskt finns under dem (bryggor, golv), och går inte upp på
+        // staket, lådor och väggar (förut följde de bara markens höjd och kunde sväva eller gå igenom saker)
+        const ray = this.story.groundAt?.(nx, a.pos.y + 0.7, nz);
+        const gy = ray ?? (a.groundAt ? a.groundAt(nx, nz) : a.pos.y);
+        if (gy > a.pos.y + 0.5 || gy < a.pos.y - 3) {
+          a.target.copy(a.pos);
+          a.wait = 1 + Math.random() * 2;
+        } else {
+          a.pos.set(nx, gy, nz);
+          moving = true;
+        }
       } else if (a.wait <= 0) {
         a.wait = 2 + Math.random() * 5;
         const ang = Math.random() * Math.PI * 2, r = Math.random() * a.radius;
