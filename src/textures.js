@@ -1,4 +1,4 @@
-// Procedurella texturer i låg upplösning (32x32) för retrokänslan.
+// Procedurella texturer i låg upplösning (32x32).
 // Allt ritas med kod, så projektet behöver inga bildfiler än.
 import * as THREE from 'three';
 
@@ -16,7 +16,7 @@ const clamp255 = (v) => Math.max(0, Math.min(255, Math.round(v)));
 
 // 0.13+: texturerna ritas som förut i låg upplösning, men förstoras sedan mjukt till fyra gånger storleken
 // och får ett fint korn ovanpå. Då försvinner de skarpa pixelrutorna (Minecraft-känslan) och ytorna ser
-// målade ut, mer. Med upprepning (wrap) ritas kanterna så att mönstret går ihop.
+// målade ut. Med upprepning (wrap) ritas kanterna så att mönstret går ihop.
 export function soften(src, { scale = 4, grain = 7, wrap = true, seed = 7 } = {}) {
   const w = src.width, h = src.height;
   const c = document.createElement('canvas');

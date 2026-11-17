@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.21 · The Crown of Othrys (spelets final: Mount Othrys, den sista fängelsehålan, Kronos och slutet) (öppningsscen, Cello vaknar i sin säng, nya saker i huset, bättre kistor och Maren i famnen)
+**Version:** prototyp 0.21.1 · The Crown of Othrys (spelets final: Mount Othrys, den sista fängelsehålan, Kronos och slutet; 0.21.1: spelet står på egna ben, utan lån från andra spel)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -33,6 +33,16 @@ python3 tools/models/dump_fbx.py Boss1.fbx:boss1 ...   # FBX → tools/models/sr
 python3 tools/models/build_models.py                    # → models/pack.bin
 python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
 ```
+
+## Vad är nytt i 0.21.1: på egna ben
+
+Spelet ska stå på egna ben, så alla hänvisningar till andra spel och konsoler är borta:
+
+- **Retro mode** heter nu **Retro mode** (*Low resolution and big, chunky pixels*), i pausmenyn och på startskärmen.
+- **Föremålen har egna namn:** *Healing Draught* (förut Healing Draught), *Iron Key* (förut Iron Key), *Heart Ember* (förut Heart Ember). Texten när Cello hittar något börjar med *Cello found...*
+- **Flöjtens sånger har egna namn och egna melodier:** *Waking Chant*, *Grumble's Call*, *Sunturn Hymn* och *Lament of Rain*. Tonerna är nya, och den låga tonen visas som ◆.
+- **Musikfilerna har nya namn:** *Fields at Dawn*, *Whispers of the Hollow Woods* och *The Hollow Mask Watches*.
+- Kommentarerna i koden, README och beskrivningen i `package.json` jämför inte längre med andra spel.
 
 ## Vad är nytt i 0.21: The Crown of Othrys (finalen)
 
@@ -169,7 +179,7 @@ Nytt i koden: `src/water.js` (vattenytan, vågorna och ljusnätet på botten), `
 
 Titanerna vaknar. Efter nekropolen faller en titan ur stormen över Willowmere, och titankungen **Kronos** talar för första gången. Seren kommer till undsättning, och sedan följer hon med västerut.
 
-- **Mjukare grafik**: texturerna jämnas ut (`soften` i `src/textures.js`) och filtreras mjukt i stället för pixligt, så att världen ser mindre ut som klossar. retroläget (pixlar) är nu av som standard (går att slå på i inställningarna).
+- **Mjukare grafik**: texturerna jämnas ut (`soften` i `src/textures.js`) och filtreras mjukt i stället för pixligt, så att världen ser mindre ut som klossar. Retroläget (pixlar) är nu av som standard (går att slå på i inställningarna).
 - **Ny region: The Galecrown** (`src/regions/galecrown.js`), över Stormbron väster om Stormreach (bron är stängd av vinden tills titanen har anfallit Willowmere). Seren har sitt läger där. Vägen till tornet går över en stenbro där vindbyarna blåser i takt (gå när det är lugnt, eller gör dig tung).
 - **Nytt tempel: The Windbound Spire** (`src/spire.js`), fyra delar:
   - *The Gale Gate*: en trappa där vinden blåser nedför (gör dig tung med hammaren), och arkivet med kartan och en nyckel.
@@ -370,7 +380,7 @@ Det tar ungefär fyra minuter att springa raka vägen från Aetheria till fästn
 
 ### Föremål, butik och pengar
 
-- **Föremålsmenyn (Tab):** välj vilket föremål som ligger på **F**, **G** och **V**, som snabbknapparna i klassiska äventyrsspel. Menyn visar också svärdet, skölden, det Cello har fått och vad spåkvinnan sa.
+- **Föremålsmenyn (Tab):** välj vilket föremål som ligger på **F**, **G** och **V**. Menyn visar också svärdet, skölden, det Cello har fått och vad spåkvinnan sa.
 - **Skärvor** är pengarna: gröna (1), blå (5), röda (20) och lila (50). De finns i gräset (svärdet klipper det), i krukor, hos fiender och i kistor.
 - **Svärdet slits** när det träffar, och mest mot sköldar. Det går av till slut och skär då kortare och svagare. Pell säljer ett nytt, och Vane i Aetheria smider ett åt den som har skärvor.
 - **Lyktan** (Pell, 40 skärvor) lyser upp mörker och tänder gamla eldfat. Den drar olja; Pell och Mags säljer mer.
@@ -428,7 +438,7 @@ Spåren ligger i `music/` (128 kbit/s MP3). När spelet publiceras som artifact 
 | F · G · V | Föremålen på snabbknapparna (från början markslag på F och tung vikt på G) |
 | Tab / B | Föremålsmenyn: välj föremål och lägg dem på F, G eller V |
 | K | Karta över området och en översikt över riket (pausar spelet) |
-| M · N · P · H · I | Ljud · musik · retroläge · dölj hjälpen · felsökningsinfo |
+| M · N · P · H · I | Ljud · musik · pausmenyn · dölj hjälpen · felsökningsinfo |
 | ↑ ← → ↓ · Space | Med flöjten framme: spela toner (Esc slutar spela) |
 
 Handkontroll: A hopp, X svärd, B rulla, RT sköld, LT lås, Y prata, RB/LB/höger på styrkorset föremålsknapparna, Start föremålsmenyn, Back karta.

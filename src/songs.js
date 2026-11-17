@@ -1,4 +1,4 @@
-// Instrumentet (0.11): Pilgrim's Flute. Spelaren spelar själv tonerna, som med flöjten i klassiska äventyrsspel,
+// Instrumentet (0.11): Pilgrim's Flute. Spelaren spelar själv tonerna
 // och lär sig sånger av folk i världen:
 //
 //   Waking Chant  (Odo, pilgrimen på Long Bridge)   öppnar stenarna med en sjungande fågel på
@@ -11,7 +11,7 @@ import * as THREE from 'three';
 
 export const NOTES = ['low', 'down', 'right', 'left', 'up'];
 const FREQ = { low: 293.66, down: 349.23, right: 440, left: 523.25, up: 587.33 };
-export const GLYPH = { up: '▲', down: '▼', left: '◀', right: '▶', low: '●' };
+export const GLYPH = { up: '▲', down: '▼', left: '◀', right: '▶', low: '◆' };
 const NOTE_COLOR = { up: '#ffd27a', down: '#8fe4ff', left: '#c9a8ff', right: '#9af0a0', low: '#ff9a7a' };
 
 export const SONGS = {

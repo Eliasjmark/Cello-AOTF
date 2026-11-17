@@ -42,7 +42,7 @@ import { Motes } from './motes.js';
 import { PauseMenu } from './pause.js';
 import { SunShadows, markShadows } from './shadows.js';
 
-const PIXEL_LINES = 360; // retroläge: spelet ritas i ungefär så här många rader
+const PIXEL_LINES = 360; // Retroläget: spelet ritas i ungefär så här många rader
 const FLASH = new THREE.Color(0x8d98b4);
 
 function start(saved = {}) {
@@ -69,7 +69,7 @@ function start(saved = {}) {
   moon.position.set(-40, 60, 25);
   scene.add(moon);
   const sun = new SunShadows(renderer, moon, scene);
-  // 0.13: ljuset en lugn dag (klassiska äventyrsspel): varmt, disigt solljus och dämpade gröna och bruna toner
+  // 0.13: ljuset en lugn dag: varmt, disigt solljus och dämpade gröna och bruna toner
   const TP = { sky: new THREE.Color(0xe0d2b0), ground: new THREE.Color(0x5a4630), sun: new THREE.Color(0xffd8a4), fog: new THREE.Color(0xa89878) };
   const base = { hemi: 1.5, moon: 1.25, flash: 1, sky: new THREE.Color(0x9aa7bd), ground: new THREE.Color(0x3a3029), moonColor: new THREE.Color(0xc6d0e6), near: 34, far: 260 };
   // 0.11: dygnet och vädret

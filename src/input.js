@@ -2,7 +2,7 @@
 //
 // Tangentbord och mus:  WASD spring · Space hopp · vänsterklick svärd · högerklick/R sköld
 //                       Shift undanmanöver · Q lock-on · E prata/öppna · F, G, V föremålsknappar
-//                       Tab/B föremålsmenyn · K karta · C gå långsamt · M ljud · P retroläge
+//                       Tab/B föremålsmenyn · K karta · C gå långsamt · M ljud · P pausmenyn
 const DEAD = 0.18;
 const MOUSE_X = 0.0026, MOUSE_Y = 0.0022;
 

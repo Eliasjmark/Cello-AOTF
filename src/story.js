@@ -888,7 +888,7 @@ export class Story {
     P.hp = P.maxHp;
     this.hud.setHearts(P.hp, P.maxHp);
     this.sfx.play('item');
-    this.hud.toast("You got Maren's Amulet. One more heart!", 4000);
+    this.hud.toast("Cello found Maren's Amulet. One more heart!", 4000);
   }
 
   giveGloves() {
@@ -898,7 +898,7 @@ export class Story {
     this.hud.setItems(P);
     this.sfx.play('fanfare');
     this.music?.duckFor(2.2, 0.12);
-    this.hud.toast("You got the Smith's Gloves! Your ground strike is faster, and Cello moves quicker with heavy weight.", 5200);
+    this.hud.toast("Cello found the Smith's Gloves! Your ground strike is faster, and Cello moves quicker with heavy weight.", 5200);
   }
 
   askRest(entry, prompt = 'The fire crackles warmly. Rest a while?', text = 'Cello rests by the fire...') {

@@ -119,7 +119,7 @@ export function buildField(B, areas) {
     const x = X0 + 18, z = -190;
     B.watchtower(x, H(x, z), z, 0.3, 6);
     B.torch('fieldTower', x - 4, H(x - 4, z), z + 3);
-    // En kista som bara syns när eldfatet brinner
+    // En kista som bara syns när eldfatet brinner (en hemlighet)
     B.chest('fieldTowerChest', x, H(x, z), z, 0.3, { shards: 20 }, { reveal: 'fieldTower' });
   }
 

@@ -50,7 +50,7 @@ const approach = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp
 const easeOut = (t) => 1 - (1 - t) * (1 - t);
 const clamp01 = (t) => Math.min(1, Math.max(0, t));
 
-// Cello i låg-polystil (som en retrofigur): formade lemmar med knän och armbågar, ansikte som blinkar,
+// Cello i låg-polystil: formade lemmar med knän och armbågar, ansikte som blinkar,
 // hår, tunika med kjolfåll och en röd halsduk som fladdrar bakom honom.
 function buildModel() {
   const mat = (c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true });

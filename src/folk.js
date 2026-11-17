@@ -1091,7 +1091,7 @@ export class Folk {
     }
     // Det som behövs för att komma vidare sägs alltid, även när Fenn är sur
     const tip = s.lantern
-      ? (s.caveOpen ? "You got through! I heard the stone grind open from out here." : 'Light both braziers inside. The stone door will feel the heat.')
+      ? (s.caveOpen ? "You made it through! I heard the stone grind open from out here." : 'Light both braziers inside. The stone door will feel the heat.')
       : 'No lantern, no way through. Willowmere is east across the Stormvale.';
     if (this.chats.mood(n.id)) {
       story.talk(n, [...this.chats.grudge(n), L(tip)]);
@@ -1134,7 +1134,7 @@ export class Folk {
           L('I am Tarek. I trade blades from here to the edge of the world. Or I did, until the Ashlings found my caravan.'),
           L('They took everything but this. A whetstone from the old quarries of Qadesh. A blade kept on it stays sharp twice as long.'),
           L('Take it. A life is worth more than a stone.'),
-          { run: () => { s.whetstone = true; P.wearMul = 0.5; this.sfx.play('fanfare'); this.music?.duckFor(2.0, 0.15); this.inventory.refresh(true); this.hud.toast("You got Tarek's Whetstone! Your sword wears down half as fast.", 4600); } },
+          { run: () => { s.whetstone = true; P.wearMul = 0.5; this.sfx.play('fanfare'); this.music?.duckFor(2.0, 0.15); this.inventory.refresh(true); this.hud.toast("Cello found Tarek's Whetstone! Your sword wears down half as fast.", 4600); } },
         ], () => story.save(true));
         return;
       }

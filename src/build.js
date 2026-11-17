@@ -535,7 +535,7 @@ export function createBuilder(scene, lights) {
   }
 
   // ---------- grästuvor (en instansierad mesh per område, som går att skära) ----------
-  // 0.13: tre korsade plan, högre tuvor (mjukt) som vajar i vinden (se M.tuft)
+  // 0.13: tre korsade plan, högre tuvor som vajar i vinden (se M.tuft)
   const tuftGeo = (() => {
     const w = 0.42, hgt = 0.95;
     const pos = [], uv = [], idx = [];
