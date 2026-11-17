@@ -38,8 +38,9 @@ python3 tools/hero/paint.py                             # → models/cello-hero.
 
 Spelet ska stå på egna ben, så alla hänvisningar till andra spel och konsoler är borta:
 
-- **Retro mode** heter nu **Retro mode** (*Low resolution and big, chunky pixels*), i pausmenyn och på startskärmen.
-- **Föremålen har egna namn:** *Healing Draught* (förut Healing Draught), *Iron Key* (förut Iron Key), *Heart Ember* (förut Heart Ember). Texten när Cello hittar något börjar med *Cello found...*
+- Grafikläget med låg upplösning heter **Retro mode** (*Low resolution and big, chunky pixels*), i pausmenyn och på startskärmen.
+- **Föremålen har egna namn:** *Healing Draught*, *Iron Key* och *Heart Ember*. Texten när Cello hittar något börjar med *Cello found...*
+- Hela historiken är omskriven, så att inte heller äldre versioner hänvisar till andra spel.
 - **Flöjtens sånger har egna namn och egna melodier:** *Waking Chant*, *Grumble's Call*, *Sunturn Hymn* och *Lament of Rain*. Tonerna är nya, och den låga tonen visas som ◆.
 - **Musikfilerna har nya namn:** *Fields at Dawn*, *Whispers of the Hollow Woods* och *The Hollow Mask Watches*.
 - Kommentarerna i koden, README och beskrivningen i `package.json` jämför inte längre med andra spel.
