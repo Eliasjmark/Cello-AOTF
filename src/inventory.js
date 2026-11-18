@@ -404,14 +404,7 @@ export class Inventory {
       this.sfx.play('select', { rate: 0.9 + this.sel * 0.05 });
       this.renderBag();
     });
-    // 0.18: ett svagt ljud när musen glider över ett föremål eller en knapp
-    let hovered = null;
-    bag.addEventListener('pointerover', (e) => {
-      const b = e.target.closest('[data-item],[data-slot],.bag-close');
-      if (b === hovered) return;
-      hovered = b;
-      if (b) this.sfx.play('menuHover');
-    });
+    // 0.21.3: inget ljud när musen glider över, bara vid klick
     this.el.assign.addEventListener('click', (e) => {
       const b = e.target.closest('[data-slot]');
       if (!b) return;

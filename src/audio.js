@@ -62,9 +62,7 @@ const FANFARE = [[523.25, 0], [659.25, 0.13], [783.99, 0.26], [1046.5, 0.39], [9
 // synth: true = koden spelar sitt eget ljud också (lager), also: fler klipp samtidigt eller efter en stund
 const SAMPLES = {
   // menyerna
-  menuMove: { s: ['ui_move'], vol: 0.55, jit: 0.04 },
-  menuSelect: { s: ['ui_select'], vol: 0.75, also: [{ s: ['ui_pop3'], vol: 0.35, delay: 0.03 }] },
-  menuBack: { s: ['ui_back'], vol: 0.6 },
+  // 0.21.3: menuMove och menuSelect spelas av syntens mjuka toner i stället för de skarpa klippen
   menuDeny: { s: ['ui_deny'], vol: 0.55 },
   menuOpen: { s: ['ui_open'], vol: 0.7 },
   menuStart: { s: ['ui_start'], vol: 0.7, also: [{ s: ['unsheath'], vol: 0.55, delay: 0.05 }] },
@@ -79,7 +77,7 @@ const SAMPLES = {
   bagClose: { s: ['ui_close'], vol: 0.6 },
   pauseOpen: { s: ['ui_open'], vol: 0.7, also: [{ s: ['ui_pop1'], vol: 0.4, delay: 0.05 }] },
   pauseClose: { s: ['ui_close'], vol: 0.6 },
-  select: { s: ['ui_pop3'], vol: 0.6, jit: 0.05 },
+  select: { s: ['ui_pop3'], vol: 0.3, jit: 0.03 }, // 0.21.3: dämpad
   equip: { s: ['equip'], vol: 0.75 },
   mapOpen: { s: ['ui_map_open'], vol: 0.75 },
   mapClose: { s: ['ui_map_close'], vol: 0.7 },
@@ -519,6 +517,7 @@ export class Sfx {
   }
 
   play(name, opt = {}) {
+    this.plays = (this.plays || 0) + 1; // 0.21.3: menyerna ser om ett klick redan gav ljud
     if (!this.ok) return;
     const t = this.ctx.currentTime + (opt.delay || 0);
     const v = opt.vol ?? 1;
@@ -672,18 +671,26 @@ export class Sfx {
         [523.25, 783.99].forEach((f, i) => this.osc('triangle', f, f, t + i * 0.12, 0.8, this.gain(t + i * 0.12, 0.004, 0.08 * v, 0.8)));
         break;
       // ---------- 0.9: startmenyn ----------
-      case 'menuMove': // markören flyttas: en liten kristallklang
-        this.osc('sine', 1318.5, 1318.5, t, 0.09, this.gain(t, 0.002, 0.07 * v, 0.09));
-        this.osc('triangle', 659.25, 659.25, t, 0.07, this.gain(t, 0.002, 0.05 * v, 0.07));
+      case 'menuMove': { // 0.21.3: markören flyttas (tangentbord): en dämpad träklang
+        const lp = this.lowpass(this.gain(t, 0.008, 0.06 * v, 0.16), 1400);
+        this.osc('sine', 587.33, 587.33, t, 0.18, lp);
         break;
-      case 'menuSelect': // välj: två toner uppåt och lite gnistor
-        [[783.99, 0], [1174.66, 0.07]].forEach(([f, d]) => this.osc('triangle', f, f, t + d, 0.3, this.gain(t + d, 0.003, 0.16 * v, 0.3)));
-        this.osc('sine', 2349.3, 2349.3, t + 0.07, 0.4, this.gain(t + 0.07, 0.003, 0.04 * v, 0.4));
-        this.noiseThrough('highpass', 7000, 9000, 0.7, t + 0.05, 0.25, this.gain(t + 0.05, 0.01, 0.05 * v, 0.25));
+      }
+      case 'menuSelect': { // 0.21.3: välj: en mjuk, varm klang (kvint) som klingar ut lugnt
+        const lp = this.lowpass(this.gain(t, 0.012, 0.13 * v, 0.55), 1800);
+        this.osc('sine', 392, 392, t, 0.6, lp);
+        const lp2 = this.lowpass(this.gain(t + 0.06, 0.015, 0.08 * v, 0.6), 2200);
+        this.osc('sine', 587.33, 587.33, t + 0.06, 0.66, lp2);
+        this.osc('sine', 196, 196, t, 0.3, this.gain(t, 0.01, 0.05 * v, 0.28));
         break;
-      case 'menuBack': // tillbaka: två toner nedåt
-        [[659.25, 0], [440, 0.07]].forEach(([f, d]) => this.osc('triangle', f, f, t + d, 0.22, this.gain(t + d, 0.003, 0.13 * v, 0.22)));
+      }
+      case 'menuBack': { // 0.21.3: tillbaka: samma mjuka klang, nedåt
+        const lp = this.lowpass(this.gain(t, 0.012, 0.11 * v, 0.4), 1600);
+        this.osc('sine', 587.33, 587.33, t, 0.45, lp);
+        const lp2 = this.lowpass(this.gain(t + 0.06, 0.015, 0.09 * v, 0.45), 1600);
+        this.osc('sine', 392, 392, t + 0.06, 0.5, lp2);
         break;
+      }
       case 'menuDeny': // går inte
         this.osc('square', 150, 130, t, 0.14, this.lowpass(this.gain(t, 0.003, 0.09 * v, 0.14), 900));
         this.osc('square', 150, 130, t + 0.16, 0.14, this.lowpass(this.gain(t + 0.16, 0.003, 0.08 * v, 0.14), 900));

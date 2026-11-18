@@ -2,7 +2,7 @@
 
 Ett 3D-äventyr i världen The Shattered Realm, flytande öar i en evig storm, byggt med [Three.js](https://threejs.org) och spelbart direkt i webbläsaren.
 
-**Version:** prototyp 0.21.2 · The Crown of Othrys (spelets final: Mount Othrys, den sista fängelsehålan, Kronos och slutet; 0.21.1: spelet står på egna ben, utan lån från andra spel)
+**Version:** prototyp 0.21.3 · The Crown of Othrys (spelets final: Mount Othrys, den sista fängelsehålan, Kronos och slutet; 0.21.1: spelet står på egna ben, utan lån från andra spel)
 
 Spelet är på engelska. Kommentarerna i koden och den här filen är på svenska.
 
@@ -33,6 +33,13 @@ python3 tools/models/dump_fbx.py Boss1.fbx:boss1 ...   # FBX → tools/models/sr
 python3 tools/models/build_models.py                    # → models/pack.bin
 python3 tools/hero/paint.py                             # → models/cello-hero.bin (Cello på startmenyn)
 ```
+
+## Vad är nytt i 0.21.3: lugnare menyljud
+
+- **Inget ljud när musen glider över knappar.** På startskärmen (New Game, Load Game …), i pausmenyn, på pausknappen och i väskan låter det nu bara när man klickar.
+- **Ett mjukare klickljud.** De skarpa klippen för val, markör och tillbaka är utbytta mot en varm, dämpad klang (två sinustoner i kvint med mjuk början och lugn utklingning). Klicket på föremål i väskan är dämpat.
+- Alla val låter, även de som inte hade något eget ljud (t.ex. Options och How to Play), eftersom ljudet förut kom från hovern.
+- Ett nytt test (`t123`) för musen över knapparna och för klicken.
 
 ## Vad är nytt i 0.21.2: buggfixar
 

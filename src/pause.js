@@ -48,7 +48,6 @@ export class PauseMenu {
     btn.innerHTML = '<span></span><span></span>';
     btn.hidden = true;
     btn.addEventListener('click', (e) => { e.stopPropagation(); this.toggle(); });
-    btn.addEventListener('pointerenter', () => this.o.sfx.play('menuHover'));
     const tr = document.querySelector('.topright');
     tr?.insertBefore(btn, tr.firstChild);
     this.btn = btn;
@@ -89,7 +88,7 @@ export class PauseMenu {
       b.innerHTML = `<span class="mark" aria-hidden="true"></span><span class="label">${it.label}</span>${it.sub ? `<span class="sub">${it.sub}</span>` : ''}`;
       if (it.disabled) b.setAttribute('aria-disabled', 'true');
       const entry = { ...it, el: b };
-      b.addEventListener('pointerenter', () => this.focus(this.items.indexOf(entry)));
+      b.addEventListener('pointerenter', () => this.focus(this.items.indexOf(entry), false)); // 0.21.3: tyst hover
       b.addEventListener('click', (e) => {
         e.preventDefault();
         if (performance.now() < (this.armed || 0)) return;
@@ -114,7 +113,10 @@ export class PauseMenu {
     const it = this.items[this.cur];
     if (!it) return;
     if (it.disabled) { this.o.sfx.play('menuDeny'); return; }
+    // 0.21.3: varje val låter (mjukt), även de som inte har ett eget ljud
+    const n = this.o.sfx.plays || 0;
     it.run?.();
+    if ((this.o.sfx.plays || 0) === n) this.o.sfx.play('menuSelect');
   }
 
   back() {

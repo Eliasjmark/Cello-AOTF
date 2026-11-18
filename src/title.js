@@ -514,7 +514,7 @@ export class TitleScreen {
       b.className = `title-item ${it.cls || ''}`;
       b.innerHTML = `<span class="mark" aria-hidden="true"></span><span class="label">${it.label}</span>${it.sub ? `<span class="sub">${it.sub}</span>` : ''}`;
       if (it.disabled) b.setAttribute('aria-disabled', 'true');
-      b.addEventListener('pointerenter', () => this.focus(this.items.indexOf(entry), true));
+      b.addEventListener('pointerenter', () => this.focus(this.items.indexOf(entry), false)); // 0.21.3: tyst hover
       b.addEventListener('click', (e) => {
         e.preventDefault();
         if (performance.now() < (this.armed || 0) || this.leaving) return;
@@ -567,7 +567,10 @@ export class TitleScreen {
     const it = this.items?.[this.cur];
     if (!it) return;
     if (it.disabled) { this.sfx.play('menuDeny'); return; }
+    // 0.21.3: varje val låter (mjukt), även de som inte har ett eget ljud
+    const n = this.sfx.plays || 0;
     it.run();
+    if ((this.sfx.plays || 0) === n) this.sfx.play('menuSelect');
   }
 
   back() {
